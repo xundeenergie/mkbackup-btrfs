@@ -1,0 +1,10 @@
+[Unit]
+Description=Runs btrfs-balance on %f weekly
+ConditionPathIsMountPoint=%f
+
+[Timer]
+OnCalendar=Mon *-*-* 00:00:00
+Unit=btrfs-scrub@%i.service
+
+[Install]
+WantedBy=%i.mount

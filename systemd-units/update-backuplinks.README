@@ -1,0 +1,7 @@
+Erzeugt Links im Verzeichnis ~/backup eines jeden Users, der aktiviert wurde.
+
+User aktiviert man mit
+
+systemctl enable update-backuplinks@USER.service
+
+

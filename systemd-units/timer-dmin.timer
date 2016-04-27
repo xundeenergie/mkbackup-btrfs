@@ -1,0 +1,10 @@
+[Unit]
+Description=10-Minutes Timer
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=10min
+Unit=timer-dmin.target
+
+[Install]
+WantedBy=basic.target
