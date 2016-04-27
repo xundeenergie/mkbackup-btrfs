@@ -1,0 +1,2 @@
+//Take a snapshot befor upgrading the system
+DPkg::Pre-Invoke {"/bin/systemctl start mkbackup@apt_upgrade.service";};

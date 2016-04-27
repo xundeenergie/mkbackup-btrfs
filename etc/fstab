@@ -1,0 +1,31 @@
+#####################################
+## System - Lokal
+#####################################
+# Hier kein subvol angeben. Ist in grub.cfg "rootflags=subvol=@debian"
+LABEL=debian		/			btrfs	defaults,compress=lzo,space_cache,autodefrag,inode_cache,noatime		0	0
+#LABEL=debian	/boot/grub/x86_64-efi	btrfs	defaults,compress=lzo,space_cache,autodefrag,inode_cache,noatime,subvol=__ALWAYSCURRENT__/boot-grub-x86_64-efi	0	0
+LABEL=debian	/home			btrfs	defaults,compress=lzo,space_cache,autodefrag,inode_cache,noatime,subvol=__ALWAYSCURRENT__/home			0	0
+LABEL=debian	/usr/local		btrfs	defaults,compress=lzo,space_cache,autodefrag,inode_cache,noatime,subvol=__ALWAYSCURRENT__/usr-local		0	0
+LABEL=debian	/opt			btrfs	defaults,compress=lzo,space_cache,autodefrag,inode_cache,noatime,subvol=__ALWAYSCURRENT__/opt			0	0
+LABEL=debian	/var/opt		btrfs	defaults,compress=lzo,space_cache,autodefrag,inode_cache,noatime,subvol=__ALWAYSCURRENT__/var-opt		0	0
+LABEL=debian	/var/log		btrfs	defaults,compress=lzo,space_cache,autodefrag,inode_cache,noatime,subvol=__ALWAYSCURRENT__/var-log		0	0
+LABEL=debian	/var/lib/mpd		btrfs	defaults,compress=lzo,space_cache,autodefrag,inode_cache,noatime,subvol=__ALWAYSCURRENT__/var-lib-mpd		0	0
+#LABEL=debian	/var/lib/named		btrfs	defaults,compress=lzo,space_cache,autodefrag,inode_cache,noatime,subvol=__ALWAYSCURRENT__/var-lib-named		0	0
+LABEL=debian	/var/spool	 	btrfs	defaults,compress=lzo,space_cache,autodefrag,inode_cache,noatime,subvol=__ALWAYSCURRENT__/var-spool		0	0
+LABEL=debian	/var/spool/dovecot	btrfs	defaults,compress=lzo,space_cache,autodefrag,inode_cache,noatime,subvol=__ALWAYSCURRENT__/var-spool-dovecot	0	0
+LABEL=debian	/var/tmp		btrfs	defaults,compress=lzo,space_cache,autodefrag,inode_cache,noatime,subvol=__ALWAYSCURRENT__/var-tmp		0	0
+#LABEL=debian	/var/www		btrfs	defaults,compress=lzo,space_cache,autodefrag,inode_cache,noatime,subvol=__ALWAYSCURRENT__/var-www		0	0
+LABEL=debian	/var/cache		btrfs	defaults,compress=lzo,space_cache,autodefrag,inode_cache,noatime,subvol=__ALWAYSCURRENT__/var-cache		0	0
+#LABEL=debian	/srv			btrfs	defaults,compress=lzo,space_cache,autodefrag,inode_cache,noatime,subvol=__ALWAYSCURRENT__/srv			0	0
+tmpfs		/tmp			tmpfs	nosuid,size=25%													0	0
+
+
+UUID=2AE9-56D2  /boot/efi       vfat    umask=0077      0       0
+####################################
+## BACKUP
+####################################
+## Ist über unit-Files in /etc/systemd/system geregelt
+LABEL=debian	/var/cache/btrfs_pool_SYSTEM	btrfs	defaults,comment=systemd.automount,noatime,compress=lzo,space_cache,ssd,discard		0 0
+#/dev/mapper/mars	/var/cache/backup	btrfs 	noatime,autodefrag,compress-force=lzo,space_cache,nofail,comment=systemd.automount,noauto,x-systemd.device-timeout=5 0 0
+#/dev/mapper/mars	/backup			btrfs	noatime,autodefrag,compress-force=lzo,space_cache,nofail,comment=systemd.automount,noauto,subvol=aldebaran	0	0
+/var/cache/backup/aldebaran	/backup-local	none	bind,ro,nofail,noauto	0	0
