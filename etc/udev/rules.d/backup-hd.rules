@@ -1,0 +1,4 @@
+ACTION=="add", KERNEL=="sd?3", SUBSYSTEMS=="usb", ATTRS{idVendor}=="174c", SYMLINK+="disk/mars", TAG+="systemd", ENV{SYSTEMD_WANTS}+="backup-automount.target"
+
+ACTION=="remove", KERNEL=="sd?3", SUBSYSTEMS=="usb", ATTRS{idVendor}=="174c", ATTRS{idProduct}=="55aa", \
+RUN+="/bin/systemctl --no-block stop backup-automount.target"
