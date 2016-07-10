@@ -1,0 +1,41 @@
+[Unit]
+Description=Make %i-backup from system-subvolume
+
+#ConditionPathExists=!/run/btrfs-actions
+#ConditionDirectoryNotEmpty=!/run/btrfs-actions
+ConditionPathExists=!/run/mkbackup
+ConditionPathExists=!/run/btrfs-actions
+ConditionDirectoryNotEmpty=!/run/mkbackup
+
+Requires=set-environ.service
+Wants=dpkg-get-selection.service
+#Wants=mkbackup-transfer.service
+After=set-environ.service dpkg-get-selection.service mkbackup.target
+#After=set-environ.service dpkg-get-selection.service
+#Before=mkbackup-transfer.service
+
+Conflicts=suspend.target shutdown.target sleep.target
+OnFailure=status-email-root@%n.service
+
+[Service]
+#Type=oneshot
+#Type=simple
+Type=idle
+#EnvironmentFile=/etc/mkbtrbackup.conf.d/%i.conf
+RuntimeDirectory=mkbackup
+
+Nice=10
+IOSchedulingClass=3
+#IOSchedulingPriority=
+CPUSchedulingPolicy=idle
+
+ExecStartPre=/bin/sh -c "(/bin/systemctl is-active -q mkbackup.target)"
+ExecStartPre=/bin/touch /run/mkbackup/%i-systemd.lock
+#ExecStart=/usr/local/bin/mkbtrbackup create --interval %i ${SRC}/${SYSSUBVOL} ${SRC}/__ALWAYSCURRENT__ --cleanup -L ${OPTIONS} 
+ExecStart=/usr/local/bin/mksnapshot -t %i -V -T -c -C create 
+#ExecStartPost=/usr/local/bin/mksnapshot -Vy -T -t %i transfer
+ExecStopPost=-/bin/systemctl start update-backuplinks.target
+ExecStopPost=-/bin/rm /run/mkbackup/%i-systemd.lock
+
+[Install]
+WantedBy=timer-%i.target 

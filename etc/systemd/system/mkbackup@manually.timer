@@ -1,0 +1,17 @@
+[Unit]
+Description=Runs backup %I after pluggin in external HD
+BindsTo=backup-automount.target
+#BindsTo=dev-disk-by\x2duuid-8afdced6\x2d8204\x2d42f0\x2da4e6\x2dadc9c759b762.device
+#BindsTo=var-cache-backup.mount
+#Wants=var-cache-backup.mount
+#After=var-cache-backup.mount mkbackup@afterboot.service
+
+[Timer]
+OnActiveSec=30s
+#OnActiveSec=20s
+Unit=mkbackup@%i.service
+
+[Install]
+#WantedBy=dev-disk-by\x2duuid-8afdced6\x2d8204\x2d42f0\x2da4e6\x2dadc9c759b762.device
+#WantedBy=var-cache-backup.mount
+WantedBy=backup-automount.target

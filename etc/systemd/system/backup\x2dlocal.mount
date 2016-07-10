@@ -1,0 +1,13 @@
+[Unit]
+SourcePath=/etc/fstab
+Documentation=man:fstab(5) man:systemd-fstab-generator(8)
+PartOf=var-cache-btrfs_pool_SYSTEM.mount
+
+[Mount]
+What=/var/cache/btrfs_pool_SYSTEM
+Where=/backup-local
+Type=none
+Options=bind,ro,nofail,noauto,comment=systemd.automount
+
+[Install]
+WantedBy=var-cache-btrfs_pool_SYSTEM.mount

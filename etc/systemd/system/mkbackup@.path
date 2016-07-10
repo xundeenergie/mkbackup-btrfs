@@ -1,0 +1,11 @@
+[Unit]
+Description=Activate automount on Device %I
+
+[Path]
+PathExists=/dev/disk/by-uuid/%I
+#Unit=systemd-cryptsetup@mars.service
+Unit=status-email-root@%n.service
+Unit=dev-disk-by\x2duuid-%I.mount
+
+[Install]
+WantedBy=paths.target
