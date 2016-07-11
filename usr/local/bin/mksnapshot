@@ -4,6 +4,7 @@ import datetime
 import signal
 import sys
 import os
+import errno
 import shlex
 import tempfile
 #import optparse
@@ -142,16 +143,38 @@ def cleanup_part(options,store='SNP'):
                 if os.path.exists("/proc/%s" % (pid)):
                     verbose(options,"running: %s %s" % (snapshot,pid))
                 else:
-                    print(" =delete-part> ",os.path.basename(snapshot))
+                    print(" =delete-part1> ",os.path.basename(snapshot))
                     os.remove(lockfile)
                     Y = Snapshot(options,os.path.basename(snapshot))
                     Y.DELETE(options,store=store)
             else:
-                print(" =delete-part> ",os.path.basename(snapshot))
-                os.remove(lockfile)
+                print(" =delete-part2> ",os.path.basename(snapshot))
+                #os.remove(lockfile)
                 Y = Snapshot(options,os.path.basename(snapshot))
                 Y.DELETE(options,store=store)
+    dirs = os.listdir( path )
+    ex = re.compile('.lock~$')
+    for files in dirs:
+        if ex.search(files):
+            if os.path.exists(path+'/'+files.partition('.lock~')[0]):
+                verbose(options,"nodelete %s" % (files))
+                pass
+            else:
+                verbose(options,"delete %s" % (files))
+                os.remove(path+'/'+files)
+	
+	
 
+
+def symlink_force(target, link_name):
+    try:
+        os.symlink(target, link_name)
+    except OSError as e:
+        if e.errno == errno.EEXIST:
+            os.remove(link_name)
+            os.symlink(target, link_name)
+        else:
+            raise e
 
 class Snapshot:
     what = 'Create, list and transfer snapshots from btrfs-Filesystems'
@@ -160,6 +183,7 @@ class Snapshot:
         self.options = options
         self.config   = Config()
         self.name     = name
+        self.rawname  = name.split('.')[0]
         self.parentname = None
         self.bparentname = None
         self.srcsnaps = []
@@ -181,14 +205,6 @@ class Snapshot:
         #self.syssubvol = subprocess.check_output(['/usr/bin/grub-mkrelpath','/'], shell=False).decode('utf8').split("\n")[0].strip("/")
         self.syssubvol = getsyssubvol()
         self.btrfs = btrfs()
-#        if os.path.isfile('/sbin/btrfs'):
-#            self.btrfs   = '/sbin/btrfs'
-#        elif os.path.isfile('/bin/btrfs'):
-#            self.btrfs   = '/bin/btrfs'
-#        elif os.path.isfile('/usr/bin/btrfs'):
-#            self.btrfs   = '/usr/bin/btrfs'
-#        else:
-#            exit("btrfs not found")
 
         if ts == '':
             self.timestamp = ''
@@ -460,7 +476,6 @@ class Snapshot:
             parentsnap = self.name 
         else:
             parentsnap = Parent[2]
-        print(parentsnap)
 
         X = Snapshot(self.options,self.name)
         self.options.parent=False
@@ -534,6 +549,13 @@ class Snapshot:
                 pipe([options.btrfs, "send",src],[options.btrfs,'receive',dstdir],options)
                 verbose(options,'set »%s« readwrite' % dst)
                 xShell([options.btrfs,'property','set','-ts',dst,'ro','false'],options)
+
+	#Create a temporary Symlink and rename it.
+        tmpLink = pathBKP+'/tempLnk'
+        #linkName = path+'/'+self.name+'.'+self.config.getSymLink(self.interval)
+        linkName = pathBKP+'/'+self.rawname+'.CURRENT'
+        print(' =symlink>',linkName)
+        symlink_force(pathBKP+'/'+self.name.partition('.part')[0],linkName)
 
         
         if ext == True: self.SETPROP(options,store='BKP',ro='true')
@@ -694,13 +716,13 @@ class Snapshot:
         tmpLink = path+'/tempLnk'
         linkName = path+'/'+self.name+'.'+self.config.getSymLink(self.interval)
         print(' =symlink>',linkName)
-        os.symlink(path+'/'+NEW,tmpLink)
-        os.rename(tmpLink, linkName)
+        symlink_force(path+'/'+NEW,linkName)
+        #os.rename(tmpLink, linkName)
+
+	#Unlock snapshot
         print(' =unlock> ',path+'/'+self.name+self.timestamp+self.tag)
         os.remove(path+'/'+self.name+self.timestamp+self.tag+'.part.lock~')
-#        if os.path.realpath(linkName) == target:
-#            verbose(options,'Link %s created' % (linkName))
-        #print(path+'/'+NEW,path+'/'+self.name+'.'+self.config.getSymLink(self.tag))
+
         # Cleanup afer each creation deactivated for cron-cleanup-reasons
         #if options.cuint: self.CLEANUP(options,interval=True,store=store)
         if options.cuint:
@@ -926,7 +948,7 @@ def exit_gracefully():
 
 CONF = Config()
 
-usage = """USAGE: %s ACTION [STORE] [options] <snapshots> [<snapshot> [<snapshot]]*
+usage = """USAGE: %s [options] ACTION [[STORE] [STORE] [STORE]] <snapshots> [<snapshot> [<snapshot]]*
 
 snapshots* = Name(n) der Snapshots, die angezeigt/gelistet oder von denen ein weiterer Snapshot gemacht werden soll.
              Dieser Name ist ohne Pfadangabe und wird jeweils in den Verzeichnissen des "STORE" gesucht.
@@ -948,22 +970,22 @@ def main():
 
     parser.add_argument("-v", "--verbosity", action="count", default=0, help="increase output verbosity")
     parser.add_argument("-V", "--volumes-config", dest="volumes", action="store_true",help="Read volumes to snapshot from configfile\n%s" % ('\n'.join(CONF.ListIntVolumes())))
-    parser.add_argument("-s", "--subvolumes", dest="sub", action="store_true", help="List Subvolumes in Snapshot. If False or unset, it lists all the snapshots in the store")
+    parser.add_argument("-s", "--subvolumes", dest="sub", action="store_true", help="list - List Subvolumes in Snapshot. If False or unset, it lists all the snapshots in the store")
     #parser.add_argument("--read-only", dest="setro", action="store_false", help="Set snapshot to Read-Only")
     parser.add_argument("-f", "--full-path", dest="fullpath", default=False, action="store_true",help="list - Show full pathname in listing")
     parser.add_argument("-p", "--parent", dest="parent", action="store_true",help="list - Show snapshots of the parent subvolume in listing")
     parser.add_argument("-P", "--get-path", dest="path", action="store_true",help="list - Show path of given store in listing")
     parser.add_argument("-a", "--show-all", dest="all", action="store_true", help="list - Show given one and children-snapshots")
-    parser.add_argument("-d", "--default-volume", dest="syssubvol", default=False, action="store_true",help="Take Snapshot from default-subvolume")
-    parser.add_argument("-r", "--reverse", dest="rev", action="store_true", default=False, help="Liste die Snapshots in umgekehrter Reihenfolge")
-    parser.add_argument("-t", "--tag", dest="tag", default="misc",help="add tag to subvol-name")
-    parser.add_argument("-n", "--no-timestamp", action="store_true", dest="ts", default=False, help = "Keinen Timestamp an den Snapshot-Namen anfügen")
-    parser.add_argument("-c", "--cleanup", dest="cleanup", action="store_true", help="Cleanup before creation of a new Snapshot all broken Snapshots before (*.part)")
-    parser.add_argument("-C", "--cleanup-interval", dest="cuint", action="store_true", help="Delete old snapshots, wich are higher number than allowed in config for this interval \n\t%s" % ('\n\t'.join(CONF.ListIntervalsFull())))
-    parser.add_argument("-o", "--show-older", dest="older", action="store_true", help="Show only older snapshots from given one")
-    parser.add_argument("-y", "--transfer-youngest", dest="young", action="store_true", help="search the younges snapshot(s) and transfer ist/them")
-    parser.add_argument("-L", "--create-link", dest="link", action="store_true", help="Create symbolic links '%s'" % (' '.join(CONF.ListSymlinkNames())))
-    parser.add_argument("-T", "--check-transfer", dest="transfer", action="store_true", help="If transfer is choosen as action, this option checks, if transfer is set in configfile")
+    parser.add_argument("-o", "--show-older", dest="older", action="store_true", help="list - Show only older snapshots from given one")
+    parser.add_argument("-r", "--reverse", dest="rev", action="store_true", default=False, help="list - list snapshots in reversed order")
+    parser.add_argument("-t", "--tag", dest="tag", default="misc",help="create, list, delete - add tag to subvol-name")
+    parser.add_argument("-d", "--default-volume", dest="syssubvol", default=False, action="store_true",help="create - Take Snapshot from default-subvolume")
+    parser.add_argument("-n", "--no-timestamp", action="store_true", dest="ts", default=False, help = "create - name snapshot without timestamp")
+    parser.add_argument("-c", "--cleanup", dest="cleanup", action="store_true", help="create, cleanup - Cleanup before creation of a new Snapshot all broken Snapshots before (*.part)")
+    parser.add_argument("-L", "--create-link", dest="link", action="store_true", help="create - Create symbolic links '%s'" % (' '.join(CONF.ListSymlinkNames())))
+    parser.add_argument("-T", "--check-transfer", dest="transfer", action="store_true", help="create - If transfer is choosen as action, this option checks, if transfer is set in configfile")
+    parser.add_argument("-y", "--transfer-youngest", dest="young", action="store_true", help="create, cleanup, transfer - search the younges snapshot(s) and transfer ist/them")
+    parser.add_argument("-C", "--cleanup-interval", dest="cuint", action="store_true", help="cleanup - Delete old snapshots, wich are higher number than allowed in config for this interval \n\t%s" % ('\n\t'.join(CONF.ListIntervalsFull())))
     parser.add_argument('--btrfs', default=btrfs(), help='/path/to/the/btrfs command')
                                                 
     parser.add_argument('args', nargs=argparse.REMAINDER, help='''actions, stores and Snapshots to handle

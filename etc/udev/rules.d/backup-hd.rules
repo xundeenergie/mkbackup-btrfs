@@ -1,5 +1,10 @@
-ACTION=="add", KERNEL=="sd*", SUBSYSTEMS=="usb", ENV{ID_FS_UUID}="ec1438f5-3f5b-407c-b83f-cef6ba7a6c3c", \
-	SYMLINK+="disk/mars", TAG+="systemd", ENV{SYSTEMD_WANTS}+="backup-automount.target", ENV{SYSTEMD_WANTS}+="mkbackup-transfer.target"
+#KERNEL=="sd?6", SUBSYSTEMS=="usb", ATTRS{manufacturer}=="asmedia", ATTRS{idVendor}=="174c", ATTRS{idProduct}=="55aa", SYMLINK+="disk/mars" \
+#ACTION=="add", KERNEL=="sd?6", SUBSYSTEMS=="usb", ATTRS{idVendor}=="174c", SYMLINK+="disk/mars", TAG+="systemd", ENV{SYSTEMD_WANTS}+="backup-automount.target", ENV{SYSTEMD_WANTS}+="mkbackup@manually.timer"
+#0bc2:ab24
 
+ACTION=="add", KERNEL=="sd*", SUBSYSTEMS=="usb", ENV{ID_FS_UUID}="ec1438f5-3f5b-407c-b83f-cef6ba7a6c3c", SYMLINK+="disk/mars", TAG+="systemd", ENV{SYSTEMD_WANTS}+="backup-automount.target", ENV{SYSTEMD_WANTS}+="mkbackup-transfer.target"
+
+#ACTION=="remove", KERNEL=="sd?3", SUBSYSTEMS=="usb", ATTRS{idVendor}=="174c", ATTRS{idProduct}=="55aa", \
 ACTION=="remove", KERNEL=="sd*", SUBSYSTEMS=="usb", ENV{ID_FS_UUID}="ec1438f5-3f5b-407c-b83f-cef6ba7a6c3c", \
-	RUN+="/bin/systemctl --no-block stop backup-automount.target mkbackup-transfer.target"
+RUN+="/bin/systemctl --no-block stop backup-automount.target mkbackup-transfer.target"
+#RUN+="/bin/systemctl --no-block stop mkbackup@manually.timer var-cache-backup.automount"
