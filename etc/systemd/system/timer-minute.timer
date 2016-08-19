@@ -1,0 +1,9 @@
+[Unit]
+Description=1-Minute Timer
+
+[Timer]
+OnUnitActiveSec=1min
+Unit=timer-dmin.target
+
+[Install]
+WantedBy=basic.target

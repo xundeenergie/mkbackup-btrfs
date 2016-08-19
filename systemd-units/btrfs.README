@@ -1,8 +1,0 @@
-Für ein regelmäßiges balancing und scrubbing eines btrfs-Filesystems aktiviert man dieses unter Angabe mit des Mountpunktes.
-
-z.B. um den Pool auf /var/cache/btrfs_pool_SYSTEM regelmäßig zuerst zu scrubben und dann zu balancen :
-
-  systemctl start btrfs-balance@var-cache-btrfs_pool_SYSTEM.timer
-  systemctl enable btrfs-balance@var-cache-btrfs_pool_SYSTEM.timer
-
-dazu muss das Verzeichnis auch als Mountpoint existieren, auf dem eine btrfs-Partition (oder Subvolume) gemountet wird.

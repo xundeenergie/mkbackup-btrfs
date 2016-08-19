@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily Timer
+OnFailure=status-email-root@%n.service
+
+[Timer]
+OnCalendar=*-*-* 10:00:00
+Persistent=true
+Unit=timer-daily.target
+AccuracySec=5min
+
+[Install]
+WantedBy=basic.target

@@ -1,3 +1,0 @@
-[Unit]
-Description=Update all backup-directories in user-homes
-StopWhenUnneeded=yes

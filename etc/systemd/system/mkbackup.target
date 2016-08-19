@@ -1,17 +1,6 @@
 [Unit]
-Description=Enables all backup.timers and backup.services
-#Wants=mkbackup@dmin.timer 
-#Wants=mkbackup@hourly.timer 
-#Wants=mkbackup@daily.timer 
-#Wants=mkbackup@weekly.timer 
-#Wants=mkbackup@monthly.timer 
+Description=Enables all backup.services
 
 
 [Install]
-WantedBy=timers.target
-#Also=mkbackup@afterboot.timer 
-#Also=mkbackup@dmin.timer 
-#Also=mkbackup@hourly.timer 
-#Also=mkbackup@daily.timer 
-#Also=mkbackup@weekly.timer 
-#Also=mkbackup@monthly.timer 
+WantedBy=basic.target

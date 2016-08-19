@@ -1,0 +1,35 @@
+[Unit]
+#Description=Scrub btrfs-filesystem %f %i
+Description=Scrubs filesystem on %f weekly
+Wants=btrfs-balance@%i.service
+After=btrfs-balance@%i.service
+
+ConditionPathExists=!/run/btrfs-actions
+ConditionDirectoryNotEmpty=!/run/btrfs-actions
+ConditionPathExists=!/run/mkbackup
+ConditionDirectoryNotEmpty=!/run/mkbackup
+ConditionACPower=true
+
+
+#Wants=btrfs-status-email-root@%i.service
+#Before=btrfs-status-email-root@%i.service
+Conflicts=suspend.target shutdown.target
+OnFailure=status-email-root@%n.service
+
+[Service]
+RuntimeDirectory=btrfs-actions
+#Type=oneshot
+
+Nice=11
+IOSchedulingClass=3
+#IOSchedulingPriority=
+CPUSchedulingPolicy=idle
+
+ExecStartPre=/bin/touch /run/btrfs-actions/scrub-systemd-%i.lock
+ExecStart=/bin/btrfs scrub start -Bd %f
+ExecStop=/etc/systemd/system/scripts/btrfs-action.sh %f scrub $MAINPID
+ExecStopPost=/bin/rm /run/btrfs-actions/scrub-systemd-%i.lock
+
+
+[Install]
+WantedBy=timer-weekly.target

@@ -1,0 +1,12 @@
+[Unit]
+Description=Monthly Timer
+OnFailure=status-email-root@%n.service
+
+[Timer]
+OnCalendar=*-*-01 12:30:00
+Persistent=true
+Unit=timer-monthly.target
+AccuracySec=5days
+
+[Install]
+WantedBy=basic.target

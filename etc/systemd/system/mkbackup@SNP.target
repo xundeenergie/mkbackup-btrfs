@@ -1,0 +1,8 @@
+[Unit]
+Description=Target for services for %i in mkbackup
+
+Documentation=man:systemd.special(7)
+StopWhenUnneeded=no
+
+[Install]
+WantedBy=local-fs.target

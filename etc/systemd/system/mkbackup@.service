@@ -39,3 +39,4 @@ ExecStopPost=-/bin/rm /run/mkbackup/%i-systemd.lock
 
 [Install]
 WantedBy=timer-%i.target 
+DefaultInstance=mkbackup@manually.service

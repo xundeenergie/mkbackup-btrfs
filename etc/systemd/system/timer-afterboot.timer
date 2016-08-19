@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for event after successfull boot
+
+[Timer]
+OnActiveSec=90s
+Unit=timer-afterboot.target
+AccuracySec=10min
+
+[Install]
+WantedBy=multi-user.target

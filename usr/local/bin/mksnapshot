@@ -1,4 +1,5 @@
 #!/usr/bin/python3 -u
+# Version 20160819
 
 import datetime
 import signal
@@ -128,7 +129,7 @@ def getyoungest(options,path,sub,tag=''):
 
 def cleanup_part(options,store='SNP'):
     # cleanup unfinished snapshots
-    path = Config().getMountPath(store)
+    path = Config().getStorePath(store)
     verbose(options,"Cleanup incomplete snapshots in %s" % (path))
     command = [options.btrfs, "subvol","list","--sort=-gen","-o",path] 
     list = xShell(command,options)
@@ -515,10 +516,15 @@ class Snapshot:
                                 break
                             print(' => Incremental transfer »%s« ==> »%s«' % (os.path.basename(src),dstdir), flush=True)
                             os.sync()
-                            pipe([options.btrfs,"send",'-p',par,src],[options.btrfs,'receive',dstdir],options)
-                            verbose(options,'set »%s« readwrite' % dst)
-                            xShell([options.btrfs,'property','set','-ts',dst,'ro','false'],options)
-                            break
+                            try:
+                                pipe([options.btrfs,"send",'-p',par,src],[options.btrfs,'receive',dstdir],options)
+                                verbose(options,'set »%s« readwrite' % dst)
+                                xShell([options.btrfs,'property','set','-ts',dst,'ro','false'],options)
+                                break
+                            except:
+                                print("Transfer failed for: %s" % (src)) 
+                                os.rename(dst,dst+".part")
+                                break
                         else:
                             print(' -> no destination-parent for »%s« in »%s«, try next' % (os.path.basename(src),Parent[3]))
                             continue
@@ -733,10 +739,12 @@ class Snapshot:
     def SETPROP(self,options,store='SRC',ro='false'):
         verbose(options,'Set %s readonly=%s' % (self.name,ro))
         pathSRC = '/'+self.config.getStorePath(store).strip('/')
+        print(store+'='+pathSRC)
         if ro == 'true': 
             self.options.parent=True
             for i in reversed(self.LIST(store=store,sub=True,fullpath=True)):
-                print(' =ro> '+pathSRC+'/'+i[1])
+                #print(' =ro> '+pathSRC+'/'+i[1])
+                print(' =ro> '+store+'/'+i[1])
                 if i[1].split('/')[0] == self.syssubvol or i[1].split('/')[0] == '__ALWAYSCURRENT__': 
                     print("%s is systemvolume! faild to set readonly!!" % (i[1].split('/')[0]))
                     return("Failure - Action on Systemvolume")
@@ -748,7 +756,8 @@ class Snapshot:
         else: 
             self.options.parent = True
             for i in self.LIST(store=store,sub=True,fullpath=True):
-                print(' =rw> '+pathSRC+'/'+i[1])
+                #print(' =rw> '+pathSRC+'/'+i[1])
+                print(' =rw> '+store+'/'+i[1])
                 LSTRO = ['btrfs', 'property', 'set','-ts',pathSRC+'/'+i[1],'ro',ro]
                 #print(' '.join(LSTRO))
                 subprocess.call(             LSTRO,stdout=subprocess.DEVNULL)
@@ -757,13 +766,15 @@ class Snapshot:
 
     def DELETE(self,options,store='SRC'):
         pathSRC = '/'+self.config.getStorePath(store).strip('/')
+        print(store+'='+pathSRC)
         DEL = ['btrfs', 'subvolume', 'delete','-c']
         P = Snapshot(self.options,self.name)
         P.SETPROP(options,store=store,ro='false')
 #        self.SETPROP(store=store,ro='false')
 #        self.options.parent = True
         for i in reversed(self.LIST(store=store,sub=True,fullpath=True)):
-            print(' =del> '+pathSRC+'/'+i[1])
+            #print(' =del> '+pathSRC+'/'+i[1])
+            print(' =del> '+store+'/'+i[1])
             if i[1] == self.syssubvol: 
                 print("%s is systemvolume! Cannot be deleted!" % (i))
             else:
@@ -1176,6 +1187,8 @@ def main():
 
         else:
             print("No further action")
+    print("mksnapshot@"+options.tag+" finnished")
+    print("------------------------------------")
 
 if __name__ == '__main__':
     main()

@@ -1,0 +1,8 @@
+[Unit]
+Description=btrfs-status email for %f to root 
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/systemd-btrfs-email root@localhost %i %f
+#User=nobody
+Group=systemd-journal

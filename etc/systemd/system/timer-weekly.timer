@@ -1,0 +1,12 @@
+[Unit]
+Description=Weekly Timer
+OnFailure=status-email-root@%n.service
+
+[Timer]
+OnCalendar=Mon *-*-* 20:00:00
+Persistent=true
+Unit=timer-weekly.target
+AccuracySec=5min
+
+[Install]
+WantedBy=basic.target
