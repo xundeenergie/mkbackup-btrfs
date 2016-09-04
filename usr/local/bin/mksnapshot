@@ -1,5 +1,4 @@
 #!/usr/bin/python3 -u
-# Version 20160819
 
 import datetime
 import signal
@@ -561,7 +560,8 @@ class Snapshot:
         #linkName = path+'/'+self.name+'.'+self.config.getSymLink(self.interval)
         linkName = pathBKP+'/'+self.rawname+'.CURRENT'
         print(' =symlink>',linkName)
-        symlink_force(pathBKP+'/'+self.name.partition('.part')[0],linkName)
+        #symlink_force(pathBKP+'/'+self.name.partition('.part')[0],linkName)
+        symlink_force('./'+self.name.partition('.part')[0],linkName)
 
         
         if ext == True: self.SETPROP(options,store='BKP',ro='true')
@@ -722,7 +722,8 @@ class Snapshot:
         tmpLink = path+'/tempLnk'
         linkName = path+'/'+self.name+'.'+self.config.getSymLink(self.interval)
         print(' =symlink>',linkName)
-        symlink_force(path+'/'+NEW,linkName)
+        #symlink_force(path+'/'+NEW,linkName)
+        symlink_force('./'+NEW,linkName)
         #os.rename(tmpLink, linkName)
 
 	#Unlock snapshot

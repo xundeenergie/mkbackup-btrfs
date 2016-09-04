@@ -1,0 +1,6 @@
+[Unit]
+Description=Enables mounting of all ~/backup directories
+
+
+[Install]
+WantedBy=mkbackup.target

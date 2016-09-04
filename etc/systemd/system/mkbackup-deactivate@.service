@@ -1,0 +1,6 @@
+[Unit]
+Description=Deactivate external Drive/Partition for mkbackup/mksnapshot for device %I.
+
+[Service]
+Type=oneshot
+ExecStart=/etc/systemd/system/mksnapshot-create-volume.sh disable /%I
