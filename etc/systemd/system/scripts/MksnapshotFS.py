@@ -22,9 +22,12 @@ from fuse import Fuse
 
 # JS - Snapshotnamehandling, get the current user and so on
 import getpass
+import socket
 
 from time import strptime, strftime
 from datetime import datetime,date,time,timedelta
+
+from mksnapshotconfig import *
 
 DEBUG = True
 
@@ -35,7 +38,6 @@ if not hasattr(fuse, '__version__'):
 fuse.fuse_python_api = (0, 2)
 
 fuse.feature_assert('stateful_files', 'has_init')
-
 
 def flag2mode(flags):
     md = {os.O_RDONLY: 'r', os.O_WRONLY: 'w', os.O_RDWR: 'w+'}
@@ -57,22 +59,39 @@ class Xmp(Fuse):
             for i in args: print "ARG: "+i
             for i in kw: print "KW: "+i
 
+        #get hostname
+        # die auskommentierte if-Funktion liefert hostname.localdomain.
+#        if socket.gethostname().find('.')>=0:
+#            hostname=socket.gethostname()
+#        else:
+#            hostname=socket.gethostbyaddr(socket.gethostname())[0]
+        #socket.gethostname() liefert nur "hostname" ohne .localdomain
+        hostname=socket.gethostname()
         # do stuff to set up your filesystem here, if you want
         #import thread
         #thread.start_new_thread(self.mythread, ())
-        #print self.local
-        self.root='/var/cache/btrfs_pool_SYSTEM/'
+        
+        CONFIG=Config()
+
+        self.root=CONFIG.getStorePath('SNP')
+        self.local=CONFIG.getStorePath('SNP')
+        self.extern=CONFIG.getStorePath('BKP')
+#        self.root='/var/cache/btrfs_pool_SYSTEM'
+#        self.local='/var/cache/btrfs_pool_SYSTEM'
+#        self.extern='/var/cache/backup/'+hostname
 
         self.snapshots={}
         self.direntries=[]
         Xmp.realpath=""
         self.USER=getpass.getuser()
         self.HOME=os.environ['HOME']
-        self.BDIRS={'local':'/var/cache/btrfs_pool_SYSTEM','extern':'/var/cache/backup'}
+        #self.BDIRS={'local':'/var/cache/btrfs_pool_SYSTEM','extern':'/var/cache/backup/aldebaran'}
+        #self.BDIRS={'local':self.local,'extern':self.extern}
         
 # JS - some helpers
-    def translate(self,subvolname,location='local'):
+    def translate(self,subvolname,location='loc'):
         n = len(subvolname.split('.'))
+        ac = ""
         if n == 1:
             return subvolname+'--'+location
         elif n == 2:
@@ -81,32 +100,34 @@ class Xmp(Fuse):
             sndt = datetime.strptime(subvolname.split('.')[1],"%Y-%m-%d_%H:%M:%S") #snapshot-timestamp
             action = subvolname.split('.')[2]
             if action == 'manually':
-                action="-manually"
+                ac="-"+action
             elif action == 'aptupgrade':
-                action="-aptupgrade"
+                ac="-"+action
             else:
-                action=""
+                ac=""
 
             snd = datetime.date(sndt) #snapshot-date
-            today = datetime.date(datetime.now())
-            yesterday = datetime.date(datetime.now()-timedelta(days=1))
-            dbyesterday = datetime.date(datetime.now()-timedelta(days=2))
-            if snd == today:
-                return datetime.strftime(sndt,'heute %H-%M-%S')+'--'+location+action
-            elif snd == yesterday:
-                return datetime.strftime(sndt,'gestern %H-%M-%S')+'--'+location+action
-            elif snd == dbyesterday:
-                return datetime.strftime(sndt,'vorgestern %H-%M-%S')+'--'+location+action
+            if snd == datetime.date(datetime.now()):
+                #today
+                dts = 'heute %H-%M-%S'
+            elif snd == datetime.date(datetime.now()-timedelta(days=1)):
+                #yesterday
+                dts = 'gestern %H-%M-%S'
+#            elif snd == datetime.date(datetime.now()-timedelta(days=2)):
+#                #day before yesterday
+#                dts = 'vorgestern %H-%M-%S'
             else:
-                return datetime.strftime(sndt,'%Y.%B.%d %H-%M-%S')+'--'+location+action
+                #any day else
+                dts = '%Y.%m.%d %H-%M-%S'
+            return datetime.strftime(sndt,dts)+'--'+location+ac
         else:
             return subvolname+'--'+location
 
     def __lsnapshots(self):
-        print "ls snapshots"
+        if DEBUG: print "ls snapshots"
         self.snapshots.clear()
         for location in self.BDIRS.iterkeys():
-            if DEBUG == True: print 'Scan location '+location
+            if DEBUG == True: print 'Scan location '+location+': '+self.BDIRS[location]
             try:
                 dirents = os.listdir(self.BDIRS[location])
             except:
@@ -121,7 +142,8 @@ class Xmp(Fuse):
     def __realpath(self,path):
         ss = path.split('/')[1]
         sv = './'+'/'.join(path.split('/')[2:])
-        if path == "/" and not self.root.strip('/') == self.BDIRS['local'].strip('/') and not self.root == self.BDIRS['extern'].strip('/'):
+        #if path == "/" and not self.root.strip('/') == self.BDIRS['loc'].strip('/') and not self.root == self.BDIRS['ext'].strip('/'):
+        if path == "/" and (self.root in self.BDIRS.values()):
             Xmp.realpath = path
             return Xmp.realpath
         if ss in self.snapshots:
@@ -129,22 +151,23 @@ class Xmp(Fuse):
             Xmp.realpath = self.snapshots[ss][0]+self.snapshots[ss][1]+sv
             return Xmp.realpath
         else: 
-            self.root = self.BDIRS['local']
+            self.root = self.BDIRS['loc']
             Xmp.realpath = self.root + path
             return Xmp.realpath
 
     def __lsdir(self,path):#
-        print "ls dir"
+        if DEBUG: print "ls dir"
         ss = path.split('/')[1]
         subdir = '/'+'/'.join(path.split('/')[2:])
         dirents = ['.', '..']
-        if path == "/" and (self.root.strip('/') == self.BDIRS['local'].strip('/') or self.root == self.BDIRS['extern'].strip('/')):
-            self.root = self.BDIRS['local']
+        #if path == "/" and (self.root.strip('/') == self.BDIRS['loc'].strip('/') or self.root == self.BDIRS['ext'].strip('/')):
+        if path == "/" and (self.root in self.BDIRS.values()):
+            self.root = self.BDIRS['loc']
             dirents.extend(self.snapshots.keys())
         elif ss in self.snapshots or path == "./":
             dirents.extend(os.listdir(self.__realpath(path)))
         else:
-            self.root = self.BDIRS['local']
+            self.root = self.BDIRS['loc']
             dirents.extend(os.listdir(path))
         return dirents
 
@@ -161,7 +184,8 @@ class Xmp(Fuse):
 #            print "mythread: ticking"
 
     def getattr(self, path):
-        if path == "/" and (self.root.strip('/') == self.BDIRS['local'].strip('/') or self.root == self.BDIRS['extern'].strip('/')):
+        #if path == "/" and (self.root.strip('/') == self.BDIRS['loc'].strip('/') or self.root == self.BDIRS['ext'].strip('/')):
+        if path == "/" and (self.root in self.BDIRS.values()):
             return os.lstat('.'+path)
         else:
             return os.lstat(self.__realpath(path))
@@ -170,7 +194,8 @@ class Xmp(Fuse):
         return os.readlink(self.__realpath(path))
 
     def readdir(self, path, offset):
-        if path == "/" and (self.root.strip('/') == self.BDIRS['local'].strip('/') or self.root == self.BDIRS['extern'].strip('/')):
+        #if path == "/" and (self.root.strip('/') == self.BDIRS['loc'].strip('/') or self.root == self.BDIRS['ext'].strip('/')):
+        if path == "/" and (self.root in self.BDIRS.values()):
             print path
         if path == "/": 
             self.__lsnapshots()
@@ -179,45 +204,45 @@ class Xmp(Fuse):
 
     def unlink(self, path):
         return -EROFS
-        os.unlink("." + path)
+        #os.unlink("." + path)
 
     def rmdir(self, path):
         return -EROFS
-        os.rmdir("." + path)
+        #os.rmdir("." + path)
 
     def symlink(self, path, path1):
         return -EROFS
-        os.symlink(path, "." + path1)
+        #os.symlink(path, "." + path1)
 
     def rename(self, path, path1):
         return -EROFS
-        os.rename("." + path, "." + path1)
+        #os.rename("." + path, "." + path1)
 
     def link(self, path, path1):
         return -EROFS
-        os.link("." + path, "." + path1)
+        #os.link("." + path, "." + path1)
 
     def chmod(self, path, mode):
         return -EROFS
-        os.chmod("." + path, mode)
+        #os.chmod("." + path, mode)
 
     def chown(self, path, user, group):
         return -EROFS
-        os.chown("." + path, user, group)
+        #os.chown("." + path, user, group)
 
     def truncate(self, path, len):
         return -EROFS
-        f = open("." + path, "a")
-        f.truncate(len)
-        f.close()
+        #f = open("." + path, "a")
+        #f.truncate(len)
+        #f.close()
 
     def mknod(self, path, mode, dev):
         return -EROFS
-        os.mknod("." + path, mode, dev)
+        #os.mknod("." + path, mode, dev)
 
     def mkdir(self, path, mode):
         return -EROFS
-        os.mkdir("." + path, mode)
+        #os.mkdir("." + path, mode)
 
     def utime(self, path, times):
         os.utime(self.__realpath(path), times)
@@ -276,8 +301,9 @@ class Xmp(Fuse):
         return os.statvfs(".")
 
     def fsinit(self):
-        print "fsinit"
-        os.chdir(self.root)
+        if DEBUG: print "fsinit"
+        self.BDIRS={'loc':'/'+self.local.strip('/'),'ext':'/'+self.extern.strip('/')}
+        os.chdir('/'+self.local.strip('/'))
         self.__lsnapshots()
 
     class XmpFile(object):
@@ -303,12 +329,10 @@ class Xmp(Fuse):
             self.file.close()
 
         def _fflush(self):
-            #return -EROFS
             if 'w' in self.file.mode or 'a' in self.file.mode:
                 self.file.flush()
 
         def fsync(self, isfsyncfile):
-            #return -EROFS
             self._fflush()
             if isfsyncfile and hasattr(os, 'fdatasync'):
                 os.fdatasync(self.fd)
@@ -316,7 +340,6 @@ class Xmp(Fuse):
                 os.fsync(self.fd)
 
         def flush(self):
-            #return -EROFS
             self._fflush()
             # cf. xmp_flush() in fusexmp_fh.c
             os.close(os.dup(self.fd))
@@ -326,7 +349,7 @@ class Xmp(Fuse):
 
         def ftruncate(self, len):
             return -EROFS
-            self.file.truncate(len)
+            #self.file.truncate(len)
 
         def lock(self, cmd, owner, **kw):
             #return -EROFS
@@ -388,17 +411,18 @@ Userspace nullfs-alike: mirror the filesystem tree from some point on.
                  usage=usage,
                  dash_s_do='setsingle')
 
-    server.parser.add_option(mountopt="root", metavar="PATH", default='/var/cache/btrfs_pool_SYSTEM',
+    server.parser.add_option(mountopt="root", metavar="PATH", default=server.local,
                              help="mirror filesystem from under PATH [default: %default]")
-    server.parser.add_option(mountopt="local", metavar="LOCAL", default='/var/cache/btrfs_pool_SYSTEM',
+    server.parser.add_option(mountopt="local", metavar="PATH", default=server.local, 
                              help="set path to filesystem from internal HDD/SSD under PATH [default: %default]")
-    server.parser.add_option(mountopt="extern", metavar="EXTERN", default='/var/cache/backup',
+    server.parser.add_option(mountopt="extern", metavar="PATH", default=server.extern, 
                              help="set path to filesystem from external HDD/SSD under PATH [default: %default]")
-    server.parse(values=server, errex=1)
 
+    server.parse(values=server, errex=1)
+    
     try:
         if server.fuse_args.mount_expected():
-            os.chdir(server.root)
+            os.chdir(server.local)
     except OSError:
         print >> sys.stderr, "can't enter root of underlying filesystem"
         sys.exit(1)

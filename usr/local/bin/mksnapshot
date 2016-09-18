@@ -19,6 +19,10 @@ from optparse import OptionParser
 import signal
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
+# /usr/lib/python3/dist-packages/mksnapshotconfig.py
+from mksnapshotconfig import Config
+#from mksnapshotconfig import getsyssubvol
+
 # create a timestamp for all actions
 timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 
@@ -104,9 +108,6 @@ def btrfs():
     else:
         exit("btrfs not found")
     return(prog)
-
-def getsyssubvol():
-    return(subprocess.check_output(['/usr/bin/grub-mkrelpath','/'], shell=False).decode('utf8').split("\n")[0].strip("/"))
 
 def getyoungest(options,path,sub,tag=''):
     first = [options.btrfs,'sub','list','-co','--sort=-ogen',path]
@@ -202,8 +203,7 @@ class Snapshot:
         self.bPUUID=None
         self.bUUID=None
         self.bRUUID=None
-        #self.syssubvol = subprocess.check_output(['/usr/bin/grub-mkrelpath','/'], shell=False).decode('utf8').split("\n")[0].strip("/")
-        self.syssubvol = getsyssubvol()
+        self.syssubvol=subprocess.check_output(['/usr/bin/grub-mkrelpath','/'], shell=False).decode('utf8').split("\n")[0].strip("/")
         self.btrfs = btrfs()
 
         if ts == '':
@@ -470,9 +470,7 @@ class Snapshot:
         if os.path.exists(pathBKP+'/'+self.name):
             print("Subvolume »%s« exists --> exit transfer" % (pathBKP+'/'+self.name))
             return() 
-            #sys.exit("Subvolume »%s« exists --> exit transfer" % (pathBKP+'/'+self.name))
         if Parent == None:
-            #parentsnap = self.name
             parentsnap = self.name 
         else:
             parentsnap = Parent[2]
@@ -557,17 +555,13 @@ class Snapshot:
 
 	#Create a temporary Symlink and rename it.
         tmpLink = pathBKP+'/tempLnk'
-        #linkName = path+'/'+self.name+'.'+self.config.getSymLink(self.interval)
         linkName = pathBKP+'/'+self.rawname+'.CURRENT'
         print(' =symlink>',linkName)
-        #symlink_force(pathBKP+'/'+self.name.partition('.part')[0],linkName)
         symlink_force('./'+self.name.partition('.part')[0],linkName)
 
         
         if ext == True: self.SETPROP(options,store='BKP',ro='true')
-        #print('  Cleanup',options.cuint)
         if options.cuint and ext == True:
-            #print('  Cleanup BKP',options.cuint)
             self.CLEANUP(options,interval=True,store='BKP')
 
 
@@ -602,7 +596,6 @@ class Snapshot:
         DEL = []
         if options.cleanup or interval==True:
             print("Cleanup interval-snapshots from %s in %s" % (self.name,store))
-            #ilist = ['dmin','hourly','daily','weekly','monthly','yearly','afterboot','aptupgrade','misc']
             ilist = self.config.ListIntervals()
             verbose(options,ilist)
             ex = re.compile('$|'.join([self.name+'.*' + word_in_list for word_in_list in ilist])+'$')
@@ -612,11 +605,9 @@ class Snapshot:
                         cdmin += 1
                         if cdmin > int(dmin): DEL.append(li.partition('path ')[2])
                     elif li.partition('hourly')[1] == 'hourly': 
-                        #print(chourly,int(hourly),li.partition('path')[2])
                         chourly += 1
                         if chourly > int(hourly): DEL.append(li.partition('path ')[2])
                     elif li.partition('daily')[1] == 'daily': 
-                        #print(cdaily,int(daily),li.partition('path')[2])
                         cdaily += 1
                         if cdaily > int(daily): DEL.append(li.partition('path ')[2])
                     elif li.partition('weekly')[1] == 'weekly': 
@@ -670,6 +661,7 @@ class Snapshot:
 
     def CREATE(self,options):
         store = 'SNP'
+        CONFIG=Config()
         cleanup_part(options,store=store)
         #path = '/'+self.config.getStorePath(store).strip('/')
         path = self.config.getStorePath(store)
@@ -696,17 +688,23 @@ class Snapshot:
         
         # check if transfer is set in configfile
         TR = False
+        SUBVOLS=[]
         if options.tag != "":
-            TR = Config().getTransfer(options.tag)
+            TR = CONFIG.getTransfer(options.tag)
             TR = True
-            SUBVOLS = Config().getVolumes(options,options.tag,youngest=options.young)
+            #SUBVOLS = CONFIG.getVolumes(options,options.tag,youngest=options.young)
+            for i in CONFIG.getVolumes(options.tag): 
+                SUBVOLS.append(getyoungest(options,CONFIG.getStorePath('SNP'),i,tag=options.tag))
         else:
             options.tag = 'misc'
-            TR = Config().getTransfer('misc')
-            SUBVOLS = Config().getVolumes(options,'misc',youngest=options.young)
+            TR = CONFIG.getTransfer('misc')
+            #SUBVOLS = CONFIG.getVolumes(options,'misc',youngest=options.young)
+            for i in CONFIG.getVolumes(options.tag): 
+                SUBVOLS.append(getyoungest(options,CONFIG.getStorePath('SNP'),i,tag=options.tag))
+        #print(SUBVOLS)
 
         # do transfer if transfer is set in config an -T on commandline
-        if options.transfer and TR and os.path.exists(Config().getStorePath('BKP')):
+        if options.transfer and TR and os.path.exists(CONFIG.getStorePath('BKP')):
             cleanup_part(options,store='BKP')
             verbose(options,'Transfer Snapshots %s to %s' % (OLD,'BKP'))
             X.TRANSFER(options)
@@ -786,181 +784,19 @@ class Snapshot:
             #subprocess.CompletedProcess(DEL,stdout=subprocess.DEVNULL,returncode=0)
         print('deleting finished')
 
-
-class Config():
-    def __init__(self):
-        self.cfile = '/etc/mksnapshot.conf'
-        self.config = configparser.ConfigParser()
-        self.hostname = subprocess.check_output("/bin/hostname",shell=True).decode('utf8').split('\n')[0]
-        if os.path.exists(self.cfile): 
-            pass #print('OK')
-        else:
-            print('Default-Config created at %s' % (self.cfile))
-            self.CreateConfig()
-        self.config.read(self.cfile)
-        psrc = os.getcwd()
-        if   '/'+psrc.strip('/') == self.config.get('DEFAULT','SNPMNT')+'/'+self.config.get('DEFAULT','snpstore'):
-            self.config.set('DEFAULT','SRC', self.config.get('DEFAULT','SNPMNT'))
-            self.config.set('DEFAULT','srcstore', self.config.get('DEFAULT','snpstore'))
-        elif '/'+psrc.strip('/') == self.config.get('DEFAULT','BKPMNT')+'/'+self.config.get('DEFAULT','bkpstore'):
-            self.config.set('DEFAULT','SRC', self.config.get('DEFAULT','BKPMNT'))
-            self.config.set('DEFAULT','srcstore', self.config.get('DEFAULT','bkpstore'))
-        else:
-            self.config.set('DEFAULT','SRC', psrc)
-            self.config.set('DEFAULT','srcstore', '')
-        
-        self.config.read(self.cfile)
-
-    def CreateConfig(self):
-        self.config['DEFAULT'] = {'SNPMNT': '/var/cache/btrfs_pool_SYSTEM',
-                             'BKPMNT': '/var/cache/backup',
-                             'snpstore': '',
-                             'bkpstore': '$h',
-                             'volumes': '$S,__ALWAYSCURRENT__',
-                             'interval': 5,
-                             'symlink': 'LAST',
-                             'transfer': False }
-        self.config['hourly'] = {'volumes':  '$S,__ALWAYSCURRENT__','interval': '24','transfer': True}
-        self.config['daily'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '7','transfer': True}
-        self.config['weekly'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '5','transfer': True}
-        self.config['monthly'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '12','transfer': True}
-        self.config['yearly'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '7','transfer': True}
-        self.config['afterboot'] = {'volumes':  '$S','interval': '4','symlink': 'LASTBOOT'}
-        self.config['aptupgrade'] = {'volumes':  '$S','interval': '6','symlink': 'BEFOREUPDATE'}
-        self.config['dmin'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '6'}
-        self.config['manually'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '5','symlink': 'MANUALLY','transfer': True}
-
-        with open(self.cfile, 'w') as configfile:
-            try:
-                self.config.write(configfile)
-            except:
-                exit("Failure during creation of config-file")
-        return(self.config)
-
-    def ReadConfig(self):
-        self.config.read(self.cfile)
-        for i in self.config:
-            print(i)
-            for j in self.config[i]:
-                print(j+':',self.config[i][j])
-
-    def ListIntervals(self):
-        LST = []
-        self.config.read(self.cfile)
-        for i in self.config:
-            if i != 'DEFAULT':
-                LST.append(i) 
-            else:
-                LST.append('misc')
-        return(LST)
-
-    def ListIntervalsFull(self):
-        LST = []
-        self.config.read(self.cfile)
-        for i in self.config:
-            if i != 'DEFAULT':
-                LST.append(i+': '+str(self.config.get(i,'interval'))) 
-            else:
-                LST.append('misc: '+str(self.config.get(i,'interval')))
-        return(LST)
-
-    def ListSymlinkNames(self):
-        LST = []
-        self.config.read(self.cfile)
-        for i in self.config:
-            LST.append(self.config.get(i,'symlink'))
-        return(list(set(LST)))
-
-
-    def getStorePath(self,store='SRC'):
-        if store == 'SRC':
-            path = '/'+self.config.get('DEFAULT','SRC').strip('/')+'/'+self.config.get('DEFAULT','srcstore').strip('/')
-        if store == 'SNP':
-            path = '/'+self.config.get('DEFAULT','SNPMNT').strip('/')+'/'+self.__trnName(self.config.get('DEFAULT','snpstore').strip('/'))
-        if store == 'BKP':
-            path = '/'+self.config.get('DEFAULT','BKPMNT').strip('/')+'/'+self.__trnName(self.config.get('DEFAULT','bkpstore').strip('/'))
-        if '/'+path.strip('/') != "/":
-            return('/'+path.strip('/'))
-        else:
-            return(None)
-
-    def getMountPath(self,store='SRC'):
-        if store == 'SRC':
-            path = '/'+self.config.get('DEFAULT','SRC').strip('/')
-        if store == 'SNP':
-            path = '/'+self.config.get('DEFAULT','SNPMNT').strip('/')
-        if store == 'BKP':
-            path = '/'+self.config.get('DEFAULT','BKPMNT').strip('/')
-        if '/'+path.strip('/') != "/":
-            return('/'+path.strip('/'))
-        else:
-            return(None)
-
-    def getInterval(self,intv='misc'):
-        try:
-            return(self.config.get(intv,'interval'))
-        except:
-            return(self.config.get('DEFAULT','interval'))
-
-    def getTransfer(self,intv='misc'):
-        try:
-            return(self.config.get(intv,'transfer'))
-        except:
-            return(self.config.get('DEFAULT','transfer'))
-
-    def getSymLink(self,intv='misc'):
-        try:
-            return(self.config.get(intv,'symlink'))
-        except:
-            return(self.config.get('DEFAULT','symlink'))
-
-    def getVolumes(self,options,intv='default',youngest=False):
-        VOLSTRANS = []
-        try:
-            VOLS = self.config.get(intv,'volumes')
-        except:
-            VOLS = self.config.get('DEFAULT','volumes')
-        for vol in VOLS.split(','):
-            vol = self.__trnName(vol)
-            if youngest:
-                verbose(options,'getyoungest from %s' % vol)
-                VOLSTRANS.append(getyoungest(options,self.getStorePath('SNP'),vol,tag=options.tag))
-            else:
-                verbose(options,'notyoungest from %s' % vol)
-                VOLSTRANS.append(vol)
-        return(VOLSTRANS)
-
-    def ListIntVolumes(self):
-        VOLSTRANS = []
-        for intv in self.ListIntervals():
-            try:
-                VOLS = self.config.get(intv,'volumes')
-            except:
-                VOLS = self.config.get('DEFAULT','volumes')
-            VOLS = VOLS.split(',')
-            for i, item in enumerate(VOLS):
-                VOLS[i] = self.__trnName(item)
-#            for vol in VOLS.split(','):
-#                vol = self.__trnName(vol)
-#                VOLSTRANS.append(vol)
-            VOLSTRANS.append('\t'+intv+': '+' '.join(VOLS))
-        return(VOLSTRANS)
-
-
-    def __trnName(self,short):
-        if short == "$S": return(getsyssubvol())
-        elif short == "$h": return(self.hostname)
-        else: return(short)
-
-
 ### END CLASSES ##############
 
 def exit_gracefully():
     verbose(options,'OK')
 
-CONF = Config()
 
-usage = """USAGE: %s [options] ACTION [[STORE] [STORE] [STORE]] <snapshots> [<snapshot> [<snapshot]]*
+
+def main():
+    # set session ID to this process so we can kill group in sigterm handle
+    #parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    CONFIG = Config()
+    usage = """USAGE: %s [options] ACTION [[STORE] [STORE] [STORE]] <snapshots> [<snapshot> [<snapshot]]*
 
 snapshots* = Name(n) der Snapshots, die angezeigt/gelistet oder von denen ein weiterer Snapshot gemacht werden soll.
              Dieser Name ist ohne Pfadangabe und wird jeweils in den Verzeichnissen des "STORE" gesucht.
@@ -969,19 +805,12 @@ STORE      = [SRC|SNP|BKP]
              SRC = %s (aktuelles Verzeichnis)
              SNP = %s
              BKP = %s
-             """ % ('%prog',os.getcwd(),CONF.getStorePath('SNP'),CONF.getStorePath('BKP'))
-
-
-def main():
-    # set session ID to this process so we can kill group in sigterm handle
-    #parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-
-    CONF = Config()
+             """ % ('%prog',os.getcwd(),CONFIG.getStorePath('SNP'),CONFIG.getStorePath('BKP'))
 
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
 
     parser.add_argument("-v", "--verbosity", action="count", default=0, help="increase output verbosity")
-    parser.add_argument("-V", "--volumes-config", dest="volumes", action="store_true",help="Read volumes to snapshot from configfile\n%s" % ('\n'.join(CONF.ListIntVolumes())))
+    parser.add_argument("-V", "--volumes-config", dest="volumes", action="store_true",help="Read volumes to snapshot from configfile\n%s" % ('\n'.join(CONFIG.ListIntVolumes())))
     parser.add_argument("-s", "--subvolumes", dest="sub", action="store_true", help="list - List Subvolumes in Snapshot. If False or unset, it lists all the snapshots in the store")
     #parser.add_argument("--read-only", dest="setro", action="store_false", help="Set snapshot to Read-Only")
     parser.add_argument("-f", "--full-path", dest="fullpath", default=False, action="store_true",help="list - Show full pathname in listing")
@@ -994,10 +823,10 @@ def main():
     parser.add_argument("-d", "--default-volume", dest="syssubvol", default=False, action="store_true",help="create - Take Snapshot from default-subvolume")
     parser.add_argument("-n", "--no-timestamp", action="store_true", dest="ts", default=False, help = "create - name snapshot without timestamp")
     parser.add_argument("-c", "--cleanup", dest="cleanup", action="store_true", help="create, cleanup - Cleanup before creation of a new Snapshot all broken Snapshots before (*.part)")
-    parser.add_argument("-L", "--create-link", dest="link", action="store_true", help="create - Create symbolic links '%s'" % (' '.join(CONF.ListSymlinkNames())))
+    parser.add_argument("-L", "--create-link", dest="link", action="store_true", help="create - Create symbolic links '%s'" % (' '.join(CONFIG.ListSymlinkNames())))
     parser.add_argument("-T", "--check-transfer", dest="transfer", action="store_true", help="create - If transfer is choosen as action, this option checks, if transfer is set in configfile")
     parser.add_argument("-y", "--transfer-youngest", dest="young", action="store_true", help="create, cleanup, transfer - search the younges snapshot(s) and transfer ist/them")
-    parser.add_argument("-C", "--cleanup-interval", dest="cuint", action="store_true", help="cleanup - Delete old snapshots, wich are higher number than allowed in config for this interval \n\t%s" % ('\n\t'.join(CONF.ListIntervalsFull())))
+    parser.add_argument("-C", "--cleanup-interval", dest="cuint", action="store_true", help="cleanup - Delete old snapshots, wich are higher number than allowed in config for this interval \n\t%s" % ('\n\t'.join(CONFIG.ListIntervalsFull())))
     parser.add_argument('--btrfs', default=btrfs(), help='/path/to/the/btrfs command')
                                                 
     parser.add_argument('args', nargs=argparse.REMAINDER, help='''actions, stores and Snapshots to handle
@@ -1008,14 +837,14 @@ def main():
         SNP: %s
         BKP: %s
     snapshots:
-        <snapshot1> <snapshot2> <snapshot3>''' % (os.getcwd(),CONF.getStorePath('SNP'),CONF.getStorePath('BKP')))
+        <snapshot1> <snapshot2> <snapshot3>''' % (os.getcwd(),CONFIG.getStorePath('SNP'),CONFIG.getStorePath('BKP')))
 
     options = parser.parse_args()
     verbose(options,options)
     STORES=[]
     SUBVOLS=[]
     ACTION=[]
-    CONFIG = Config()
+    #CONFIG = mksnapshotconfig.Config()
 
     if len(options.args) == 0:
         sys.exit("zu wenige Argumente")
@@ -1050,9 +879,6 @@ def main():
         if len(STORES) == 0:
             STORES = ['SRC']
 
-#        if len(SUBVOLS) == 0:
-#            SUBVOLS.append(getsyssubvol())
-
         if len(ACTION) == 0:
             sys.exit("No action defined. Stopping")
 
@@ -1067,7 +893,7 @@ def main():
                 if options.path:
                     print(CONFIG.getStorePath(store))
                 elif options.volumes:
-                    for x in CONFIG.getVolumes(options,options.tag):
+                    for x in CONFIG.getVolumes(options.tag):
                         print(x)
                 else:
                     for sub in SUBVOLS:
@@ -1089,13 +915,13 @@ def main():
             verbose(options,'Create Snapshots from %s' % (SUBVOLS))
             if options.volumes:
                 if options.tag != "":
-                    SUBVOLS = CONFIG.getVolumes(options,options.tag)
+                    SUBVOLS = CONFIG.getVolumes(options.tag)
                 else:
                     options.tag = 'misc'
-                    SUBVOLS = CONFIG.getVolumes(options,'misc')
+                    SUBVOLS = CONFIG.getVolumes('misc')
             else:
                 if len(SUBVOLS) == 0:
-                    SUBVOLS.append(getsyssubvol())
+                    #SUBVOLS.append(self.syssubvol)
                     exit("Kein Snapshot zum erstellen ausgewählt")
 
             store = 'SNP'
@@ -1113,7 +939,7 @@ def main():
             else:
                 for store in STORES:
                     for sub in SUBVOLS:
-                        if (store == 'SNP' or store == 'SRC' ) and sub == getsyssubvol():
+                        if (store == 'SNP' or store == 'SRC' ) and sub == syssubvol:
                             warn("Not able to delete system-subvolume %s" % (sub))
                         else:
                             A = Snapshot(options,sub)
@@ -1121,19 +947,26 @@ def main():
 
         elif ACTION == 'TRANSFER':
             TR = False
+            SUBVOLS=[]
             if options.volumes:
                 verbose(options,'Cleanup old interval-snapshots is %s' % (options.cuint))
                 if options.tag != "":
+                    #TR = True
                     TR = CONFIG.getTransfer(options.tag)
-                    TR = True
-                    SUBVOLS = CONFIG.getVolumes(options,options.tag,youngest=options.young)
+                    #SUBVOLS = CONFIG.getVolumes(options,options.tag,youngest=options.young)
+                    #UBVOLS = CONFIG.getVolumes(options,options.tag)
+                    #def getyoungest(options,path,sub,tag=''):
+                    for i in CONFIG.getVolumes(options.tag): 
+                        SUBVOLS.append(getyoungest(options,CONFIG.getStorePath('SNP'),i,tag=options.tag))
                 else:
                     options.tag = 'misc'
                     TR = CONFIG.getTransfer('misc')
-                    SUBVOLS = CONFIG.getVolumes(options,'misc',youngest=options.young)
+                    #SUBVOLS = CONFIG.getVolumes(options,'misc',youngest=options.young)
+                    for i in CONFIG.getVolumes(options.tag): 
+                        SUBVOLS.append(getyoungest(options,CONFIG.getStorePath('SNP'),i,tag=options.tag))
             else:
                 if len(SUBVOLS) == 0:
-                    SUBVOLS.append(getsyssubvol())
+                    #SUBVOLS.append(self.syssubvol)
                     exit("Kein Snapshot zum erstellen ausgewählt")
                 else:
                     TR = True
@@ -1156,12 +989,12 @@ def main():
         elif ACTION == 'CLEANUP':
             if options.volumes:
                 if options.tag != "":
-                    SUBVOLS = CONFIG.getVolumes(options,options.tag)
+                    SUBVOLS = CONFIG.getVolumes(options.tag)
                 else:
                     options.tag = 'misc'
-                    SUBVOLS = CONFIG.getVolumes(options,'misc')
+                    SUBVOLS = CONFIG.getVolumes('misc')
             else:
-                SUBVOLS.append(getsyssubvol())
+                #SUBVOLS.append(self.syssubvol)
                 for store in STORES:
                     cleanup_part(options,store=store)
                 exit("No volume choosen to cleanup")

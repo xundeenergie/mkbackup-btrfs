@@ -71,3 +71,9 @@ systemctl start mkbackup@manually.service
 TODO:
 Finnish and test snapshot-transfer to external HD.
 Create a systemd-unit for transferring snapshots to the external HD
+
+18.9.2016: 
+	-added experimental new code btrfssubvols.py - not working yet!!
+	-new library in /usr/lib/python3/dist-packages for config-parsing
+	-new Fuse-Filesystem for usermounting the backups and snapshots in $HOME/backup
+	
