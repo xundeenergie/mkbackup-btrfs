@@ -17,7 +17,8 @@ CPUSchedulingPolicy=idle
 
 ExecStartPre=/bin/sh -c "(/bin/systemctl is-active -q mkbackup@%i.target)"
 ExecStartPre=/bin/touch /run/mkbackup/daily-cleanup-systemd.lock
-ExecStart=/usr/local/bin/mksnapshot -V -c -C cleanup %i
+#ExecStart=/usr/local/bin/mksnapshot -V -c -C cleanup %i
+ExecStart=/usr/local/bin/mkbackup -V -v cleanup %i
 
 
 #ExecStopPost=-/bin/systemctl start update-backuplinks.target

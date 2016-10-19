@@ -1,0 +1,10 @@
+[Unit]
+Description=Starts mounting backups to /backup, if this directory exists
+BindsTo=mkbackup-userdir.target
+
+[Path]
+PathExists=/backup
+Unit=mkbackup-systemdir.service
+
+[Install]
+WantedBy=mkbackup.target

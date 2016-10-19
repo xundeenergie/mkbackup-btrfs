@@ -32,9 +32,10 @@ CPUSchedulingPolicy=idle
 ExecStartPre=/bin/sh -c "(/bin/systemctl is-active -q mkbackup.target)"
 ExecStartPre=/bin/touch /run/mkbackup/%i-systemd.lock
 #ExecStart=/usr/local/bin/mkbtrbackup create --interval %i ${SRC}/${SYSSUBVOL} ${SRC}/__ALWAYSCURRENT__ --cleanup -L ${OPTIONS} 
-ExecStart=/usr/local/bin/mksnapshot -t %i -V -T -c -C create 
+#ExecStart=/usr/local/bin/mksnapshot -t %i -V -T -c -C create 
+ExecStart=/usr/local/bin/mkbackup -V -v -t %i create SNP
 #ExecStartPost=/usr/local/bin/mksnapshot -Vy -T -t %i transfer
-ExecStopPost=-/bin/systemctl start update-backuplinks.target
+#ExecStopPost=-/bin/systemctl start update-backuplinks.target
 ExecStopPost=-/bin/rm /run/mkbackup/%i-systemd.lock
 
 [Install]

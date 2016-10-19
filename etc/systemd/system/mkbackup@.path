@@ -1,0 +1,13 @@
+[Unit]
+Description=Activate backup on Device %i
+
+[Path]
+PathExists=/dev/disk/by-partuuid/%i
+#PathExists=/dev/disk/by-uuid/%i
+#Unit=systemd-cryptsetup@mars.service
+#Unit=status-email-jakob@%n.service
+Unit=var-cache-backup@%i.mount
+#Unit=dev-disk-by\x2dpartuuid-%i.mount
+
+[Install]
+WantedBy=paths.target

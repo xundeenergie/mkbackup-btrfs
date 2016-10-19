@@ -29,7 +29,7 @@ from datetime import datetime,date,time,timedelta
 
 from mksnapshotconfig import *
 
-DEBUG = True
+DEBUG = False
 
 if not hasattr(fuse, '__version__'):
     raise RuntimeError, \
@@ -76,6 +76,7 @@ class Xmp(Fuse):
         self.root=CONFIG.getStorePath('SNP')
         self.local=CONFIG.getStorePath('SNP')
         self.extern=CONFIG.getStorePath('BKP')
+        self.uroot = False
 #        self.root='/var/cache/btrfs_pool_SYSTEM'
 #        self.local='/var/cache/btrfs_pool_SYSTEM'
 #        self.extern='/var/cache/backup/'+hostname
@@ -84,7 +85,11 @@ class Xmp(Fuse):
         self.direntries=[]
         Xmp.realpath=""
         self.USER=getpass.getuser()
-        self.HOME=os.environ['HOME']
+        try:
+            self.HOME=os.environ['HOME']
+        except:
+            self.HOME = None
+            self.uroot = True
         #self.BDIRS={'local':'/var/cache/btrfs_pool_SYSTEM','extern':'/var/cache/backup/aldebaran'}
         #self.BDIRS={'local':self.local,'extern':self.extern}
         
@@ -92,6 +97,7 @@ class Xmp(Fuse):
     def translate(self,subvolname,location='loc'):
         n = len(subvolname.split('.'))
         ac = ""
+        sn = subvolname.split('.')[0]+'.'
         if n == 1:
             return subvolname+'--'+location
         elif n == 2:
@@ -99,27 +105,34 @@ class Xmp(Fuse):
         elif n == 3:
             sndt = datetime.strptime(subvolname.split('.')[1],"%Y-%m-%d_%H:%M:%S") #snapshot-timestamp
             action = subvolname.split('.')[2]
-            if action == 'manually':
-                ac="-"+action
-            elif action == 'aptupgrade':
-                ac="-"+action
+            if self.uroot:
+                ac='-'+action
             else:
-                ac=""
+                sn = ''
+                if action == 'manually':
+                    ac="-"+action
+                elif action == 'aptupgrade':
+                    ac="-"+action
+                else:
+                    ac=""
 
             snd = datetime.date(sndt) #snapshot-date
             if snd == datetime.date(datetime.now()):
                 #today
-                dts = 'heute %H-%M-%S'
+                dts = sn+'heute_%H-%M-%S'
             elif snd == datetime.date(datetime.now()-timedelta(days=1)):
                 #yesterday
-                dts = 'gestern %H-%M-%S'
+                dts = sn+'gestern_%H-%M-%S'
 #            elif snd == datetime.date(datetime.now()-timedelta(days=2)):
 #                #day before yesterday
 #                dts = 'vorgestern %H-%M-%S'
             else:
                 #any day else
-                dts = '%Y.%m.%d %H-%M-%S'
-            return datetime.strftime(sndt,dts)+'--'+location+ac
+                dts = sn+'%Y.%m.%d_%H-%M-%S'
+            if self.uroot:
+                return datetime.strftime(sndt,dts)+ac+'--'+location
+            else:
+                return datetime.strftime(sndt,dts)+'--'+location+ac
         else:
             return subvolname+'--'+location
 
@@ -132,11 +145,18 @@ class Xmp(Fuse):
                 dirents = os.listdir(self.BDIRS[location])
             except:
                 continue 
-            for entry in dirents:
-                if os.path.exists(self.BDIRS[location]+'/'+entry+self.HOME) \
-                        and not os.path.islink(self.BDIRS[location]+'/'+entry):
-                    self.snapshots[self.translate(entry,location=location)] \
-                            = [self.BDIRS[location], '/'+entry+self.HOME+'/', location]
+            if self.uroot:
+                for entry in dirents:
+                    if os.path.exists(self.BDIRS[location]+'/'+entry) \
+                            and not os.path.islink(self.BDIRS[location]+'/'+entry):
+                        self.snapshots[self.translate(entry,location=location)] \
+                                = [self.BDIRS[location], '/'+entry+'/', location]
+            else:
+                for entry in dirents:
+                    if os.path.exists(self.BDIRS[location]+'/'+entry+self.HOME) \
+                            and not os.path.islink(self.BDIRS[location]+'/'+entry):
+                        self.snapshots[self.translate(entry,location=location)] \
+                                = [self.BDIRS[location], '/'+entry+self.HOME+'/', location]
 
 
     def __realpath(self,path):
@@ -146,7 +166,7 @@ class Xmp(Fuse):
         if path == "/" and (self.root in self.BDIRS.values()):
             Xmp.realpath = path
             return Xmp.realpath
-        if ss in self.snapshots:
+        elif ss in self.snapshots:
             self.root = self.snapshots[ss][0]
             Xmp.realpath = self.snapshots[ss][0]+self.snapshots[ss][1]+sv
             return Xmp.realpath
@@ -195,8 +215,10 @@ class Xmp(Fuse):
 
     def readdir(self, path, offset):
         #if path == "/" and (self.root.strip('/') == self.BDIRS['loc'].strip('/') or self.root == self.BDIRS['ext'].strip('/')):
+    
         if path == "/" and (self.root in self.BDIRS.values()):
-            print path
+            if DEBUG: print path
+            pass
         if path == "/": 
             self.__lsnapshots()
         for e in self.__lsdir(path):
@@ -302,9 +324,11 @@ class Xmp(Fuse):
 
     def fsinit(self):
         if DEBUG: print "fsinit"
+        if self.uroot == None: self.uroot = True
         self.BDIRS={'loc':'/'+self.local.strip('/'),'ext':'/'+self.extern.strip('/')}
         os.chdir('/'+self.local.strip('/'))
         self.__lsnapshots()
+
 
     class XmpFile(object):
 
@@ -417,6 +441,9 @@ Userspace nullfs-alike: mirror the filesystem tree from some point on.
                              help="set path to filesystem from internal HDD/SSD under PATH [default: %default]")
     server.parser.add_option(mountopt="extern", metavar="PATH", default=server.extern, 
                              help="set path to filesystem from external HDD/SSD under PATH [default: %default]")
+    server.parser.add_option(mountopt="uroot", metavar="BOOL", default=server.uroot, 
+                             help="""use ist for mounting on /backup for root -
+                             whole snapshots! BOOL [default: %default]""")
 
     server.parse(values=server, errex=1)
     
