@@ -68,6 +68,16 @@ You can make your first snapshot with:
 
 systemctl start mkbackup@manually.service
 
+==mlocate:
+To avoid, that mlocate searches the backups, edit its configuration
+
+/etc/updatedb.conf
+PRUNE_BIND_MOUNTS="yes"
+# PRUNENAMES=".git .bzr .hg .svn"
+PRUNEPATHS="/tmp /var/spool /media /backup /backup-local /var/cache/backup /var/cache/btrfs_pool_SYSTEM"
+PRUNEFS="NFS nfs nfs4 rpc_pipefs afs binfmt_misc proc smbfs autofs iso9660 ncpfs coda devpts ftpfs devfs mfs shfs sysfs cifs lustre tmpfs usbfs udf fuse.glusterfs fuse.sshfs curlftpfs fuse.MksnapshotFS.py"
+
+
 TODO:
 Finnish and test snapshot-transfer to external HD.
 Create a systemd-unit for transferring snapshots to the external HD

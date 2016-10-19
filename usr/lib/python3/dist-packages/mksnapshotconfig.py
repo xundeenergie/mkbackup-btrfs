@@ -18,10 +18,12 @@ if PY3:
 else:
     from ConfigParser import ConfigParser
 
+def s2bool(s):
+    return s.lower() in ['true','yes','y','1'] if s else False
 
 class Config():
-    def __init__(self):
-        self.cfile = '/etc/mksnapshot.conf'
+    def __init__(self,cfile='/etc/mksnapshot.conf'):
+        self.cfile = cfile
         self.config = ConfigParser()
         #self.hostname = subprocess.check_output("/bin/hostname",shell=True).decode('utf8').split('\n')[0]
         self.hostname=socket.gethostname()
@@ -136,6 +138,12 @@ class Config():
             return('/'+path.strip('/'))
         else:
             return(None)
+    
+    def setBKPPath(self,bkpmount=''):
+        self.config['DEFAULT']['BKPMNT'] = bkpmount
+
+    def setBKPStore(self,bkpstore=''):
+        self.config['DEFAULT']['bkpstore'] = bkpstore
 
     def getStoreName(self,store='SRC'):
         if store == 'SRC':
@@ -157,15 +165,22 @@ class Config():
 
     def getTransfer(self,intv='misc'):
         try:
-            return(self.config.get(intv,'transfer'))
+            return(s2bool(self.config.get(intv,'transfer')))
         except:
-            return(self.config.get('DEFAULT','transfer'))
+            return(s2bool(self.config.get('DEFAULT','transfer')))
 
     def getSymLink(self,intv='misc'):
         try:
             return(self.config.get(intv,'symlink'))
         except:
             return(self.config.get('DEFAULT','symlink'))
+
+    def getIsDefault(self,intv='misc'):
+        try:
+            self.config.get(intv,'interval')
+            return(intv)
+        except:
+            return('default')
 
     def getVolumes(self,intv='default'):
         VOLSTRANS = []

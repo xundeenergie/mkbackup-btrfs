@@ -1,0 +1,989 @@
+#!/usr/bin/python3 -u
+
+import argparse
+import re
+import datetime
+import subprocess
+import os
+import sys
+import errno
+
+from mksnapshotconfig import Config
+
+if hasattr(os, 'sync'):
+    sync = os.sync
+else:
+    import ctypes
+    libc = ctypes.CDLL('libc.so.6')
+    def sync():
+        libc.sync()
+
+def DEBUG(args,*msg,level=0):
+    if args.verbose < level :
+        return
+    else: 
+        for i in msg: print(i)
+        return
+
+def sp_call(args,cmdl,level=4):
+    stdout = subprocess.DEVNULL
+    stderr = subprocess.DEVNULL
+#    if args.verbose == 2:
+#        stderr = None
+#    elif args.verbose >= 3:
+#        stdout = None
+#        stderr = None
+    stdout = args.stdout
+    stderr = args.stderr
+    
+    DEBUG(args,'[II][cmdl]  '+' '.join(cmdl),level=level)
+    r = subprocess.call(cmdl, stdout=stdout, stderr=stderr)
+    return(r)
+    
+def sp_co(args,cmdl):
+    stderr = subprocess.DEVNULL
+    if args.verbose >= 2:
+        stderr = None
+    
+    DEBUG(args,'[II][cmdl]  '+' '.join(cmdl),level=4)
+    p = subprocess.Popen(cmdl,stdout=subprocess.PIPE, stderr=stderr)
+    output = p.communicate()[0]
+    return(p.returncode,output)
+     
+def isstring(s):
+    # if we use Python 3
+    if (sys.version_info[0] == 3):
+        return isinstance(s, str)
+    # we use Python 2
+    return isinstance(s, basestring)
+
+def check_lockfile(args,lf):
+    # Returns True, when lockfile is in use, and False if lockfile is unused
+    # Returns None, when lockfile is not existing
+    print(lf)
+    if os.path.isfile(lf):
+        file = open(lf, 'r')
+        pid = file.readline()
+        if len(pid) > 0 and os.path.isfile('/proc/'+pid+'/cmdline'):
+            #DEBUG(args,pid+' is running: '+lf)
+            DEBUG(args,'lockfile %s in use with process %s' % (lf,pid))
+            return(True)
+        else:
+            DEBUG(args,'lockfile %s unused' % (lf))
+            #DEBUG(args,' --> remove unused lockfile: '+lf,level=3)
+            return(False)
+    else:
+        DEBUG(args,'lockfile %s not existing' % (lf))
+        return(None)
+
+class TransferFailed(Exception):
+    pass
+
+class SubVolume:
+    what = 'store all informations about a btrfs-Subvolume'
+
+    def __init__(self,args,name,store='SRC'):
+        self.args         = args
+        self.timestamp    = args.timestamp 
+        self.verbose      = args.verbose
+        self.tag          = args.tag
+        self.exist        = True
+        self.config       = args.config #Config()
+        self.store        = store
+        self.storepath    = self.config.getStorePath(self.store)
+        self.mountpath    = self.config.getMountPath(self.store)
+        self.storename    = self.config.getStoreName(self.store)
+        self.path         = ''
+        self.dir          = ''
+        if store    == 'SRC':
+            self.name     = os.path.basename(name)
+        else:
+            self.name     = name.strip('/')
+        self.basename     = name.split('.')[0]
+
+        regexpart         = re.compile('\.part') 
+        self.OrigName  = self.name.rstrip('.part')
+        self.OrigLock  = self.OrigName+'.part'
+        self.OLockFile = '.'+self.OrigName+'.~lock'
+        self.SnapName  = self.basename+'.'+self.timestamp+'.'+self.tag
+        self.SnapLock  = self.SnapName+'.part'
+        self.SLockFile = '.'+self.SnapName+'.~lock'
+        DEBUG(self.args,'OrigName ',self.OrigName,level=4)
+        DEBUG(self.args,'OrigLock ',self.OrigLock,level=4)
+        DEBUG(self.args,'OLockFile',self.OLockFile,level=4)
+        DEBUG(self.args,'SnapName ',self.SnapName,level=4)
+        DEBUG(self.args,'SnapLock ',self.SnapLock,level=4)
+        DEBUG(self.args,'SLockFile',self.SLockFile,level=4)
+        self.part         = False
+        self.snapname     = self.basename+'.'+self.timestamp+'.'+self.tag
+        self.partname     = self.basename+'.'+self.timestamp+'.'+self.tag+'.part'
+
+#        self.oname        = "" #Originalname
+#        self.snapname     = "" #Name of Snapshot created from original (without .part)
+#        self.lockname     = "" #Name of locked snapshot
+
+        self.lockname     = self.name.rstrip('.part')
+        self.lockfile     = '.'+self.name.rstrip('.part')+'.~lock'
+        self.uuid         = '' #UUID
+        self.puuid        = '' #Parent-UUID
+        self.ruuid        = '' #Received UUID
+        self.ctime        = '' #Creation Time
+        self.ID           = 0 #subvolume-ID
+        self.gen          = 0 # Generation
+        self.cgen         = 0 #Generation at creationtime
+        self.pid          = 0 #Parent ID
+        self.tlid         = 0 #Top level ID
+        self.flags        = 0 #Flags
+        self.snapshots    = [] #List of snapshots made from this subvolume
+        self.parent       = ''
+        self.subvolsshort = []
+        self.subvolumes   = []
+        self.stderr       = args.stderr
+
+        self.translate={'Name':'name',
+                        'UUID':'uuid',
+                        'Parent UUID':'puuid',
+                        'Received UUID':'ruuid',
+                        'Creation time':'ctime',
+                        'Subvolume ID':'ID',
+                        'Generation':'gen',
+                        'Gen at creation':'cgen',
+                        'Parent ID':'pid',
+                        'Top level ID':'tlid',
+                        'Flags':'flags',
+                        'Snapshot(s)':'snapshots'}
+        DEBUG(args,'[II]  <%s> is %s: ' % (self.store, self.config.getStorePath(self.store)),level=2)
+        self.main()
+
+    def lock(self,snapshot=False):
+        lf = self.SLockFile if snapshot else self.OLockFile #lf is lockfile
+        ln = self.SnapLock if snapshot else self.OrigLock   #ln is lockname is name of locked snapshot
+        if os.path.isfile(lf):
+            DEBUG(self.args,'Nothing to lock',level=2)
+        else:
+            DEBUG(self.args," =lock> "+self.store+'/'+self.OrigName,level=1)
+            try:
+                lockfile = open(self.storepath+'/'+lf, 'w', 1)
+                lockfile.write(str(os.getpid()))
+                lockfile.close()
+            except OSError:
+                pass
+        if os.path.exists(self.dir+'/'+self.SnapLock):
+            DEBUG(self.args,' =lock: Nothing to rename',level=3)
+        else:
+            if self.args.action == 'create':
+                DEBUG(self.args," =lock: nothing to rename",level=3)
+            elif self.args.action == 'transfer':
+                DEBUG(self.args," =lock-rename> %s --> %s" % (self.OrigName,self.SnapLock),level=2)
+                #os.rename(self.OrigName,self.SnapLock)
+            else:
+                pass
+        return
+        
+    def unlock(self,checked=False,snapshot=False,store=None):
+        #path = self.config.getStorePath(store)+'/'
+        print('p')
+        path = self.dir+'/'
+        print('p',path)
+        lf = self.SLockFile if snapshot else self.OLockFile #lf is lockfile
+        ln = self.SnapLock if snapshot else self.OrigLock   #ln is lockname is name of locked snapshot
+        print('unlock-issub-bkp',issubvol(args.config.getStorePath('BKP')))
+        if checked:
+            if check_lockfile(self.args,path+lf):
+                print('A')
+                pass
+            elif check_lockfile(self.args,path+lf) == None:
+                print('B')
+                pass
+            else:
+                print('C')
+                DEBUG(self.args," =unlock-checked> <%s>/%s" % (store,lf),level=0)
+                os.remove(path+lf)
+        else:
+            if os.path.isfile(path+lf):
+                DEBUG(self.args," =unlock> <%s>/%s" % (store,lf),level=0)
+                os.remove(path+lf)
+
+    def rename(self):
+        DEBUG(args, ' =rename>: <%s>/%s -> %s' % (self.store,self.OrigLock,self.OrigName), level=1)
+        os.rename(self.dir+'/'+self.OrigLock,self.dir+'/'+self.OrigName)
+        self.part = False
+
+    def actname(self):
+        return self.snapname if self.part else self.partname
+
+    def tr_att(self,att):
+        if att in self.translate:
+            return self.translate[att]
+        else:
+            return att
+
+    def parse_btrfs_show(self):
+        DEBUG(self.args,'[II]  parse subvolume store<%s>: %s' % (self.storename,self.name),level=2)
+        subvolume_data = dict()
+        if self.name.startswith(self.storename):
+            #print("JA",self.name.strip(self.storename+'/'))
+            name = self.name.strip(self.storename+'/')
+        else:
+            #print("NEIN")
+            name = self.name
+        cmd = ['btrfs','subvolume','show',self.storepath+'/'+name]
+        #DEBUG(self.args,'[IIE][cmdl]  '+' '.join(cmd),level=4)
+        sv = False
+        snaps=[]
+        try:
+            #for line in subprocess.check_output(cmd,stderr=self.stderr).splitlines():
+            output = sp_co(self.args,cmd)
+            if output[0] == 0:
+                for line in output[1].splitlines():
+                    args = [arg.strip() for arg in str(line, encoding='utf8').split(': ')]
+                    if len(args) > 1:
+                        subvolume_data[self.tr_att(args[0])]=args[1]
+                        setattr(self, self.tr_att(args[0]), args[1])
+                    elif sv:
+                        snaps.append(args[0])
+                    else:
+                        if args[0] == 'Snapshot(s):': 
+                            sv = True
+                        else:
+                            subvolume_data['path']=args[0]
+                            self.path=args[0]
+                self.snapshots = snaps
+                self.dir       = os.path.dirname(subvolume_data['path'])
+                subvolume_data['snapshots'] = self.snapshots
+                subvolume_data['dir']       = self.dir
+                #return(subvolume_data)
+                return(0)
+            else:
+                #print("ENOENT")
+                self.exist = False
+                return(errno.ENOENT)
+        except:
+            #print("DEADBEEF")
+            self.exist = False
+            return
+
+    def get_parent(self):
+        DEBUG(self.args,'[II]  get parent',level=2)
+        cmd = ['btrfs','subvolume','list','-o','-u',self.dir]
+        DEBUG(self.args,'[II][cmdl]  '+' '.join(cmd),level=4)
+        try:
+            for line in subprocess.check_output(cmd,stderr=self.stderr).splitlines():
+                args = [arg.strip() for arg in str(line, encoding='utf8').split(' ')]
+                if args[8] == self.puuid:
+                    self.parent=args[10:]
+        except:
+            return(None)
+
+    def list_sisters(self,store='SRC',subvol='/'):
+        self.get_parent()
+        SNAPS = dict()
+        BKPS  = dict()
+        regex = re.compile('.part$')
+        cmd = ['btrfs','subvolume','list','-u','-q','-R','-c','--sort=-ogen',self.config.getStorePath(store)+subvol]
+        DEBUG(self.args,'[II][cmdl]  '+' '.join(cmd),level=4)
+        for line in subprocess.check_output(cmd,stderr=self.stderr).splitlines():
+            args = [arg.strip() for arg in str(line, encoding='utf8').split(' ')]
+            #print(args[10],self.puuid)
+            name = ' '.join(args[16:])
+            if args[10] == self.puuid and not regex.search(name):
+                SNAPS[name] = {'gen':args[3],'cgen':args[5],'puuid':args[10],'ruuid':args[12],'uuid':args[14]}
+        self.sisters = SNAPS
+        return SNAPS
+
+    def __read_subvolumes(self,name):
+        os.chdir(self.mountpath)
+        subs=[]
+        subsshort=[]
+        subsdetails = dict()
+        cmd = ['btrfs','subvolume','list','-o','-R','-c','-u','-q',name]
+        DEBUG(self.args,'[II][cmdl]  '+' '.join(cmd),level=4)
+        output = sp_co(self.args,cmd)
+        if self.exist == True and output[0] == 0:
+            for line in output[1].splitlines():
+                argmts = [ar.strip() for ar in str(line, encoding='utf8').split(' ')]
+                for i in [' '.join(argmts).partition("path ")[2]]:
+                    sep = self.name+'/'
+                    subsshort.extend([i.partition(sep)[2]])
+                    subs.extend([i])
+                    sub = str(i.partition(sep)[2])
+                    subsdetails[sub] = dict()
+                    subsdetails[sub]['gen'] = argmts[3]
+                    subsdetails[sub]['cgen'] = argmts[5]
+                    subsdetails[sub]['puuid'] = argmts[10]
+                    subsdetails[sub]['ruuid'] = argmts[12]
+                    subsdetails[sub]['uuid'] = argmts[14]
+                    A = self.__read_subvolumes(i)
+                    subs.extend(A.keys())
+                    for i in A.keys():
+                        #print('A',i,A[i])
+                        subsshort.append(i)
+                        sub = i
+                        subsdetails[sub] = dict()
+                        subsdetails[sub]['gen'] = A[i]['gen']
+                        subsdetails[sub]['cgen'] = A[i]['cgen']
+                        subsdetails[sub]['puuid'] = A[i]['puuid']
+                        subsdetails[sub]['ruuid'] = A[i]['ruuid']
+                        subsdetails[sub]['uuid'] = A[i]['uuid']
+            self.subvolumes = subs
+            self.subvolsshort = subsshort
+            self.subsdetails = subsdetails
+            return(subsdetails)
+        else:
+            DEBUG(args,'[II]  <%s> is %s: ' % (self.store, self.config.getStorePath(self.store)),level=1)
+
+            print("subvol non existant: <%s>/%s" % (self.store,self.name))
+            #return(False)
+            #raise Exception("subvol non existant: <%s>/%s" % (self.store,self.name))
+
+    def read_subvolumes(self,name):
+        try:
+            self.__read_subvolumes(name)
+            try:
+                self.subvolsshort.insert(0, '')
+            except:
+                self.subvolsshort.append('')
+            self.subvolsshort = sorted(self.subvolsshort)
+            self.subsdetails[''] = dict()
+            self.subsdetails['']['gen'] = self.gen
+            self.subsdetails['']['cgen'] = self.cgen
+            self.subsdetails['']['puuid'] = self.puuid
+            self.subsdetails['']['ruuid'] = self.ruuid
+            self.subsdetails['']['uuid'] = self.uuid
+            #print(self.subsdetails)
+        except:
+            self.subsshort = []
+            self.subsdetails = dict()
+    
+    def setprop(self,ro=True):
+        for i in self.config.getVolumes():
+            if self.name == i and ro == True:
+                print('snapshot is system-volume: not allowed to set to read-only: '+self.name)
+                return
+        setsubs = []
+        if ro:
+            DEBUG(args,' =set-ro>: <%s>/%s' % (self.store,self.name))
+            for sub in reversed(self.subvolsshort):
+                if issubvol(self.dir+'/'+self.name+'/'+sub) == True:
+                    DEBUG(args,' =ro>: <%s>/%s' % (self.store,self.name+'/'+sub),level=1)
+                    cmd = ['btrfs','property','set','-ts',self.storepath+'/'+self.name+'/'+sub,'ro','true']
+                    sp_call(self.args,cmd)
+        else:
+            DEBUG(args,' =set-rw>: <%s>/%s' % (self.store,self.name))
+            for sub in self.subvolsshort:
+                if issubvol(self.dir+'/'+self.name+'/'+sub) == True:
+                    DEBUG(args,' =rw>: <%s>/%s' % (self.store,self.name+'/'+sub), level=1)
+                    cmd = ['btrfs','property','set','-ts',self.storepath+'/'+self.name+'/'+sub,'ro','false']
+                    sp_call(self.args,cmd)
+                
+    def create(self):
+        DEBUG(args,'[II]  create snapshot from <%s>/%s' % (self.store, self.name),level=0)
+        print(self.exist)
+        if self.exist:
+            print('SNP',self.snapname)
+            #self.lock(name = self.snapname)
+            self.lock(snapshot=True)
+            for sub in self.subvolsshort:
+
+                # Test the Source for local snapshotting
+                if issubvol(self.OrigName+'/'+sub):
+                    dest = self.SnapLock+'/'+sub
+                    cmd = ['btrfs','subvolume','snapshot',self.dir+'/'+self.OrigName+'/'+sub,self.dir+'/'+dest]
+
+                    # Test the destination for local snapshotting
+                    if issubvol(self.dir+'/'+dest):
+                        # Test if top level snapshot is existing and a snapshot
+                        raise Exception(' [XX] subvol exists - this should not happen: '+self.dir+'/'+dest)
+                        print(' [XX] subvol exists - this should not happen: '+self.dir+'/'+dest)
+                    elif issubvol(self.dir+'/'+dest) == False:
+                        # If destination exists and is a directory and not a snapshot, delete dir and create snapshot (for subvolumes of snapshot)
+                        DEBUG(args,' =create>: <%s>/%s' % (self.store,dest),level=1)
+                        sp_call(args,['rm','-r','-f',self.dir+'/'+dest])
+                        sp_call(args,cmd)                           
+                    else:
+                        # If destination doesnt exist, create the snapshot
+                        DEBUG(args,' =create>: <%s>/%s' % (self.store,dest),level=1)
+                        sp_call(args,cmd)                           
+                    sync()
+
+                elif issubvol(self.OrigName+'/'+sub) == False:
+                    raise Exception(' [XX] is directory, no subvolume - this should not happen: '+sub)
+                    print(' [XX] is directory, no subvolume - this should not happen: '+sub)
+                else:
+                    #raise Exception(' [XX] 3 not existing - this should not happen: '+sub)
+                    print(' [XX] 3 not existing - this should not happen: '+sub)
+                    DEBUG(self.args, " Source-snapshot not existing: %s" % (self.OrigName+'/'+sub))
+            else:
+                pass
+            #print('C3',self.SnapLock, self.partname)
+            return(self.SnapLock)
+        else:
+            DEBUG(args,'[EE] creation not possible: original not existinging: %s' % (self.name),level=0)
+            raise
+
+
+    def transfer(self,bkpmnt=None, bkpstore=None):
+        if bkpmnt == None: bkpmnt = self.config.getMountPath('BKP')
+        if bkpstore == None: self.config.getStoreName('BKP')
+        if self.config.getTransfer(self.tag):
+            try:
+                transfer_new(self.args,snapshots=[self.SnapLock])
+#                DEBUG(args, ' =rename>: <%s>/%s -> %s' % ('BKP',self.basename+'.'+self.timestamp+'.'+self.tag+'.part',self.basename+'.'+self.timestamp+'.'+self.tag),level=1)
+                #os.rename(args.config.getStorePath('BKP')+'/'+self.basename+'.'+self.timestamp+'.'+self.tag+'.part',args.config.getStorePath('BKP')+'/'+self.basename+'.'+self.timestamp+'.'+self.tag)
+                os.rename(args.config.getStorePath('BKP')+'/'+self.partname, args.config.getStorePath('BKP')+'/'+self.snapname)
+            except TransferFailed as e:
+                raise Exception('transfer failed', e)
+                print('transfer is broken')
+            except:
+                raise Exception('transfer not possible')
+                print('transfer not possible')
+            finally:
+                return(self.SnapLock)
+#                DEBUG(args, ' =rename-fin>: <%s>/%s -> %s' % (self.store,self.basename+'.'+self.timestamp+'.'+self.tag+'.part',self.basename+'.'+self.timestamp+'.'+self.tag), level=1)
+#                #os.rename(self.basename+'.'+self.timestamp+'.'+self.tag+'.part',self.basename+'.'+self.timestamp+'.'+self.tag)
+#                os.rename(self.basename+'.'+self.timestamp+'.'+self.tag+'.part',self.basename+'.'+self.timestamp+'.'+self.tag)
+
+#        else:
+#            DEBUG(args, ' =rename>: <%s>/%s -> %s' % (self.store,self.basename+'.'+self.timestamp+'.'+self.tag+'.part',self.basename+'.'+self.timestamp+'.'+self.tag), level=1)
+#            os.rename(self.basename+'.'+self.timestamp+'.'+self.tag+'.part',self.basename+'.'+self.timestamp+'.'+self.tag)
+
+    def symlink(self):
+        linkName = self.basename+'.'+args.config.getSymLink(args.tag)
+        print(' =symlink>',linkName)
+        symlink_force('./'+self.SnapName, linkName)
+
+    def delete(self):
+        if self.exist:
+            for i in self.config.getVolumes():
+                if self.name == i:
+                    print('snapshot is system-volume: not allowed to delete: '+self.name)
+                    return
+            delsubs = []
+            #print('<%s> is %s: ' % (self.store, self.config.getStorePath(self.store)))
+            for sub in reversed(self.subvolsshort):
+                issub = issubvol(self.dir+'/'+self.OrigName+'/'+sub)
+                if issub == True:
+                    DEBUG(self.args,' -prepare-to-delete>: <%s>/%s' % (self.store,self.OrigName+'/'+sub),level=1)
+                    delsubs.append(self.dir+'/'+self.OrigName+'/'+sub)
+                elif issub == False:
+                    print(' [XX] is directory, no subvolume - this should not happen: <%s>/%s' % (self.store,self.OrigName+'/'+sub))
+                else:
+                    print(' [XX] 3 not existing - this should not happen: <%s>/%s' % (self.store,self.OrigName+'/'+sub))
+            self.setprop(ro=False)
+            cmd = ['btrfs','subvolume','delete','-c']
+            cmd.extend(delsubs)
+            print(' -delete-subvolumes>')
+            sp_call(self.args,cmd)
+            print(' -subvolumes-deleted>')
+        else:
+            print('nothing to delete - subvolume does not exist: %s %s' % (self.store,self.name))
+            
+                
+    def main(self):
+        #try:
+            self.parse_btrfs_show()
+            self.read_subvolumes(self.storename+'/'+self.name)
+        #except:
+        #    print("Snapshot does not exist: <%s>/%s" % (self.store,self.name))
+        #    return(self.exist)
+
+class listing:
+    what = "Listing of all subvolumes in store"
+    def __init__(self,args,store='SRC'):
+        self.subvolumes = dict()
+        self.args = args
+        self.result = []
+        self.result_tmp = []
+        self.path = args.config.getStorePath(store)
+        self.subs = []
+        cmd=['btrfs','subvolume','list','-R','-u','-q','-c',self.path]
+        output = sp_co(args,cmd)
+        if output[0] == 0:
+            for line in output[1].splitlines():
+                argmts = str(line, encoding='utf8').split(' ')
+                #ID 2412 gen 8547 cgen 8547 top level 2393 parent_uuid 7991115b-8a6b-6d4d-b664-03db01e902d0 received_uuid - uuid 368490e7-5aca-0d4d-9b7a-becff0487ebd path aldebaran/__ALWAYSCURRENT__.2016-10-15_22:40:25.hourly.part/var-spool-dovecot
+                self.subvolumes[argmts[1]] = dict() 
+                self.subvolumes[argmts[1]]['id'] = argmts[1]
+                self.subvolumes[argmts[1]]['gen'] = argmts[3]
+                self.subvolumes[argmts[1]]['cgen'] = argmts[5]
+                self.subvolumes[argmts[1]]['tlid'] = argmts[8]
+                self.subvolumes[argmts[1]]['puuid'] = argmts[10]
+                self.subvolumes[argmts[1]]['ruuid'] = argmts[12]
+                self.subvolumes[argmts[1]]['uuid'] = argmts[14]
+                self.subvolumes[argmts[1]]['path'] = ' '.join(argmts[16:])
+
+    def _ret(self,ret,reverse=False):
+        if reverse:
+            return(reversed(ret))
+        else:
+            return(sorted(ret))
+    
+    def list_sisters(self,ID,rev=False,older=None,younger=None,names=True):
+        result = []
+        if older   == None: older = self.args.older
+        if younger == None: younger = self.args.younger
+        for sub in sorted(self.subvolumes.keys()):
+            if self.subvolumes[sub]['puuid'] == self.subvolumes[ID]['puuid'] and not sub == ID:
+                if older:
+                    if self.subvolumes[sub]['gen'] >= self.subvolumes[ID]['gen']: continue
+                if younger:
+                    if self.subvolumes[sub]['gen'] <= self.subvolumes[ID]['gen']: continue
+                DEBUG(self.args,'SISTER',self.subvolumes[sub]['path'],level=5)
+                result.append(self.subvolumes[sub]['path']) if names else result.append(sub)
+        return(self._ret(result,reverse=rev))
+
+    def list_parent(self,puuid,rev=False,names=True):
+        result = []
+        for sub in sorted(self.subvolumes.keys()):
+            if self.subvolumes[sub]['uuid'] == puuid:
+                DEBUG(self.args,'PARENT',self.subvolumes[sub]['path'],level=5)
+                self.result.append(self.subvolumes[sub]['path']) if names else self.result.append(sub)
+        return(self._ret(reverse=rev))
+
+    def list_snapshots(self,uuid,rev=False,names=True):
+        result = []
+        for sub in sorted(self.subvolumes.keys()):
+            if self.subvolumes[sub]['puuid'] == uuid:
+                DEBUG(self.args,'PARENT',self.subvolumes[sub]['path'],level=5)
+                result.append(self.subvolumes[sub]['path']) if names else result.append(sub)
+        return(self._ret(result,reverse=rev))
+
+    def grep_subvolumes(self,expr,names=True,rev=False):
+        result = []
+        for sub in sorted(self.subvolumes.keys()):
+            if expr.search(self.subvolumes[sub]['path']):
+                DEBUG(self.args,'REGEX',self.subvolumes[sub]['path'],level=5)
+                result.append(self.subvolumes[sub]['path']) if names else result.append(sub)
+        return(self._ret(result,reverse=rev))
+
+    def _lssub(self,id):
+        # recursiv listing of all subvolumes below a given snapshot
+        result = []
+        for i in self.subvolumes:
+            if self.subvolumes[i]['tlid'] == id:
+                result.append(self.subvolumes[i]['id'])
+                for i in self._lssub(self.subvolumes[i]['id']):
+                    result.append(i)
+        return(result)
+
+    def list_subvolumes(self,id,rev=False,names=True,incl_self=True):
+        result= []
+        first = '' if names else id 
+        if incl_self: result.append(first)
+        for sub in self._lssub(id):
+            result.append(self.subvolumes[sub]['path'].partition(self.subvolumes[id]['path']+'/')[2]) if names else result.append(sub)
+        return(self._ret(result,reverse=rev))
+
+def main(args):
+    for st in args.store:
+        print(args.config.getStorePath(st))
+        for s in args.snapshot:
+            L=SubVolume(ags,s,store=st)
+            L.main()
+            L.list_sisters()
+
+
+def cleanup(args):
+    DEBUG(args,' --cleanup>')
+    DEL = []
+    explock = re.compile('.*.~lock$')
+    exppart = re.compile('.part$')
+    partlock = dict()
+    cI,I = dict(), dict()
+    for i in args.config.ListIntervals():
+        cI[i] = 0
+        I[i]  = args.config.getInterval(i)
+    #for sn in args.config.getVolumes():
+    for st in args.store:
+        storepath = args.config.getStorePath(st)+'/'
+        ST = listing(args,store=st)
+        for sn in args.snapshot:
+            ex = re.compile('$|'.join([sn+'.*' + word_in_list for word_in_list in I.keys()])+'$')
+            for i in args.config.ListIntervals():
+                cI[i] = 0
+            try:
+                for i in ST.grep_subvolumes(ex,names=False,rev=True):
+                    for tag in I.keys():
+                        if ST.subvolumes[i]['path'].partition(tag)[1] != '':
+                            cI[tag] += 1
+                            if cI[tag] > int(I[tag]):
+                                print('DELETE',ST.subvolumes[i]['path'])
+                                DEL.append([st,ST.subvolumes[i]['path']])
+            except:
+                #print('cleanup failed for %s' % (sn))
+                raise Exception('cleanup failed for %s' % (sn))
+
+        # Find unused lockfiles and delte them also
+        for i in ST.subvolumes:
+            subvol = ST.subvolumes[i]['path']
+            lckfile = '.'+subvol+'.~.lock'
+            if exppart.search(subvol): 
+                if os.path.isfile(storepath+lckfile):
+                    partlock[storepath+subvol] = storepath+lckfile
+                else:
+                    print('remove',storepath+subvol) 
+                    DEL.append([st,subvol])
+
+        for lf in partlock:
+            print(lf)
+            if check_lockfile(args,lf):
+                print('lockfile %s is in use' % (lf))
+            else:
+                X = Subvolumes(args,lf,store=st)
+                X.unlock()
+                X.delete()
+
+
+        for lf in os.listdir(args.config.getStorePath(st)):
+            if explock.search(lf):
+                if check_lockfile(args,lf):
+                    pass
+                elif check_lockfile(args,lf) == None:
+                    pass
+                else:
+                    DEBUG(args,' --> remove unused lockfile: '+lf,level=1)
+                    os.remove(lf)
+
+    # Delete them
+    for S in DEL:
+        print(S)
+        L=SubVolume(args,S[1],store=S[0])
+        L.delete()
+
+    return
+
+def issubvol(path):
+    if os.path.exists(path):
+        if os.stat(path).st_ino == 256:
+            return True
+        else:
+            return False
+    else:
+        return None
+
+def symlink_force(target, link_name):
+    try:
+        os.symlink(target, link_name)
+    except OSError as e:
+        if e.errno == errno.EEXIST:
+            os.remove(link_name)
+            os.symlink(target, link_name)
+        else:
+            raise e
+
+def create(args):
+    for st in args.store:
+        for s in args.snapshot:
+            #DEBUG(args,'[II]  create snapshot from <%s>/%s' % (st, s),level=0)
+            try:
+                SRC = SubVolume(args,s,store=st)
+                S = SubVolume(args,SRC.create(),store=st)
+                S.setprop(ro=True)
+                S.transfer(bkpmnt=args.bkpmount, bkpstore=args.bkpstore)
+                S.symlink()
+                S.rename()
+                S.unlock()
+            except Exception as e:
+                continue
+            continue
+    cleanup(args)
+
+def delete(args):
+    for st in args.store:
+        for s in args.snapshot:
+            S=SubVolume(args,s,store=st)
+            S.unlock()
+            S.delete()
+    return
+            
+def setprop(args):
+    for st in args.store:
+        for s in args.snapshot:
+            S=SubVolume(args,s,store=st)
+            S.setprop(ro=args.ro)
+    return
+            
+def lists(args):
+    if args.info:
+        if args.showpathstore:
+            for st in args.store: print(args.config.getStorePath(st))
+        elif args.showtags:
+            for i in args.config.ListIntervals(): print(i)
+        elif args.showtransfers:
+            if args.config.getTransfer(intv=args.tag):
+                DEBUG(args,'"%s" results in "%s", will transfer actual snapshots from this volume(s):' % (args.tag,args.config.getIsDefault(intv=args.tag)),level=1)
+                print(' '.join(args.config.getVolumes(intv=args.tag)))
+            else:
+                DEBUG(args,'%s will transfer nothing' % (args.tag),level=1)
+        else:
+            for i in args.config.getVolumes(intv=args.tag): print(i)
+
+    else:
+        text = 'subvolumes in'
+        if args.snap:
+            text = 'snapshots from'
+        elif args.sisters or args.older or args.younger:
+            text = 'sisters from'
+            if args.older:
+                text = 'older '+text
+            elif args.younger:
+                text = 'younger '+text
+            else:
+                text = 'all '+text
+
+        for st in args.store:
+            LIST = listing(args,store=st)
+            for s in args.snapshot:
+                lst = []
+                SV=SubVolume(args,s,store=st)
+                DEBUG(args,'[II]  list %s <%s>/%s' %(text,st,SV.name),level=1)
+                fp=''
+                if args.shortpath == True: fp=SV.name+'/'
+                if args.mountpath == True: fp=SV.storename+'/'+SV.name+'/'
+                if args.fullpath  == True: fp=SV.storepath+'/'+SV.name+'/'
+
+                if args.snap:
+                    for i in LIST.list_snapshots(SV.uuid,rev=args.reverse): print(fp+i)
+                elif args.sisters or args.older or args.younger:
+                    for i in LIST.list_sisters(SV.ID,rev=args.reverse): print(fp+i)
+                else:
+                    for i in LIST.list_subvolumes(SV.ID,rev=args.reverse): print(fp+i)
+    return(0)
+
+def send_receive(args,source,dest,parent=None):
+    if parent == None:
+        DEBUG(args,' =initial Transfer=> »<%s>/%s«' % ('SNP',source),level=1)
+        first = ['btrfs','send',source]
+    else:
+        DEBUG(args,' =incremental Transfer=> »<%s>/%s« <-parent: %s' % ('SNP',source,parent),level=1)
+        first = ['btrfs','send','-p',parent,source]
+    second = ['btrfs','receive',dest]
+    if not args.transferinfo:
+        process_curl = subprocess.Popen(first, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                        shell=False)
+        process_wc = subprocess.Popen(second, stdin=process_curl.stdout, stderr=subprocess.DEVNULL,
+                                      stdout=subprocess.PIPE, shell=False)
+        # Allow process_curl to receive a SIGPIPE if process_wc exits.
+        process_curl.stdout.close()
+        out, err = process_wc.communicate()
+        return(out.decode('utf8').split('\n'))
+    else:
+        DEBUG(args,'no transfer - only information')
+        return(0)
+
+def transfer_new(args,snapshots=None):
+    if snapshots == None:
+        # If called from commandline, not from inside the programm
+        snapshots = args.snapshot
+    SNP = listing(args,store='SNP')
+    BKP = listing(args,store='BKP')
+    SRC = dict()
+    transfers = dict()
+    if args.action == 'transfer': 
+        action = 'transfer'
+    elif args.action == 'create': 
+        action = 'create'
+    else: 
+        action = None
+    print('transfer-action',args.func.__name__,action)
+    
+    for snap in snapshots:
+        SRC[snap] = SubVolume(args,snap,store='SNP')
+        print('tr-slockname',SRC[snap].SnapLock)
+        SRC[snap].lock()
+        for sub in SNP.list_subvolumes(SRC[snap].ID,names=False):
+            #print('SUB',SNP.subvolumes[sub]['path'])
+            plist = dict()
+            for sis in SNP.list_sisters(SNP.subvolumes[sub]['id'],older=True,younger=False,names=False):
+                for bsub in BKP.subvolumes:
+                    if BKP.subvolumes[bsub]['ruuid'] == SNP.subvolumes[sis]['uuid']:
+                        #print(SNP.subvolumes[sis]['path'])
+                        plist[SNP.subvolumes[sis]['id']] = SNP.subvolumes[sis]['cgen']
+            if len(plist) > 0:
+                v=list(plist.values())
+                k=list(plist.keys())
+                parent = k[v.index(max(v))]
+                transfers[SNP.subvolumes[sub]['path']] = dict()
+                transfers[SNP.subvolumes[sub]['path']]['parent'] = SNP.subvolumes[parent]['path']
+            else:
+                transfers[SNP.subvolumes[sub]['path']] = dict()
+    for t in sorted(transfers.keys()):
+        dest = args.config.getStorePath('BKP')+'/'+t
+        destdir = os.path.dirname(dest.rstrip('/'))+'/'
+        if issubvol(dest) == False:
+            #print('isdir ==> delete ==> transfer',dest)
+            cmd = ['rm','-r','-f',dest]
+            sp_call(args,cmd)
+        elif issubvol(dest) == None:
+            pass
+            #print('notexist ==> transfer', dest)
+        else:
+            print('ignored: subvolume »%s« exists in »%s«' % (t,destdir))
+            continue
+
+        try:
+            if 'parent' in transfers[t]:
+                #print('increme',t,'parent',transfers[t]['parent'])
+                send_receive(args,t,destdir,parent=transfers[t]['parent'])
+            else:
+                #print('initial',t)
+                send_receive(args,t,destdir,parent=None)
+            cmd = ['btrfs','property','set','-ts',dest,'ro','false']
+            sp_call(args,cmd,level=2)
+        except:
+            #raise
+            raise Exception("Transfer failed for %s to destination %s!!" % (t,destdir))
+
+#    for snap in SRC:
+#        print('to unlock',snap)
+#        SRC[snap].unlock()
+
+# PARSER
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--version', action='version', version='0.1.0')
+parser.add_argument('-V', '--systemvolumes', action='store_true',
+        default=False, help='''take the systemvolumes from config. store is
+        always SNP''')
+parser.add_argument('-t', '--tag', default='misc', help='''one of %s''' % (Config().ListIntervals()))
+parser.add_argument('-v', '--verbose', action='count', default=0, help='''verbose output''' )
+parser.add_argument('-i', '--info', action='store_true', default=False, help='''Print infos, action is "list"''')
+parser.add_argument('-B', '--backup-mount-path', dest='bkpmount', default=Config().getMountPath('BKP'), help='''set path to destination mountpoint of backup-mountpoint. (default=%s) overrides 'BKP-Path':''' % (Config().getMountPath('BKP')))
+parser.add_argument('-b', '--backup-store', dest='bkpstore', default=Config().getStoreName('BKP'), help='''set storename in backup-mount. (default=%s) overrides 'BKP-Store':''' % (Config().getStoreName('BKP')))
+subparsers = parser.add_subparsers()
+
+list_parser=subparsers.add_parser('list')
+list_parser.add_argument("store", 
+                        default='SRC', 
+                        metavar='stores and snapshots',
+                        nargs='*',
+                        help='''one of SRC, BKP or SNP - where is the snapshot
+                        located and one ore more snapshots''')
+list_parser.add_argument('-r', '--reverse', action='store_true', default=False)
+#list_parser.add_argument('--snap', action='store_true', default=False, help='list snapshots from the queried snapshot')
+list_parser.add_argument('-c', '--children', dest='snap', action='store_true', default=False, help='list snapshots from the queried snapshot')
+list_parser.add_argument('-S', '--sisters', action='store_true', default=False, help='list snapshots from the queried snapshot with same parent (=sisters)')
+list_parser.add_argument('-O', '--older-sisters', action='store_true', dest='older', default=False, help='list snapshots from the queried snapshot with same parent (=sisters) and smaller cgen')
+list_parser.add_argument('-Y', '--younger-sisters', action='store_true', dest='younger', default=False, help='list snapshots from the queried snapshot with same parent (=sisters) and bigger cgen')
+list_parser.add_argument('-f', '--fullpath', action='store_true', default=False, help='print full path from /')
+list_parser.add_argument('-s', '--shortpath', action='store_true', default=False, help='print path including snapshotname')
+list_parser.add_argument('-m', '--mountpath', action='store_true', default=False, help='print path relative to mountpoint of btrfs')
+list_parser.add_argument('-P', '--show-storePath', dest='showpathstore', action='store_true', default=False, help='''Print path of given stores''')
+list_parser.add_argument('-t', '--show-tags', dest='showtags', action='store_true', default=False, help='''Print all available tags''')
+list_parser.add_argument('-T', '--show-transfers', dest='showtransfers', action='store_true', default=False, help='''Print volumes to transfer by choosen tag''')
+list_parser.set_defaults(func=lists)
+list_parser.set_defaults(action='list')
+
+create_parser=subparsers.add_parser('create')
+create_parser.add_argument("store", 
+                        default='SRC', 
+                        metavar='stores and snapshots',
+                        nargs='*',
+                        help='''one of SRC, BKP or SNP - where is the snapshot
+                        located and one ore more snapshots''')
+create_parser.set_defaults(func=create)
+create_parser.set_defaults(action='create')
+
+delete_parser=subparsers.add_parser('delete')
+delete_parser.add_argument("store", 
+                        default='SRC', 
+                        metavar='stores and snapshots',
+                        nargs='*',
+                        help='''one of SRC, BKP or SNP - where is the snapshot
+                        located and one ore more snapshots''')
+delete_parser.set_defaults(func=delete)
+delete_parser.set_defaults(action='delete')
+
+transfer_parser=subparsers.add_parser('transfer')
+transfer_parser.add_argument("snapshot", 
+                        nargs='*',
+                        help='''list of snapshots, which to be transfered to the
+                        external backup-device''')
+transfer_parser.add_argument('-i', '--info', dest='transferinfo', action='store_true', default=False, help='''show only if initial or incremental transfer is done and the parents''')
+transfer_parser.set_defaults(func=transfer_new)
+transfer_parser.set_defaults(action='transfer')
+
+cleanup_parser=subparsers.add_parser('cleanup')
+cleanup_parser.add_argument("snapshot", 
+                        nargs='*',
+                        help='''cleanup all snapshots, which are older and more
+                        than allowed in config''')
+cleanup_parser.set_defaults(func=cleanup)
+cleanup_parser.set_defaults(action='cleanup')
+
+setprop_parser=subparsers.add_parser('setprop')
+setprop_parser.add_argument("store", 
+                        default='SRC', 
+                        metavar='stores and snapshots',
+                        nargs='*',
+                        help='''one of SRC, BKP or SNP - where is the snapshot
+                        located and one ore more snapshots''')
+setprop_parser.add_argument("-r", "--ro", 
+                        default=False,
+                        action='store_true',
+                        help='''setproperty to readonly. If -r is not given,
+                        property is set to read-write''')
+setprop_parser.set_defaults(func=setprop)
+setprop_parser.set_defaults(action='setprop')
+
+
+
+if __name__ == '__main__':
+    args = parser.parse_args()
+    args.config = Config()
+    stores = []
+    snapshots = []
+    if 'store' in args: 
+        if isstring(args.store): args.store = args.store.split(' ')
+    else:
+        args.store = []
+    if 'snapshot' in args: 
+        if isstring(args.snapshot): args.snapshot = args.snapshot.split()
+    else:
+        args.snapshot = []
+    for i in args.store + args.snapshot:
+        if i == 'SNP' or i == 'SRC' or i == 'BKP':
+            stores.extend([i])
+        else:
+            snapshots.extend([i])
+    args.store = stores
+    args.snapshot = snapshots
+
+    args.config.setBKPPath(bkpmount=args.bkpmount)
+    args.config.setBKPStore(bkpstore=args.bkpstore)
+
+    if args.systemvolumes:
+        args.snapshot=args.config.getVolumes(intv=args.tag)
+        if len(args.store) == 0: args.store=['SNP']
+    if args.store == []: 
+        if os.getcwd() == args.config.getStorePath('SNP'):
+            args.store=['SNP']
+        elif os.getcwd() == args.config.getStorePath('BKP'):
+            args.store=['BKP']
+        else:
+            args.store=['SRC']
+
+        
+    # Set timestamp equal for all operations
+    args.timestamp    = datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+    if hasattr(args, 'transferinfo'):
+        args.verbose += 1
+    else:
+        args.transferinfo = False
+
+    if args.verbose <= 1:
+        args.stdout=subprocess.DEVNULL
+        args.stderr=subprocess.DEVNULL
+    elif args.verbose <=2:
+        args.stdout=subprocess.DEVNULL
+        args.stderr=None
+    elif args.verbose > 2:
+        args.stdout=None
+        args.stderr=None
+    # tag = None is not allowed. Set it to misc, if not set
+    if args.tag == None: 
+        args.tag = 'misc'
+    DEBUG(args,args,level=0)
+    args.func(args)
+    DEBUG(args,"---(%s) finnished %s %s at %s ----" % (os.getpid(),args.func.__name__, args.tag, args.timestamp),level=1)
+
