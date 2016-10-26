@@ -667,6 +667,7 @@ class SubVolume(SubVolumeInfo):
                 process_send.stdout.close()
                 out, err = process_recv.communicate()
             except:
+                raise TransferError('ERROR - sending to external backup-media failed')
                 pass
             return(out.decode('utf8').split('\n'))
         else:
@@ -677,7 +678,8 @@ class SubVolume(SubVolumeInfo):
     def symlink(self):
         for st in list(self.args.sourcepath.keys())[0], list(self.args.destpath.keys())[0]:
             StorePath = self.config.getStorePath(st)
-            if issubvol(StorePath) == None or False: continue
+            if not issubvol(StorePath): continue
+            print('SYML',issubvol(StorePath),StorePath)
             linkName = self.basename+'.'+args.config.getSymLink(args.tag)
             self.DEBUG(' =symlink> <%s>/%s' % (st,StorePath+'/'+linkName),level=0)
             symlink_force('./'+self.SnapName, StorePath+'/'+linkName)
@@ -715,7 +717,7 @@ class SubVolume(SubVolumeInfo):
                             self.DEBUG(' -prepare-to-delete> <%s>/%s' % (self.store,sname+'/'+sub),level=1)
                             delsubs.append(self.StorePath+'/'+sname+'/'+sub)
                         else:
-                            self.DEBUG('del - subvolume is locked: '+self.dir+'/'+sname,level=3)
+                            self.DEBUG('del - subvolume is locked: '+self.dir+'/'+sname+'/'+sub,level=3)
                         pass
                     else:
                         self.DEBUG('del - dir: '+self.dir+'/'+sname+'/'+sub,level=3)
@@ -726,8 +728,12 @@ class SubVolume(SubVolumeInfo):
                 cmd = ['btrfs','subvolume','delete','-c']
                 cmd.extend(delsubs)
                 print(' -delete-subvolumes>')
-                sp_call(self.args,cmd)
-                print(' -subvolumes-deleted>')
+                try:
+                    sp_call(self.args,cmd)
+                    print(' -subvolumes-deleted>')
+                except:
+                    raise DeleteError
+
             else:
                 print('del - no subvolumes registered')
             
@@ -835,6 +841,7 @@ def issubvol(path):
     return True if os.path.isdir(path) and os.stat(path).st_ino == 256 else False
 
 def symlink_force(target, link_name):
+    print(target,link_name)
     try:
         os.symlink(target, link_name)
     except OSError as e:
