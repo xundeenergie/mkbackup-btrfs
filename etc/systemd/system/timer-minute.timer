@@ -6,4 +6,4 @@ OnUnitActiveSec=1min
 Unit=timer-dmin.target
 
 [Install]
-WantedBy=basic.target
+WantedBy=timers.target

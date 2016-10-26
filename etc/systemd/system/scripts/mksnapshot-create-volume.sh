@@ -73,7 +73,7 @@ else
 	PRE="p-"
 fi
 
-echo "$DUUID | $SUUID | $ID | $PRE"
+#echo "$DUUID | $SUUID | $ID | $PRE"
 # Start by udev
 start () {
 
@@ -90,8 +90,9 @@ $SYSTEMCTL daemon-reload
 # Create udev-Rule for new external drive
 register () {
 #echo "$UUID"
-echo "AAA $(/bin/systemd-escape /dev/disk/by-${ID}/${DUUID}|sed -e 's@\\@\\\\@g')"
-echo "ACTION==\"add\", KERNEL==\"sd*\", SUBSYSTEMS==\"usb\", ENV{${SUUID}}==\"$DUUID\", SYMLINK+=\"disk/mars\", TAG+=\"systemd\", ENV{SYSTEMD_WANTS}+=\"mkbackup-external@${PRE}${DUUID}.service\", ENV{SYSTEMD_WANTS}+=\"mkbackup@BKP.target\", ENV{SYSTEMD_WANTS}+=\"smartctl-fast@$(/bin/systemd-escape /dev/disk/by-${ID}/${DUUID}|sed -e 's@\\@\\\\@g').service\"
+#echo "AAA $(/bin/systemd-escape /dev/disk/by-${ID}/${DUUID}|sed -e 's@\\@\\\\@g')"
+#echo "ACTION==\"add\", KERNEL==\"sd*\", SUBSYSTEMS==\"usb\", ENV{${SUUID}}==\"$DUUID\", SYMLINK+=\"disk/mars\", TAG+=\"systemd\", ENV{SYSTEMD_WANTS}+=\"mkbackup-external@${PRE}${DUUID}.service\", ENV{SYSTEMD_WANTS}+=\"mkbackup@BKP.target\", ENV{SYSTEMD_WANTS}+=\"smartctl-fast@$(/bin/systemd-escape /dev/disk/by-${ID}/${DUUID}|sed -e 's@\\@\\\\@g').service\"
+echo "ACTION==\"add\", KERNEL==\"sd*\", SUBSYSTEMS==\"usb\", ENV{${SUUID}}==\"$DUUID\", SYMLINK+=\"disk/mars\", TAG+=\"systemd\", ENV{SYSTEMD_WANTS}+=\"mkbackup-external@${PRE}${DUUID}.service\", ENV{SYSTEMD_WANTS}+=\"mkbackup@BKP.target\", ENV{SYSTEMD_WANTS}+=\"smartctl-fast@$(/bin/systemd-escape /dev/disk/by-${ID}/${DUUID}).service\"
 
 ACTION==\"remove\", KERNEL==\"sd*\", SUBSYSTEMS==\"usb\", ENV{${SUUID}}=\"$DUUID\", \
 RUN+=\"${SYSTEMCTL} --no-block stop mkbackup@BKP.target\"" > "${DESTUDEV}99-ext-bkp-volume-${PRE}${DUUID}.rules"
@@ -129,6 +130,6 @@ case $ACTION in
 		exit 2;;
 esac
 
-#$SYSTEMCTL daemon-reload
+$SYSTEMCTL daemon-reload
 #/bin/systemctl 
 exit 0

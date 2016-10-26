@@ -7,4 +7,5 @@ Unit=timer-afterboot.target
 AccuracySec=10min
 
 [Install]
-WantedBy=multi-user.target
+#WantedBy=multi-user.target
+WantedBy=timers.target

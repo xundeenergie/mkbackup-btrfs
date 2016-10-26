@@ -4,9 +4,10 @@ OnFailure=status-email-root@%n.service
 
 [Timer]
 OnCalendar=Mon *-*-* 20:00:00
+RandomizedDelaySec=4days
+AccuracySec=1day
 Persistent=true
 Unit=timer-weekly.target
-AccuracySec=5min
 
 [Install]
-WantedBy=basic.target
+WantedBy=timers.target

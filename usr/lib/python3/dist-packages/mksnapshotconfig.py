@@ -139,23 +139,29 @@ class Config():
         else:
             return(None)
     
-    def setBKPPath(self,bkpmount=''):
-        self.config['DEFAULT']['BKPMNT'] = bkpmount
+    def setBKPPath(self,mount):
+        self.config['DEFAULT']['BKPMNT'] = mount
 
-    def setBKPStore(self,bkpstore=''):
-        self.config['DEFAULT']['bkpstore'] = bkpstore
+    def setBKPStore(self,store):
+        self.config['DEFAULT']['bkpstore'] = store
+
+    def setSNPPath(self,mount):
+        self.config['DEFAULT']['SNPMNT'] = mount
+
+    def setSNPStore(self,store):
+        self.config['DEFAULT']['snpstore'] = store
 
     def getStoreName(self,store='SRC'):
         if store == 'SRC':
-            path = '/'+self.config.get('DEFAULT','srcstore').strip('/')
+            path = self.config.get('DEFAULT','srcstore').strip('/')
         elif store == 'SNP':
-            path = '/'+self.__trnName(self.config.get('DEFAULT','snpstore').strip('/'))
+            path = self.__trnName(self.config.get('DEFAULT','snpstore').strip('/'))
         elif store == 'BKP':
-            path = '/'+self.__trnName(self.config.get('DEFAULT','bkpstore').strip('/'))
+            path = self.__trnName(self.config.get('DEFAULT','bkpstore').strip('/'))
         if '/'+path.strip('/') != "/":
             return(path.strip('/'))
         else:
-            return('.')
+            return('')
 
     def getInterval(self,intv='misc'):
         try:

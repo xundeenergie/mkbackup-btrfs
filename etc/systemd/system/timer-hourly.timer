@@ -9,4 +9,4 @@ Unit=timer-hourly.target
 AccuracySec=5min
 
 [Install]
-WantedBy=basic.target
+WantedBy=timers.target

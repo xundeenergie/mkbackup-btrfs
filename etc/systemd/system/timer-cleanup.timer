@@ -10,6 +10,5 @@ AccuracySec=1us
 RandomizedDelaySec=10min
 
 [Install]
-#WantedBy=basic.target
 WantedBy=timers.target
 

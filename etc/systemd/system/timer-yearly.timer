@@ -1,11 +1,11 @@
 [Unit]
-Description=Monthly Timer
+Description=Yearly Timer
 OnFailure=status-email-root@%n.service
 
 [Timer]
-OnCalendar=*-*-01,15 12:30:00
-RandomizedDelaySec=15d
-AccuracySec=2d
+OnCalendar=*-01,07-01 12:30:00
+RandomizedDelaySec=6month
+AccuracySec=2month
 Persistent=true
 Unit=timer-monthly.target
 
