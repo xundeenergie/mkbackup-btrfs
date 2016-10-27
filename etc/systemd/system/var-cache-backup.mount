@@ -1,0 +1,16 @@
+[Unit]
+SourcePath=/etc/fstab
+Documentation=man:fstab(5) man:systemd-fstab-generator(8)
+Requires=var-cache-backup.automount
+After=var-cache-backup.automount
+#PartOf=var-cache-backup.automount
+#Wants=backup.mount backup.automount
+#Before=backup.mount
+
+[Mount]
+#What - drop-in in var-cache-backup.mount.d by mkbackup-start@...service which is started by udev-rule
+#What=/dev/disk/by-uuid/e75ad421-9cda-4031-a61c-4e99bc882e1c
+Where=/var/cache/backup
+Type=btrfs
+TimeoutSec=10s
+Options=defaults,noatime,nofail,compress=lzo,space_cache,inode_cache,relatime,subvol=/
