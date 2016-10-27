@@ -1,9 +1,14 @@
+
 [Unit]
 Before=local-fs.target
-BindsTo=backup-automount.target
+#BindsTo=mkbackup@BKP.target
+#PartOf=mkbackup@BKP.target
 
 [Automount]
+TimeoutIdleSec=15s
 Where=/backup
 
 [Install]
-WantedBy=backup-automount.target
+#WantedBy=backup-automount.target
+#WantedBy=mkbackup@BKP.target
+WantedBy=local-fs.target

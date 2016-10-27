@@ -121,10 +121,15 @@ class SystemVolumeError(Error):
 
 class listing:
     what = "Listing of all subvolumes in store"
-    Lists = Stack()
+    #Lists = Stack()
+    CreatedSubvolumes = Stack()
+    DeletedSubvolumes = Stack()
+    TransferedSubvolumes = Stack()
+
+
 
     def __init__(self,args,store='SRC',single=False):
-        listing.Lists.push(store)
+        #listing.Lists.push(store)
         self.args      = args
         self.store     = store
         self.single    = single
@@ -308,13 +313,9 @@ class SubVolumeInfo(listing):
         self.snapshots = snaps
         self.dir       = os.path.dirname(self.path)
         return
-#            else:
-#                print("ENOENT",output)
-#                self.exist = False
 
 
 class SubVolume(SubVolumeInfo):
-#class SubVolume:
     # read Subclasses:  http://www.python-course.eu/python3_inheritance.php
     what = 'store all informations about a btrfs-Subvolume'
 
@@ -329,7 +330,6 @@ class SubVolume(SubVolumeInfo):
         self.verbose      = args.verbose
         self.tag          = args.tag
         self.config       = args.config #Config()
-#        self.store        = store
         self.path         = ''
         self.dir          = ''
         self.basename     = name.split('.')[0]
@@ -379,7 +379,6 @@ class SubVolume(SubVolumeInfo):
 
     def _deletelockfile(self,lf,ln,checked=True):
         path = self.StorePath+'/'
-        #self.DEBUG(" =unlock>  <%s>/%s" % (self.store,ln),level=0)
         if checked:
             if check_lockfile(self.args,path+lf):
                 self.DEBUG('ERROR - lockfile in use: <%s - %s>/%s' % (self.store,self.StorePath,path+lf),level=2)
@@ -395,7 +394,6 @@ class SubVolume(SubVolumeInfo):
 
 
     def _rename(self,Action,From,To,store):
-        # Rename von übertragenen Snapshots im Backupstore noch einfügen
         for i in self.config.getVolumes():
             if From == i:
                 raise RuntimeError('ERROR - Systemvolume not allowed to rename (From): %s' % (From),1)
@@ -572,11 +570,13 @@ class SubVolume(SubVolumeInfo):
                 else:
                     pass
                 self.snapped = True
+
                 self.scanfs() #rescan filesystem after creating the new snapshots
                 ex = re.compile(self.SnapLock+'$')
                 for i in self.grep_volume(ex,names=False,rev=True):
                     self.DEBUG('SnapID,SnapName %s %s'%(self.svols[i]['id'],self.svols[i]['path']),level=5)
                     self.SnapID = self.svols[i]['id']
+                    listing.CreatedSubvolumes.push((self.store,self.SnapName))
                     return(list([self.svols[i]['id'],self.svols[i]['path']]))
                 
                 raise CreateError('FAILURE - create new snapshot failed %s' % (self.SnapLock), 0)
@@ -606,7 +606,6 @@ class SubVolume(SubVolumeInfo):
 
             #self.scanfs() #update btrfs-list in memory
             for sub in self.list_subvolumes(sid,names=False):
-                print('SUB',sub)
                 plist = dict()
                 for sis in self.list_sisters(self.svols[sub]['id'],older=True,younger=False,names=False):
                     for bsub in BKP.svols:
@@ -647,6 +646,8 @@ class SubVolume(SubVolumeInfo):
                     sp_call(self.args,cmd,level=2)
                 except:
                     raise TransferError
+            listing.TransferedSubvolumes.push(re.sub('\.part$','',sname))
+            return
 
     def send_receive(self,source,dest,parent=None):
         if parent == None:
@@ -674,6 +675,16 @@ class SubVolume(SubVolumeInfo):
             self.DEBUG('no transfer - only information')
             return
 
+    def symlink_force(self,target, link_name):
+        try:
+            os.symlink(target, link_name)
+        except OSError as e:
+            if e.errno == errno.EEXIST:
+                    os.remove(link_name)
+                    os.symlink(target, link_name)
+            else:
+                raise e
+    
 
     def symlink(self):
 
@@ -699,7 +710,8 @@ class SubVolume(SubVolumeInfo):
             if not issubvol(StorePath): continue
             linkName = self.basename+'.'+args.config.getSymLink(args.tag)
             self.DEBUG(' =symlink> <%s>/%s' % (st,StorePath+'/'+linkName),level=0)
-            symlink_force('./'+self.SnapName, StorePath+'/'+linkName)
+            self.symlink_force('./'+self.SnapName, StorePath+'/'+linkName)
+            if args.config.getSymLink(args.tag) != args.config.getSymLink(): self.symlink_force('./'+self.SnapName, StorePath+'/'+self.basename+'.LAST')
 
     def delete(self):
         if self.args.action == 'somethingelse':
@@ -748,6 +760,8 @@ class SubVolume(SubVolumeInfo):
                 try:
                     sp_call(self.args,cmd)
                     print(' -subvolumes-deleted>')
+                    #linkName = self.basename+'.'+args.config.getSymLink(args.tag)
+                    listing.DeletedSubvolumes.push((self.store,re.sub('\.part$','',sname)))
                 except:
                     raise DeleteError
 
@@ -859,15 +873,15 @@ def issubvol(path):
     if not path == None:
         return True if os.path.isdir(path) and os.stat(path).st_ino == 256 else False
 
-def symlink_force(target, link_name):
-    try:
-        os.symlink(target, link_name)
-    except OSError as e:
-        if e.errno == errno.EEXIST:
-                os.remove(link_name)
-                os.symlink(target, link_name)
-        else:
-            raise e
+#def symlink_force(target, link_name):
+#    try:
+#        os.symlink(target, link_name)
+#    except OSError as e:
+#        if e.errno == errno.EEXIST:
+#                os.remove(link_name)
+#                os.symlink(target, link_name)
+#        else:
+#            raise e
 
 def create(args):
     SRC=dict()
@@ -993,31 +1007,6 @@ def lists(args):
                 except:
                     raise
     return
-
-#def send_receive(args,source,dest,parent=None):
-#    if parent == None:
-#        DEBUG(' =initial Transfer=> »<%s>/%s«' % ('SNP',source),level=1,verbose=args.verbose)
-#        first = ['btrfs','send',source]
-#    else:
-#        DEBUG(' =incremental Transfer=> »<%s>/%s« <-parent: %s' % ('SNP',source,parent),level=1,verbose=args.verbose)
-#        first = ['btrfs','send','-p',parent,source]
-#    second = ['btrfs','receive',dest]
-#    DEBUG(' '.join(first)+' | '+' '.join(second),level=3,verbose=args.verbose)
-#    if not args.transferinfo:
-#        try:
-#            process_send = subprocess.Popen(first, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-#                                            shell=False)
-#            process_recv = subprocess.Popen(second, stdin=process_send.stdout, stderr=subprocess.DEVNULL,
-#                                          stdout=subprocess.PIPE, shell=False)
-#            # Allow process_curl to receive a SIGPIPE if process_wc exits.
-#            process_send.stdout.close()
-#            out, err = process_recv.communicate()
-#        except:
-#            pass
-#        return(out.decode('utf8').split('\n'))
-#    else:
-#        DEBUG('no transfer - only information',verbose=args.verbose)
-#        return(0)
 
 def transfer(args):
     SRC=dict()
@@ -1170,7 +1159,7 @@ if __name__ == '__main__':
 
     print(args.store,args.snapshots)
 
-    # set pathes to defaults from config
+    # set pathes in config to the given from cmdlin or default
     args.config.setBKPPath(args.bkpmount)
     args.config.setBKPStore(args.bkpstore)
     args.config.setSNPPath(args.snpmount)
@@ -1181,6 +1170,7 @@ if __name__ == '__main__':
         args.snapshots=args.config.getVolumes(intv=args.tag)
         if len(args.store) == 0: args.store=['SNP']
 
+    # set store and path to store depending on action
     args.sourcepath, args.destpath  = dict(), dict()
     if args.action == 'create' or args.action == 'transfer':
         if 'BKP' in args.store: args.store.pop(args.store.index('BKP'))
@@ -1209,6 +1199,7 @@ if __name__ == '__main__':
     else:
         args.transferinfo = False
 
+    # set stdout and stderr for output of subprocess-calls for the verbose-levels
     if args.verbose <= 1:
         args.stdout=subprocess.DEVNULL
         args.stderr=subprocess.DEVNULL
@@ -1221,10 +1212,37 @@ if __name__ == '__main__':
     # tag = None is not allowed. Set it to misc, if not set
     if args.tag == None: 
         args.tag = 'misc'
-    DEBUG(level=0,verbose=args.verbose)
+
+    # Run action
     args.func(args)
-    while not listing.Lists.is_empty():
-        print(listing.Lists.pop())
+
+    # Check symlinks in stores, if they exist and ok or missing.
+    for vol in Config().getVolumes():
+        for st in (args.sourcepath.keys()):
+            p = args.sourcepath[st]
+            for sln in Config().ListSymlinkNames():
+                link = p+'/'+vol+'.'+sln
+                if os.path.exists(link):
+                    if os.path.islink(link):
+                        DEBUG('Symlink ok: %s/%s.%s' % (st,vol,sln),level=4,verbose=args.verbose)
+                    else:
+                        DEBUG('Symlink broken: %s/%s.%s --> remove it' % (st,vol,sln),level=4,verbose=args.verbose)
+                        os.remove(link)
+                else:
+                    DEBUG('Symlink missing: %s/%s.%s' % (st,vol,sln),level=4,verbose=args.verbose)
+
+    # print summary over all actions 
+    if not args.action == 'listing':
+        DEBUG('---=== SUMMARY ===---',level=0,verbose=args.verbose)
+        DEBUG('Created Subvolumes:',level=0,verbose=args.verbose)
+        while not listing.CreatedSubvolumes.is_empty():
+            print(listing.CreatedSubvolumes.pop())
+        DEBUG('Transfered Subvolumes:',level=0,verbose=args.verbose)
+        while not listing.TransferedSubvolumes.is_empty():
+            print(listing.TransferedSubvolumes.pop())
+        DEBUG('Deleted Subvolumes:',level=0,verbose=args.verbose)
+        while not listing.DeletedSubvolumes.is_empty():
+            print(listing.DeletedSubvolumes.pop())
    
     DEBUG("---(%s) finnished %s %s at %s ----" % (os.getpid(),args.func.__name__, args.tag, args.timestamp),level=1,verbose=args.verbose)
 #
