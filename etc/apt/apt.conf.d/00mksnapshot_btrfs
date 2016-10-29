@@ -1,2 +1,2 @@
 //Take a snapshot befor upgrading the system
-DPkg::Pre-Invoke {"/bin/systemctl start mkbackup@aptupgrade.service";};
+DPkg::Pre-Invoke {"/bin/systemctl start timer-aptupgrade.target";};

@@ -621,6 +621,7 @@ class SubVolume(SubVolumeInfo):
                     transfers[self.svols[sub]['path']] = dict()
 
 
+            self.DEBUG(' ==transfer=> »<%s>/%s«' % (self.store,sname),level=0)
             for t in sorted(transfers.keys()):
                 dest = args.config.getStorePath('BKP')+'/'+t
                 destdir = os.path.dirname(dest.rstrip('/'))+'/'
@@ -651,10 +652,10 @@ class SubVolume(SubVolumeInfo):
 
     def send_receive(self,source,dest,parent=None):
         if parent == None:
-            self.DEBUG(' =init transfer=> »<%s>/%s«' % (self.store,source),level=1)
+            self.DEBUG('  =init transfer=> »<%s>/%s«' % (self.store,source),level=1)
             first = ['btrfs','send',self.StorePath+'/'+source]
         else:
-            self.DEBUG(' =incr transfer=> »<%s>%s« <-parent: %s' % (self.store,source,parent),level=1)
+            self.DEBUG('  =incr transfer=> »<%s>%s« <-parent: %s' % (self.store,source,parent),level=1)
             first = ['btrfs','send','-p',self.StorePath+'/'+parent,self.StorePath+'/'+source]
         second = ['btrfs','receive',dest]
         self.DEBUG(' '.join(first)+' | '+' '.join(second),level=3)
