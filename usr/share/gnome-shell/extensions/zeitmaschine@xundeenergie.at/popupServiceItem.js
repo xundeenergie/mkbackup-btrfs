@@ -28,14 +28,15 @@ const PopupServiceItem = new Lang.Class({
         this.actionButton.child = icon;
         this.actor.add(this.actionButton, { expand: false, x_align: St.Align.END });
 
-        /*this.ejectButton = new St.Button({ x_align: 1,
+        this.transferButton = new St.Button({ label: 'transfer',
+					     x_align: 1,
                                              reactive: true,
                                              can_focus: true,
                                              track_hover: true,
-                                             accessible_name: 'eject',
-                                             style_class: 'system-menu-action services-systemd-button-reload' });
+                                             accessible_name: 'transfer',
+                                             style_class: 'system-menu-action services-systemd-button-transfer' });
 
-        this.ejectButton.child = new St.Icon({ icon_name: 'media-eject-symbolic' });
-        this.actor.add(this.ejectButton, { expand: false, x_align: St.Align.END });*/
+        //this.transferButton.child = new St.Icon({ icon_name: 'media-eject-symbolic' });
+        this.actor.add(this.transferButton, { expand: false, x_align: St.Align.END });
     }
 });
