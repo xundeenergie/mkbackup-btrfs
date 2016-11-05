@@ -3,6 +3,7 @@ const Lang = imports.lang;
 const Main = imports.ui.main;
 const PanelMenu = imports.ui.panelMenu;
 const PopupMenu = imports.ui.popupMenu;
+
 const St = imports.gi.St;
 const Shell = imports.gi.Shell;
 
@@ -16,7 +17,8 @@ const Util = imports.misc.util;
 const PopupServiceItem = Me.imports.popupServiceItem.PopupServiceItem;
 const PopupTargetItem = Me.imports.popupTargetItem.PopupTargetItem;
 const PopupMenuItem = Me.imports.popupManuallyItem.PopupServiceItem;
-//const MountMenuItem = Me.imports.popupMountItem.PopupMountItem;
+const MountMenuItem = Me.imports.popupMountItem.MountMenuItem;
+const DriveMenuItem = Me.imports.popupDriveItem.DriveMenuItem;
 var Gio = imports.gi.Gio;
 const Mainloop = imports.mainloop;
 
@@ -61,22 +63,29 @@ const BackupManager = new Lang.Class({
 		this.actor.add_actor(hbox);
 		this.actor.add_style_class_name('panel-status-button');
 
+		let mlrfconID
+		let mlrfmconID
 		this.actor.connect('button-press-event', Lang.bind(this, function() {
-			//Mainloop.timeout_add_seconds(refreshTime, Lang.bind(this, this._refresh));
+			//mlrfconID = Mainloop.timeout_add_seconds(refreshTime, Lang.bind(this, this._refresh));
 			this._refresh();
+		}));
+
+		mlrfmconID = Mainloop.timeout_add_seconds(refreshTime, Lang.bind(this, function() {
+			this._refresh_main;
+			this._refresh;
 		}));
 
 		Main.panel.addToStatusArea('backupManager', this);
 		
-		this._init_menu();
 		this._refresh_main();
 		this._refresh();
 
-		this._monitor = Gio.VolumeMonitor.get();
-		this._addedId = this._monitor.connect('mount-added', Lang.bind(this, function(monitor, mount) {
-			this._checkMount(mount);
+		//this._monitor = Gio.VolumeMonitor.get();
+		//this._addedId = this._monitor.connect('mount-added', Lang.bind(this, function(monitor, mount) {
+			//this._checkMount(mount);
 			//this._updateMenuVisibility();
-		}));
+		//}));
+        
 		/*	this._addedId = this._monitor.connect('mount-added', Lang.bind(this, function(monitor, mount) {
 		    this._addMount(mount);
 		    this._updateMenuVisibility();
@@ -88,9 +97,14 @@ const BackupManager = new Lang.Class({
 
 		this._mounts = [ ];
 
+		/*log('AAA',this._monitor.get_connected_drives())
+		log('AAA',this._monitor.get_mounts())
 		this._monitor.get_mounts().forEach(Lang.bind(this, this._addMount));
+		this._monitor.get_connected_drives().forEach(Lang.bind(this, this._showDrive));
+	    this._monitor.get_volumes().forEach(Lang.bind(this, this._showVolumes));
+        */
 		this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-		this.menu.addAction(_("Open File"), function(event) {
+		this.menu.addAction(_("Open Backups"), function(event) {
 			let context = global.create_app_launch_context(event.get_time(), -1);
 			let GF = Gio.File.new_for_path('backup');
 			Gio.AppInfo.launch_default_for_uri(GF.get_uri(),context);
@@ -98,11 +112,51 @@ const BackupManager = new Lang.Class({
 
 	},
 
+    _showVolumes: function(volume) {
+        log('VOL',volume,volume.get_name())
+    },
+
+    _showDrive: function(drive) {
+        log('DRIVE',drive.get_name(),drive.get_volumes(),drive.has_media(),drive.is_removable(),drive.has_volumes(),drive.enumerate_identifiers());
+        if (drive.is_removable() && drive.has_media()) {
+            log('D',drive.get_name(),drive.get_volumes());
+            let submenu = new PopupMenu.PopupSubMenuMenuItem(_(drive.get_name()), true);
+            submenu.icon.icon_name = 'drive-harddisk-usb-symbolic';
+            submenu.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+            let menuItem = new PopupMenuItem('BLA');
+            submenu.menu.addMenuItem(menuItem);
+
+            //log('VOLUME',volume.get_name(),volume.get_uuid(),volume.get_icon(),volume.get_mount(),volume.can_mount(),volume.can_eject());
+            drive.get_volumes().forEach(Lang.bind(this, function(volume) {
+                if (volume.can_mount()){
+                    let menuItem = new PopupMenuItem(volume.get_name());
+                    submenu.menu.addMenuItem(menuItem);
+                    if ( volume.get_mount() != null ) {
+                        let mount = volume.get_mount();
+                        log('MR',mount.get_root());
+                    }
+                }
+            
+            
+            }));
+            this.menu.addMenuItem(submenu,1);
+        }
+
+    },
+
     _addMount: function(mount) {
+        log('MOUNT',mount.get_drive(),mount.get_volume())
+        if( mount.get_drive()){
+            let d = mount.get_drive();
+            log('DN',d.get_name());
+        
+        } else
+            log('NOK')
+            
 	//let item = new MountMenuItem(mount);
 	//this._mounts.unshift(item);
 	//this.menu.addMenuItem(item, 0);
-    log('ADD MOUNT '+mount.get_uuid()+'|'+mount.can_unmount()+' '+mount.can_eject()+' '+mount.get_name()+' '+mount.get_default_location().toSource());
+    //log('ADD MOUNT '+mount.get_uuid()+'|'+mount.can_unmount()+' '+mount.can_eject()+' '+mount.get_name()+' '+mount.get_default_location().toSource());
     },
 
     _checkMount: function(mount) {
@@ -143,9 +197,6 @@ const BackupManager = new Lang.Class({
 
     _refresh_main: function() {
         let active = false;
-        //let active2 = false;
-        let msg = '';
-        let sc = '';
 
         let volumes = ['var-cache-backup.mount', 'home-jakob-Videos-extern.mount'];
 
@@ -156,7 +207,7 @@ const BackupManager = new Lang.Class({
             active = (stat == 0 || active);
         };
 
-        mainicon.style = (active ? "color: #ff0000;" : "color:#ffffff;");
+        mainicon.style = (active ? "color: #ff0000;" : "color: revert;");
         sLabel.set_text(active ? _("active") : "");
         /*let volumes = ['/var/cache/backup', '/home/jakob/Videos/extern'];
         for (var vol in volumes) {
@@ -179,19 +230,23 @@ const BackupManager = new Lang.Class({
         
         */
 
-        Mainloop.timeout_add_seconds(refreshTime, Lang.bind(this, this._refresh_main));
+        mlrfmconID = Mainloop.timeout_add_seconds(refreshTime, Lang.bind(this, function() {
+            this._refresh_main();
+            this._refresh();
+        }));
+
+
+        //Mainloop.timeout_add_seconds(refreshTime, Lang.bind(this, this._refresh_main));
         //log('ML',Mainloop.timeout_add_seconds(refreshTime, Lang.bind(this, this._refresh)));
 	//Mainloop.source_remove('the id from above');
         return false;
     },
 
-	_init_menu: function() {
-		this.menu.removeAll();
-		return true;
-	},
-
 	_refresh: function() {
-		log('XXXXXXX')
+		
+		if (!this.menu.isOpen) 
+			return;
+		log('refresh menu, menu is open:',this.menu.isOpen)
 		this._loadConfig();
 		let me = this.menu._getMenuItems();
 		this._entries.forEach(Lang.bind(this, function(service) {
@@ -218,18 +273,12 @@ const BackupManager = new Lang.Class({
 					me.splice(me.indexOf(item),1);
 				} 
 			}));
+
 			if (found) {
 				//log('update',service['name']);
 				if ( eout.toString().replace(/\n$/, "") == 'static' ) {
 					serviceItem.setToggleState(active);
-				} else {
-					serviceItem.actionButton.child.icon_name = (active ? EnabledIcon : DisabledIcon);
-					serviceItem.actionButton.child.style = (active ? "color: #ff0000;" : "color: revert;");
-					if (transfer == "none")
-						serviceItem.transferButton.label = "target";
-					else
-						serviceItem.transferButton.style = (transfer ? "text-decoration: revert;" : "text-decoration: line-through;");
-				}
+				} 
 			} else {
 				//log('new',service['name']);
 				if ( eout.toString().replace(/\n$/, "") == 'static' ) {
@@ -254,21 +303,26 @@ const BackupManager = new Lang.Class({
 							this._getCommand(service['service'], 'restart', service["type"]));
 						this.menu.close();
 					}));
-					serviceItem.actionButton.child.icon_name = (active ? EnabledIcon : DisabledIcon);
-					serviceItem.actionButton.child.style = (active ? "color: #ff0000;" : "color: revert;");
-					if (transfer == "none")
-						serviceItem.transferButton.label = "target";
-					else
-						serviceItem.transferButton.style = (transfer ? "text-decoration: revert;" : "text-decoration: line-through;");
 				}
 			}
-
+            if (serviceItem.actionButton.child) {
+            serviceItem.actionButton.child.icon_name = (active ? EnabledIcon : DisabledIcon);
+            serviceItem.actionButton.child.style = (active ? "color: #ff0000;" : "color: revert;");
+            if (transfer == "none")
+                serviceItem.transferButton.label = "target";
+            else
+                serviceItem.transferButton.style = (transfer ? "text-decoration: revert;" : "text-decoration: line-through;");
+            }
 		}));
+
 		this.menu._getMenuItems().forEach(Lang.bind(this, function(item) {
-			if ( me.length > 2 ) {
-				for (let i = 2; i < me.length; i++) {
+            let mic = 4
+			if ( me.length > mic ) {
+				for (let i = mic; i < me.length; i++) {
 					if (item == me[i]) {
+                        log('DESTROY',me[i].label.text);
 						item.destroy();
+
 					}
 
 				}
