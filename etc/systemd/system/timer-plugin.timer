@@ -5,7 +5,7 @@ PartOf=mkbackup@BKP.target
 
 [Timer]
 OnActiveSec=30s
-Unit=mkbackup@%i.service
+Unit=timer-plugin.target
 
 [Install]
 WantedBy=mkbackup@BKP.target

@@ -1,0 +1,9 @@
+[Unit]
+Description=Runs manually triggered backup
+#BindsTo=mkbackup@BKP.target
+#PartOf=mkbackup@BKP.target
+
+[Timer]
+OnActiveSec=1s
+Unit=timer-manually.target
+
