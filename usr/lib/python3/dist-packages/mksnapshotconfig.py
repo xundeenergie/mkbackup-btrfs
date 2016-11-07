@@ -71,6 +71,7 @@ class Config():
         self.config['afterboot'] = {'volumes':  '$S','interval': '4','symlink': 'LASTBOOT'}
         self.config['aptupgrade'] = {'volumes':  '$S','interval': '6','symlink': 'BEFOREUPDATE'}
         self.config['dmin'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '6'}
+        self.config['plugin'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '5','transfer': True}
         self.config['manually'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '5','symlink': 'MANUALLY','transfer': True}
 
         with open(self.cfile, 'w') as configfile:
