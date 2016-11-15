@@ -2,7 +2,6 @@
 Description=Show all userspezific backups in %h/backup
 
 [Service]
-#User=%i
 ExecStart=/etc/systemd/system/scripts/MksnapshotFS.py -f %h/backup
 ExecStop=-/bin/fusermount -u %h/backup
 Restart=on-success

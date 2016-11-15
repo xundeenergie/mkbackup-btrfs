@@ -4,8 +4,8 @@ Description=10-Minutes Timer
 [Timer]
 OnBootSec=10min
 OnUnitActiveSec=10min
-RandomizedDelaySec=5min
-AccuracySec=1min
+RandomizedDelaySec=2min
+AccuracySec=2min
 Unit=timer-dmin.target
 
 [Install]

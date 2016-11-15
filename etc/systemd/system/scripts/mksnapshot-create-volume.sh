@@ -32,7 +32,7 @@ case $2 in
 	*)
 		DEV=$2
 		UUID="$(blkid $DEV -o value -s UUID)"
-		PARTUUID="$(blkid $DEV -o value -s PARTUUID)"
+		#PARTUUID="$(blkid $DEV -o value -s PARTUUID)"
 		PRE="d-"
 		;;
 esac

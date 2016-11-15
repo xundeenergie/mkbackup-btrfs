@@ -4,8 +4,8 @@ OnFailure=status-email-root@%n.service
 
 [Timer]
 OnCalendar=*-01,07-01 12:30:00
-RandomizedDelaySec=6month
-AccuracySec=2month
+RandomizedDelaySec=1month
+AccuracySec=15days
 Persistent=true
 Unit=timer-monthly.target
 

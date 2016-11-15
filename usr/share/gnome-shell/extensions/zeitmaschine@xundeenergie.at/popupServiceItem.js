@@ -38,5 +38,6 @@ const PopupServiceItem = new Lang.Class({
 
         //this.transferButton.child = new St.Icon({ icon_name: 'media-eject-symbolic' });
         this.actor.add(this.transferButton, { expand: false, x_align: St.Align.END });
-    }
+    },
+
 });

@@ -131,14 +131,46 @@ class Config():
     def getMountPath(self,store='SRC'):
         if store == 'SRC':
             path = '/'+self.config.get('DEFAULT','SRC').strip('/')
-        if store == 'SNP':
+        elif store == 'SNP':
             path = '/'+self.config.get('DEFAULT','SNPMNT').strip('/')
-        if store == 'BKP':
+        elif store == 'BKP':
             path = '/'+self.config.get('DEFAULT','BKPMNT').strip('/')
+
         if '/'+path.strip('/') != "/":
             return('/'+path.strip('/'))
         else:
             return(None)
+
+    def getDevice(self,store='SRC'):
+        mp = self.getMountPath(store=store)
+        #cmd = """awk -F " " '$1 !~ /systemd-1/ && $2 == "%s" && $3 == "btrfs" {printf $1}' /proc/mounts""" % (mp)
+        cmd = """awk -F " " '$2 == "%s" && $3 == "autofs" {printf $1}' /proc/mounts""" % (mp)
+        amount =  subprocess.check_output(cmd, shell=True).decode()
+        if amount == '':
+            pass
+        elif amount == 'systemd-1':
+            os.stat(self.getStorePath(store=store))
+        else:
+            print("don't know")
+            return None
+
+        cmd = """awk -F " " '$2 == "%s" && $3 == "btrfs" {printf $1}' /proc/mounts""" % (mp)
+        device =  subprocess.check_output(cmd, shell=True).decode()
+        if device == '':
+            return None
+        else:
+            return device
+
+
+        #return device if device != '' else None
+
+    def getUUID(self,store='SRC'):
+        device = self.getDevice(store=store)
+        if device == None: return None
+        cmd = "/sbin/blkid %s -o value -s 'UUID'" % (device)
+        uuid =  subprocess.check_output(cmd, shell=True).decode().partition('\n')[0]
+        return uuid if uuid != '' else None
+
     
     def setBKPPath(self,mount):
         self.config['DEFAULT']['BKPMNT'] = mount

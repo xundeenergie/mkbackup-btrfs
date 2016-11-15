@@ -7,6 +7,7 @@ import subprocess
 import os
 import sys
 import errno
+import glob
 
 from mksnapshotconfig import Config
 
@@ -178,13 +179,13 @@ class listing:
         return
 
     def _ret(self,ret,reverse=False):
-        return(reversed(ret) if reverse else sorted(ret))
+        return(reversed(ret) if reverse else ret)
     
     def list_sisters(self,ID,rev=False,older=None,younger=None,names=True):
         result = []
         if older   == None: older = self.args.older
         if younger == None: younger = self.args.younger
-        for sub in sorted(self.svols.keys()):
+        for sub in sorted(self.svols.keys(),key=int):
             if self.svols[sub]['puuid'] == self.svols[ID]['puuid'] and not sub == ID:
                 if older:
                     if self.svols[sub]['gen'] >= self.svols[ID]['gen']: continue
@@ -196,7 +197,7 @@ class listing:
 
     def list_parent(self,puuid,rev=False,names=True):
         result = []
-        for sub in sorted(self.svols.keys()):
+        for sub in sorted(self.svols.keys(),key=int):
             if self.svols[sub]['uuid'] == puuid:
                 self.DEBUG('PARENT',self.svols[sub]['path'],level=5)
                 self.result.append(self.svols[sub]['path']) if names else self.result.append(sub)
@@ -204,7 +205,7 @@ class listing:
 
     def list_snapshots(self,uuid,rev=False,names=True):
         result = []
-        for sub in sorted(self.svols.keys()):
+        for sub in sorted(self.svols.keys(),key=int):
             if self.svols[sub]['puuid'] == uuid:
                 self.DEBUG('PARENT',self.svols[sub]['path'],level=5)
                 result.append(self.svols[sub]['path']) if names else result.append(sub)
@@ -212,7 +213,7 @@ class listing:
 
     def grep_volume(self,expr,names=True,rev=False):
         result = []
-        for sub in sorted(self.svols.keys()):
+        for sub in sorted(self.svols.keys(),key=int):
             if expr.search(self.svols[sub]['path']):
                 self.DEBUG('REGEX',self.svols[sub]['path'],level=5)
                 result.append(self.svols[sub]['path']) if names else result.append(sub)
@@ -220,7 +221,7 @@ class listing:
 
     def grep_subvolumes(self,expr,names=True,rev=False):
         result = []
-        for sub in sorted(self.svols.keys()):
+        for sub in sorted(self.svols.keys(),key=int):
             if expr.search(self.svols[sub]['path']):
                 self.DEBUG('REGEX',self.svols[sub]['path'],level=5)
                 result.append(self.svols[sub]['path']) if names else result.append(sub)
@@ -597,9 +598,28 @@ class SubVolume(SubVolumeInfo):
                 sname = self.OrigLock
                 sid = self.id
 
-            if not issubvol(self.BkpPath): 
-                print(' =no-transfer: backup-media ')
+            
+            #get uuids of SNP/SRC and BKP and compare. If they are the same, no transfer, if they are different, make transfer to external media
+            #print(self.config.getDevice(store='BKP'))
+            uuidS = self.config.getUUID(store=self.store)
+            uuidB = self.config.getUUID(store='BKP')
+            if None == uuidS:
+                self.DEBUG(" =no-transfer: Filesystem not mounted: %s" % (self.config.getDevice(store=self.store)))
                 return
+            if None == uuidB:
+                self.DEBUG(" =no-transfer: Filesystem not mounted: %s" % (self.config.getMountPath(store='BKP')))
+                return
+
+
+            if uuidS == uuidB: 
+                # Same Filesystem on SRC/SNP and BKP. No transfer
+                return
+            else:
+                # Test if path to external backup-store is a btrfs-subvolume. if not, no transfer
+                if not issubvol(self.BkpPath): 
+                    self.DEBUG(' =no-transfer: no subvolume for backup on external media')
+                    return
+
 
             BKP = listing(self.args,store='BKP')
             transfers = dict()
@@ -622,7 +642,8 @@ class SubVolume(SubVolumeInfo):
 
 
             self.DEBUG(' ==transfer=> »<%s>/%s«' % (self.store,sname),level=0)
-            for t in sorted(transfers.keys()):
+            
+            for t in sorted(transfers.keys(),key=int):
                 dest = args.config.getStorePath('BKP')+'/'+t
                 destdir = os.path.dirname(dest.rstrip('/'))+'/'
                 if issubvol(dest) == False:
@@ -821,17 +842,19 @@ def cleanup(args):
             ST[st] = listing(args,store=st,single=True)
             if len(args.snapshots) > 0:
                 DEBUG(args,'  --cleanup interval-snapshots',level=3)
-                print('DO',args.snapshots)
+                #print('DO',args.snapshots)
                 for sn in args.snapshots:
                     ex = re.compile('$|'.join([sn+'.*' + word_in_list for word_in_list in I.keys()])+'$')
                     for i in args.config.ListIntervals():
                         cI[i] = 0
                     try:
                         for i in ST[st].grep_subvolumes(ex,names=False,rev=True):
+                            print('SV',i,ST[st].svols[i]['path'])
                             for tag in I.keys():
                                 if ST[st].svols[i]['path'].partition(tag)[1] != '':
                                     cI[tag] += 1
                                     if cI[tag] > int(I[tag]):
+                                        print('SVpush',i,ST[st].svols[i]['path'])
                                         DEL.push([st,ST[st].svols[i]['path']])
                     except:
                         raise CleanupError('cleanup failed for %s' % (sn))
@@ -964,8 +987,44 @@ def lists(args):
             else:
                 DEBUG('%s will transfer nothing' % (args.tag),level=1,verbose=args.verbose)
         else:
-            for i in args.config.getVolumes(intv=args.tag): print(i)
-
+            reintv = re.compile('NEXT|'+'|'.join(args.config.ListIntervals()))
+            cmd=['systemctl','list-timers']
+            try:
+                #output,error = sp_co(self.args,cmd)
+                res = subprocess.Popen(cmd,stdout=subprocess.PIPE, stderr=args.stderr)
+                output,error = res.communicate()
+                if res.returncode > 0:
+                    raise 
+            except:
+                raise
+            #if output[0] == 0:
+            for line in output.splitlines():
+                if reintv.search(str(line)): 
+                    o = line.decode().replace("timer-","").replace(".timer"," backup")
+                    print(o[:125])
+            print('-+-+-+-+-+-+-+-+-+-+-+-')
+            ST=dict()
+            for st in args.store:
+                ST[st]=dict()
+                #for vol in args.config.getVolumes():
+                for vol in args.snapshots:
+                    ST[st][vol]=dict()
+                    for intv in args.config.ListIntervals():
+                        ST[st][vol][intv] = list()
+                    for snp in glob.glob(args.config.getStorePath(st)+'/'+vol+'.*'):
+                        for intv in ST[st][vol].keys():
+                            R = re.compile(intv)
+                            if R.search(snp):
+                                ST[st][vol][intv].append(os.path.basename(snp))
+            for st in ST.keys():
+                print('Youngest snapshot in %s' % (st))
+                for vol in ST[st].keys():
+                    print('\tVolumes: %s' % (vol))
+                    for intv in ST[st][vol].keys():
+                        if len(ST[st][vol][intv]) > 0:
+                            print('\t\t'+ST[st][vol][intv].pop())
+                        else:
+                            print('\t\t'+"is missing: %s" % (intv))
     else:
         text = 'subvolumes in'
         if args.snap:
@@ -1154,11 +1213,11 @@ if __name__ == '__main__':
         if i == 'SNP' or i == 'SRC' or i == 'BKP':
             stores.extend([i])
         else:
-            snapshots.extend([i])
+            snapshots.extend([i.rstrip('/')])
     args.store = stores
     args.snapshots = snapshots
 
-    print(args.store,args.snapshots)
+    #print(args.store,args.snapshots)
 
     # set pathes in config to the given from cmdlin or default
     args.config.setBKPPath(args.bkpmount)
@@ -1233,17 +1292,21 @@ if __name__ == '__main__':
                     DEBUG('Symlink missing: %s/%s.%s' % (st,vol,sln),level=4,verbose=args.verbose)
 
     # print summary over all actions 
-    if not args.action == 'listing':
+    if not args.action == 'list':
         DEBUG('---=== SUMMARY ===---',level=0,verbose=args.verbose)
+        DEBUG('Stores: %s, snapshots: %s' % (args.store,args.snapshots))
         DEBUG('Created Subvolumes:',level=0,verbose=args.verbose)
         while not listing.CreatedSubvolumes.is_empty():
             print(listing.CreatedSubvolumes.pop())
+        print('---')
         DEBUG('Transfered Subvolumes:',level=0,verbose=args.verbose)
         while not listing.TransferedSubvolumes.is_empty():
             print(listing.TransferedSubvolumes.pop())
+        print('---')
         DEBUG('Deleted Subvolumes:',level=0,verbose=args.verbose)
         while not listing.DeletedSubvolumes.is_empty():
             print(listing.DeletedSubvolumes.pop())
+        print('---')
    
-    DEBUG("---(%s) finnished %s %s at %s ----" % (os.getpid(),args.func.__name__, args.tag, args.timestamp),level=1,verbose=args.verbose)
+    DEBUG("---== (%s) finnished %s %s at %s ==---" % (os.getpid(),args.func.__name__, args.tag, args.timestamp),level=1,verbose=args.verbose)
 #

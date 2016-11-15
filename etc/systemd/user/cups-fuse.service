@@ -1,0 +1,7 @@
+[Unit]
+Description=Show all userspezific backups in %h/backup
+
+[Service]
+ExecStart=/etc/systemd/system/scripts/CupsFS.py -f %h/Desktop/Drucker
+ExecStop=-/bin/fusermount -u %h/Desktop/Drucker
+Restart=on-success

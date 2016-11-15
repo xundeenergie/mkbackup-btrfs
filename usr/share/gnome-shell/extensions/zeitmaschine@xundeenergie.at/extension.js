@@ -19,6 +19,7 @@ const PopupTargetItem = Me.imports.popupTargetItem.PopupTargetItem;
 const PopupMenuItem = Me.imports.popupManuallyItem.PopupServiceItem;
 const MountMenuItem = Me.imports.popupMountItem.MountMenuItem;
 const DriveMenuItem = Me.imports.popupDriveItem.DriveMenuItem;
+const VolMenuItem = Me.imports.popupBkpVolumItem.PopupBKPItem;
 var Gio = imports.gi.Gio;
 const Mainloop = imports.mainloop;
 
@@ -26,7 +27,6 @@ const refreshTime = 3.0;
 let sLabel;
 let icon;
 let mainicon;
-let hostname;
 let extMediaName = 'external backup-drive';
 
 const DisabledIcon = 'my-caffeine-off-symbolic';
@@ -41,11 +41,15 @@ const BackupManager = new Lang.Class({
 
 	_init: function() {
 
+        this._drives = [ ];
+        this._volumes = [ ];
+        this._mounts = [ ];
+
         //Set a FileMonitor on the config-File. So the Config-File is only
         //read, when it changed.
         this.GF = Gio.File.new_for_path('/etc/mksnapshot.conf');
         this._monitorGF = this.GF.monitor_file(Gio.FileMonitorFlags.NONE,null,null,null)
-        this._monitorGF.set_rate_limit(650);
+        //this._monitorGF.set_rate_limit(650);
         this._monitorGF.connect("changed", Lang.bind(this, function(monitor, file,o, event) {
             // without this test, _loadConfig() is called more than once!!
             if (event == Gio.FileMonitorEvent.CHANGES_DONE_HINT && ! /~$/.test(file.get_basename())) {
@@ -53,19 +57,18 @@ const BackupManager = new Lang.Class({
             }
         }));
 
-        hostname = this._run_command('hostname');
+
+
         this._loadConfig();
         this.watchvolume = this._run_command('systemd-escape --path '+this.bkpmnt)+'.mount' 
 
-        //log(this.watchvolume)
 		PanelMenu.Button.prototype._init.call(this, 0.0);
 
-		this._settings = Convenience.getSettings();
-		this._settings.connect('changed', Lang.bind(this, this._loadConfig));
+		//this._settings = Convenience.getSettings();
+		//this._settings.connect('changed', Lang.bind(this, this._loadConfig));
 
 		//this._loadConfig();
 
-//this.mount = mount;
 
 		let hbox = new St.BoxLayout({ style_class: 'panel-status-menu-box' });
 		mainicon = new St.Icon({icon_name: 'drive-harddisk-usb-symbolic', 
@@ -90,14 +93,15 @@ const BackupManager = new Lang.Class({
 
 		Main.panel.addToStatusArea('backupManager', this);
 		
-		this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+		//this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
 		let bkpitem = this.menu.addAction(_("Open Backups"), function(event) {
 			let context = global.create_app_launch_context(event.get_time(), -1);
 			let GF = Gio.File.new_for_path('backup');
 			Gio.AppInfo.launch_default_for_uri(GF.get_uri(),context);
 		});
 
-        this.extItem = new PopupTargetItem(extMediaName, false);
+        this.extItem = new PopupTargetItem(extMediaName, this._check_service('mkbackup@BKP.target','active'));
         this.menu.addMenuItem(this.extItem);
         
         this.extItem.connect('toggled', Lang.bind(this, function() {
@@ -123,11 +127,147 @@ const BackupManager = new Lang.Class({
         this._refreshID = Mainloop.timeout_add_seconds(refreshTime, Lang.bind(this, this._refresh_panel));
         // New Volumes to use as backup-media
         this._monitor = Gio.VolumeMonitor.get();
-        this._monitor.get_volumes().forEach(Lang.bind(this, this._showVolume));
+
+        this._removedDriveId = this._monitor.connect('drive-disconnected', Lang.bind(this, function(monitor, drive) {
+            log('DRIVE DISCONNECTED',drive.get_name())
+            this.extItem.label.text = 'external backup-drive';
+            this.drvsubmenu.destroy();
+            //this._showDrive(mount);
+        }));
+
+        this._addedDriveId = this._monitor.connect('drive-connected', Lang.bind(this, function(monitor, drive) {
+            log('DRIVE CONNECTED',drive.get_name());
+            this.extItem.label.text = drive.get_name();
+            log(drive.get_volumes());
+
+            this._DriveAdded(drive);
+            //this.drvsubmenu = new PopupMenu.PopupSubMenuMenuItem(_(drive.get_name()), true);
+            //this.drvsubmenu.icon.icon_name = 'drive-harddisk-usb-symbolic';
+            //this.drvsubmenu.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+            //log(mount.get_name())
+            //this._showDrive(drive);
+        }));
+
+        this._addedVolumeId = this._monitor.connect('volume-added', Lang.bind(this, function(monitor, volume){
+            this._VolumeAdded(volume);
+        }))
+
+        this._removedVolumeId = this._monitor.connect('volume-removed', Lang.bind(this, function(monitor, volume){
+            this._VolumeRemoved(volume);
+        }))
+
+        this._monitor.get_volumes().forEach(Lang.bind(this, function(volume) {
+            this._VolumeAdded(volume);
+            }));
+            
+
+        this._addedMountId = this._monitor.connect('mount-added', Lang.bind(this, function(monitor, mount) {
+            log('MOUNT CONNECTED',mount.get_name())
+            log(mount.get_name())
+            let volume = mount.get_volume()
+            log(volume.get_name(),volume.get_uuid())
+            //log(mount.get_name())
+            //this._showDrive(drive);
+        }));
 
         //log(Gio.UnixMountPoint.get_device_path('/var/cache/backup'))
         return;
 	},
+
+    _DriveAdded: function(drive) {
+        log('Drive added',drive.get_name())
+        this.drvsubmenu = new PopupMenu.PopupSubMenuMenuItem(_(drive.get_name()), true);
+        this.drvsubmenu.icon.icon_name = 'drive-harddisk-usb-symbolic';
+        //this.drvsubmenu.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+    },
+
+    _VolumeRemoved: function(volume) {
+        //Volume is removed, after it's mounted from system(d)
+        log('VOLUME REMOVED',volume.get_name())
+    },
+
+    _VolumeAdded: function(volume) {
+        //Volume is added, after it's unmounted from system(d)
+        log('VOLUME CONNECTED',volume.get_name())
+        log('ID',this._addedVolumeId)
+        if (volume.get_drive() == null)
+            return
+        let drive = volume.get_drive()
+        if ( !volume.can_mount() || !drive.is_removable())
+            return
+        log(volume.get_mount())
+        log(volume.enumerate_identifiers())
+        log(volume.get_identifier('uuid'))
+        log(volume.get_identifier('unix-device'))
+        log(volume.get_identifier('class'))
+        log(volume.get_identifier('label'))
+
+        let me
+        try {
+            me = this.drvsubmenu.menu._getMenuItems();
+        } catch(e) {
+            this._DriveAdded(drive)
+        }
+        me = this.drvsubmenu.menu._getMenuItems();
+
+        let menuItem = new VolMenuItem(volume, false);
+
+        let VF = Gio.File.new_for_path('/etc/udev/rules.d/99-ext-bkp-volume-u-'+volume.get_identifier('uuid')+'.rules');
+        if (VF.query_exists(null)) {
+            log('UDEV exists','/etc/udev/rules.d/99-ext-bkp-volume-u-'+volume.get_identifier('uuid')+'.rules')
+            menuItem.setToggleState(true);
+        } else {
+            log('UDEV not exists','/etc/udev/rules.d/99-ext-bkp-volume-u-'+volume.get_identifier('uuid')+'.rules')
+            menuItem.setToggleState(false);
+        }
+
+
+        this._removeItemByLabel(volume.get_name());
+        this.drvsubmenu.menu.addMenuItem(menuItem);
+        let connID = menuItem.connect('toggled', Lang.bind(this, function() {
+            log('ACTIVE?',menuItem.state,menuItem.label.text)
+            if (menuItem.state) {
+                reg = 'register'
+            } else {
+                reg = 'unregister'
+            }
+            GLib.spawn_command_line_async(
+                this._getCommand('mkbackup-'+reg+'@'+volume.get_identifier('unix-device')+'.service', 'start', 'system'));
+        }));
+        log(connID,volume.get_name())
+        this.menu.addMenuItem(this.drvsubmenu,1);
+    },
+
+    _removeItemByLabel: function(label) { 
+        log('LAB',label)
+        let children = this.drvsubmenu.menu._getMenuItems(); 
+        for (let i = 0; i < children.length; i++) { 
+            let item = children[i]; 
+            log('REM',item.label.text,label)
+            if (item.label.text == label)
+                item.destroy(); 
+        } 
+    }, 
+
+    
+
+    _addMount: function(mount) {
+        let item = new MountMenuItem(mount);
+        this._mounts.unshift(item);
+        this.menu.addMenuItem(item, 0);
+    },
+
+    _removeMount: function(mount) {
+        for (let i = 0; i < this._mounts.length; i++) {
+            let item = this._mounts[i];
+            if (item.mount == mount) {
+            item.destroy();
+            this._mounts.splice(i, 1);
+            return;
+            }
+        }
+        log ('Removing a mount that was never added to the menu');
+    },
 
     _run_command: function(COMMAND) {
         let output = "";
@@ -143,58 +283,33 @@ const BackupManager = new Lang.Class({
 
 
     _showVolume: function(volume) {
-        //log(volume.get_name());
         let drive = volume.get_drive();
         let mount = volume.get_mount();
-        if (drive != null && mount != null){
-            //log(drive.has_volumes(),volume.get_uuid());
-            extMediaName = drive.get_name();
-            this.extItem.label.text = drive.get_name();
-            //log('VOL',drive.get_name(),volume.get_name(),mount.get_name(),'volume can mount:',volume.can_mount())
+        if (drive != null && drive.is_removable()){
+            log('SVDRIVE',drive.get_name(),drive.is_removable())
+            log('SVVOL',volume.get_name(),volume.get_uuid(),drive.is_removable());
         }
     },
 
     _showDrive: function(drive) {
-        log('DRIVE',drive.get_name(),drive.get_volumes(),drive.has_media(),drive.is_removable(),drive.has_volumes(),drive.enumerate_identifiers());
-        if (drive.is_removable() && drive.has_media()) {
-            log('D',drive.get_name(),drive.get_volumes());
-            let submenu = new PopupMenu.PopupSubMenuMenuItem(_(drive.get_name()), true);
-            submenu.icon.icon_name = 'drive-harddisk-usb-symbolic';
-            submenu.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-            let menuItem = new PopupMenuItem('BLA');
-            submenu.menu.addMenuItem(menuItem);
+        //extMediaName = 'external backup-drive';
+        log('SDDRIVE',drive.get_name(),drive.get_volumes(),drive.has_media(),drive.is_removable(),drive.has_volumes(),drive.enumerate_identifiers());
+        if (drive.is_removable() && drive.has_volumes()) {
+            //extMediaName = drive.get_name();
+            log('SDDREMOV')
 
-            //log('VOLUME',volume.get_name(),volume.get_uuid(),volume.get_icon(),volume.get_mount(),volume.can_mount(),volume.can_eject());
             drive.get_volumes().forEach(Lang.bind(this, function(volume) {
                 if (volume.can_mount()){
-                    let menuItem = new PopupMenuItem(volume.get_name());
-                    submenu.menu.addMenuItem(menuItem);
+                    log('SDVOL',volume.get_name());
                     if ( volume.get_mount() != null ) {
                         let mount = volume.get_mount();
-                        log('MR',mount.get_root());
+                        log('SDMR',mount.get_root());
                     }
                 }
-            
-            
             }));
-            this.menu.addMenuItem(submenu,1);
+        } else {
+            log(drive.is_removable(),drive.has_volumes(),drive.get_volumes());
         }
-
-    },
-
-    _addMount: function(mount) {
-        log('MOUNT',mount.get_drive(),mount.get_volume())
-        if( mount.get_drive()){
-            let d = mount.get_drive();
-            log('DN',d.get_name());
-        
-        } else
-            log('NOK')
-            
-	//let item = new MountMenuItem(mount);
-	//this._mounts.unshift(item);
-	//this.menu.addMenuItem(item, 0);
-    //log('ADD MOUNT '+mount.get_uuid()+'|'+mount.can_unmount()+' '+mount.can_eject()+' '+mount.get_name()+' '+mount.get_default_location().toSource());
     },
 
     _checkMount: function(mount) {
@@ -202,25 +317,7 @@ const BackupManager = new Lang.Class({
         log('VOLUME '+mount.get_volume());
         return(mount.can_unmount() || mount.can_eject())
     },
-    /*_addMount: function(mount) {
-	let item = new MountMenuItem(mount);
-	this._mounts.unshift(item);
-	this.menu.addMenuItem(item, 0);
-    },
 
-    _removeMount: function(mount) {
-	for (let i = 0; i < this._mounts.length; i++) {
-	    let item = this._mounts[i];
-	    if (item.mount == mount) {
-		item.destroy();
-		this._mounts.splice(i, 1);
-		return;
-	    }
-	}
-	log ('Removing a mount that was never added to the menu');
-    },
-
- */
 	_getCommand: function(service, action, type) {
 		let command = "systemctl"
 
@@ -240,6 +337,7 @@ const BackupManager = new Lang.Class({
         volumes.push(this.watchvolume)
 
         volumes.push('home-jakob-Videos-extern.mount')
+        volumes.push('home-media.mount')
         //let volumes = ['var-cache-backup.mount', 'home-jakob-Videos-extern.mount'];
 
         for (var vol in volumes) {
@@ -276,24 +374,16 @@ const BackupManager = new Lang.Class({
 
     _check_service: function(service,stat) {
         let [_, aout, aerr, astat] = GLib.spawn_command_line_sync(
-                            this._getCommand(service, 'is-'+stat, 'system'));
-
+            this._getCommand(service, 'is-'+stat, 'system'));
         return (astat == 0);
-
     },
 
 	_refresh: function() {
-		
-		//log('refresh menu 1, menu is open:',this.menu.isOpen)
-		//log('refresh submenu , menu is open:',this.bkpsubmenu.menu.isOpen)
-		//this._loadConfig();
 		let me = this.bkpsubmenu.menu._getMenuItems();
-        //log(this._entries)
 		this._entries.forEach(Lang.bind(this, function(service) {
             service.enabled = false;
-            service.staticserv = false;
-            service.staticserv = false;
             service.active = false;
+            service.staticserv = false;
             service.found = false;
 			let serviceItem
 			
@@ -318,7 +408,6 @@ const BackupManager = new Lang.Class({
 				} 
 			}));
 
-            //log('S',service['found'],service.found)
 			if (service.found) {
 				//log('update',service['name']);
 				if ( service.staticserv ) {
@@ -380,7 +469,7 @@ const BackupManager = new Lang.Class({
 	},
 
     _loadConfig: function() {
-        log('LOAD CONFIG')
+        //log('LOAD CONFIG')
         let intervals
         let services = []
         let kf = new GLib.KeyFile()
@@ -408,7 +497,7 @@ const BackupManager = new Lang.Class({
                 } catch(err) {
                     obj.tr = (kf.get_value("DEFAULT","transfer").toLowerCase() === "true");
                 }
-                this._entries.push(obj)}));
+            this._entries.push(obj)}));
         } 
     }
 });

@@ -67,6 +67,7 @@ class Xmp(Fuse):
 #            hostname=socket.gethostbyaddr(socket.gethostname())[0]
         #socket.gethostname() liefert nur "hostname" ohne .localdomain
         hostname=socket.gethostname()
+
         # do stuff to set up your filesystem here, if you want
         #import thread
         #thread.start_new_thread(self.mythread, ())
@@ -76,22 +77,20 @@ class Xmp(Fuse):
         self.root=CONFIG.getStorePath('SNP')
         self.local=CONFIG.getStorePath('SNP')
         self.extern=CONFIG.getStorePath('BKP')
-        self.uroot = False
-#        self.root='/var/cache/btrfs_pool_SYSTEM'
-#        self.local='/var/cache/btrfs_pool_SYSTEM'
-#        self.extern='/var/cache/backup/'+hostname
-
         self.snapshots={}
         self.direntries=[]
         Xmp.realpath=""
         self.USER=getpass.getuser()
+        if os.getuid() == 0:
+            self.uroot = True  
+        else:
+            self.uroot = False
+
         try:
             self.HOME=os.environ['HOME']
         except:
             self.HOME = None
             self.uroot = True
-        #self.BDIRS={'local':'/var/cache/btrfs_pool_SYSTEM','extern':'/var/cache/backup/aldebaran'}
-        #self.BDIRS={'local':self.local,'extern':self.extern}
         
 # JS - some helpers
     def translate(self,subvolname,location='loc'):
@@ -99,7 +98,8 @@ class Xmp(Fuse):
         ac = ""
         sn = subvolname.split('.')[0]+'.'
         if n == 1:
-            return subvolname+'--'+location
+            #return subvolname+'--'+location
+            return 'CURRENT--'+location
         elif n == 2:
             return subvolname+'--'+location
         elif n == 3:
@@ -204,7 +204,6 @@ class Xmp(Fuse):
 #            print "mythread: ticking"
 
     def getattr(self, path):
-        #if path == "/" and (self.root.strip('/') == self.BDIRS['loc'].strip('/') or self.root == self.BDIRS['ext'].strip('/')):
         if path == "/" and (self.root in self.BDIRS.values()):
             return os.lstat('.'+path)
         else:
@@ -214,8 +213,6 @@ class Xmp(Fuse):
         return os.readlink(self.__realpath(path))
 
     def readdir(self, path, offset):
-        #if path == "/" and (self.root.strip('/') == self.BDIRS['loc'].strip('/') or self.root == self.BDIRS['ext'].strip('/')):
-    
         if path == "/" and (self.root in self.BDIRS.values()):
             if DEBUG: print path
             pass
@@ -324,7 +321,6 @@ class Xmp(Fuse):
 
     def fsinit(self):
         if DEBUG: print "fsinit"
-        if self.uroot == None: self.uroot = True
         self.BDIRS={'loc':'/'+self.local.strip('/'),'ext':'/'+self.extern.strip('/')}
         os.chdir('/'+self.local.strip('/'))
         self.__lsnapshots()
