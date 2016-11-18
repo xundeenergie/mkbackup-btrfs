@@ -3,7 +3,7 @@ Description=Daily Timer
 OnFailure=status-email-root@%n.service
 
 [Timer]
-OnCalendar=*-*-* 9,21:00
+OnCalendar=*-*-* 10:00
 RandomizedDelaySec=12h
 AccuracySec=1h
 Persistent=true

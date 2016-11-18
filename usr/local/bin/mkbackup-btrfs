@@ -643,7 +643,7 @@ class SubVolume(SubVolumeInfo):
 
             self.DEBUG(' ==transfer=> »<%s>/%s«' % (self.store,sname),level=0)
             
-            for t in sorted(transfers.keys(),key=int):
+            for t in sorted(transfers.keys()):
                 dest = args.config.getStorePath('BKP')+'/'+t
                 destdir = os.path.dirname(dest.rstrip('/'))+'/'
                 if issubvol(dest) == False:
@@ -849,12 +849,10 @@ def cleanup(args):
                         cI[i] = 0
                     try:
                         for i in ST[st].grep_subvolumes(ex,names=False,rev=True):
-                            print('SV',i,ST[st].svols[i]['path'])
                             for tag in I.keys():
                                 if ST[st].svols[i]['path'].partition(tag)[1] != '':
                                     cI[tag] += 1
                                     if cI[tag] > int(I[tag]):
-                                        print('SVpush',i,ST[st].svols[i]['path'])
                                         DEL.push([st,ST[st].svols[i]['path']])
                     except:
                         raise CleanupError('cleanup failed for %s' % (sn))
@@ -998,11 +996,14 @@ def lists(args):
             except:
                 raise
             #if output[0] == 0:
+            cut =  120
             for line in output.splitlines():
-                if reintv.search(str(line)): 
-                    o = line.decode().replace("timer-","").replace(".timer"," backup")
-                    print(o[:125])
-            print('-+-+-+-+-+-+-+-+-+-+-+-')
+                l = line.decode()
+                if "ACTIVATES" in l: cut = l.find("ACTIVATES")
+                l = l[:cut]
+                if reintv.search(l): 
+                    o = l.replace("timer-","").replace(".timer"," backup")
+                    print(o)
             ST=dict()
             for st in args.store:
                 ST[st]=dict()
@@ -1013,18 +1014,28 @@ def lists(args):
                         ST[st][vol][intv] = list()
                     for snp in glob.glob(args.config.getStorePath(st)+'/'+vol+'.*'):
                         for intv in ST[st][vol].keys():
-                            R = re.compile(intv)
+                            R = re.compile(intv+'$')
                             if R.search(snp):
                                 ST[st][vol][intv].append(os.path.basename(snp))
             for st in ST.keys():
+                print('..--==°°==--..')
                 print('Youngest snapshot in %s' % (st))
                 for vol in ST[st].keys():
-                    print('\tVolumes: %s' % (vol))
+                    s = dict()
+                    missing = list()
+                    print('\tVolume: %s' % (vol))
                     for intv in ST[st][vol].keys():
                         if len(ST[st][vol][intv]) > 0:
-                            print('\t\t'+ST[st][vol][intv].pop())
+                            i = ST[st][vol][intv].pop()
+                            s[i.split('.')[1]] = i
+                            
                         else:
-                            print('\t\t'+"is missing: %s" % (intv))
+                            missing.append(intv)
+                            #print('\t\t'+"is missing: %s" % (intv))
+                    for i in reversed(sorted(s.keys())):
+                        print('\t\t'+s[i])
+                    print('\t\tmissing: %s' % (', '.join(missing)))
+        print('--finish--')
     else:
         text = 'subvolumes in'
         if args.snap:

@@ -7,7 +7,7 @@ OnCalendar=*-01,07-01 12:30:00
 RandomizedDelaySec=1month
 AccuracySec=15days
 Persistent=true
-Unit=timer-monthly.target
+Unit=timer-yearly.target
 
 [Install]
 WantedBy=timers.target

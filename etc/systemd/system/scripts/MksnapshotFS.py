@@ -161,15 +161,14 @@ class Xmp(Fuse):
 
     def __realpath(self,path):
         ss = path.split('/')[1]
-        sv = './'+'/'.join(path.split('/')[2:])
-        #if path == "/" and not self.root.strip('/') == self.BDIRS['loc'].strip('/') and not self.root == self.BDIRS['ext'].strip('/'):
+        #sv = './'+'/'.join(path.split('/')[2:])
+        sv = '/'.join(path.split('/')[2:])
         if path == "/" and (self.root in self.BDIRS.values()):
-            Xmp.realpath = path
-            return Xmp.realpath
+            return self.root
         elif ss in self.snapshots:
             self.root = self.snapshots[ss][0]
-            Xmp.realpath = self.snapshots[ss][0]+self.snapshots[ss][1]+sv
-            return Xmp.realpath
+            Xmp.realpath = self.snapshots[ss][0]+self.snapshots[ss][1]
+            return self.snapshots[ss][0]+self.snapshots[ss][1]+sv
         else: 
             self.root = self.BDIRS['loc']
             Xmp.realpath = self.root + path
@@ -204,8 +203,9 @@ class Xmp(Fuse):
 #            print "mythread: ticking"
 
     def getattr(self, path):
+        return os.lstat(self.__realpath(path))
         if path == "/" and (self.root in self.BDIRS.values()):
-            return os.lstat('.'+path)
+            return os.lstat(self.root)
         else:
             return os.lstat(self.__realpath(path))
 
@@ -329,11 +329,9 @@ class Xmp(Fuse):
     class XmpFile(object):
 
         def __init__(self, path, flags, *mode):
-            path = Xmp.realpath
-            #print "P: "+path
-            self.file = os.fdopen(os.open(path, flags, *mode),
-                                  flag2mode(flags))
-            self.fd = self.file.fileno()
+            path = Xmp.realpath+'/'.join(path.split('/')[2:])
+            self.fd = os.open(path, flags, *mode)
+            self.file = os.fdopen(self.fd, flag2mode(flags))
 
         def read(self, length, offset):
             self.file.seek(offset)
