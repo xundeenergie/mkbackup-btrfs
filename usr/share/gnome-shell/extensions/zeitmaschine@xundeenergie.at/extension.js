@@ -29,8 +29,10 @@ let icon;
 let mainicon;
 let extMediaName = 'external backup-drive';
 
-const DisabledIcon = 'my-caffeine-off-symbolic';
-const EnabledIcon = 'my-caffeine-on-symbolic';
+//const DisabledIcon = 'my-caffeine-off-symbolic';
+//const EnabledIcon = 'my-caffeine-on-symbolic';
+const DisabledIcon = 'system-run-symbolic';
+const EnabledIcon = 'system-run-symbolic';
 
 
 const BackupManager = new Lang.Class({
@@ -49,15 +51,12 @@ const BackupManager = new Lang.Class({
         //read, when it changed.
         this.GF = Gio.File.new_for_path('/etc/mksnapshot.conf');
         this._monitorGF = this.GF.monitor_file(Gio.FileMonitorFlags.NONE,null,null,null)
-        //this._monitorGF.set_rate_limit(650);
-        this._monitorGF.connect("changed", Lang.bind(this, function(monitor, file,o, event) {
+        this._monitorGF.connect("changed", Lang.bind(this, function(monitor, file, o, event) {
             // without this test, _loadConfig() is called more than once!!
             if (event == Gio.FileMonitorEvent.CHANGES_DONE_HINT && ! /~$/.test(file.get_basename())) {
                 this._loadConfig();
             }
         }));
-
-
 
         this._loadConfig();
         this.watchvolume = this._run_command('systemd-escape --path '+this.bkpmnt)+'.mount' 
@@ -76,7 +75,7 @@ const BackupManager = new Lang.Class({
 
 		sLabel = new St.Label({
 			text: '---',
-			style_class: 'iospeed-label'
+			//style_class: 'iospeed-label'
 		});
 
 		hbox.add_child(sLabel);
@@ -85,8 +84,6 @@ const BackupManager = new Lang.Class({
 
 		this.actor.add_actor(hbox);
 		this.actor.add_style_class_name('panel-status-button');
-        
-
 		this.actor.connect('button-press-event', Lang.bind(this, function() {
 			this._refresh();
 		}));
@@ -95,6 +92,8 @@ const BackupManager = new Lang.Class({
 		
 		//this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
+        // Fill the Menu
+        // First a Entry to open backup-Location
 		let bkpitem = this.menu.addAction(_("Open Backups"), function(event) {
 			let context = global.create_app_launch_context(event.get_time(), -1);
 			let GF = Gio.File.new_for_path('backup');
@@ -334,21 +333,27 @@ const BackupManager = new Lang.Class({
 
         let active = false;
         let volumes = []
+        let mounted = false;
         volumes.push(this.watchvolume)
 
+        // TODO: find all Volumes on the drive, holding the backup and add this
+        // volumes to the list
         volumes.push('home-jakob-Videos-extern.mount')
         volumes.push('home-media.mount')
-        //let volumes = ['var-cache-backup.mount', 'home-jakob-Videos-extern.mount'];
 
-        for (var vol in volumes) {
-            let [_, out, err, stat] = GLib.spawn_command_line_sync(
-                this._getCommand(volumes[vol], 'is-active', 'system'));
-            
-            active = (stat == 0 || active);
-        };
+        this.aout = GLib.spawn_command_line_sync(
+            this._getCommand(this.services.join(' '), 'is-active', 'system'))[1].toString().split('\n');
+        //log(this.aout);
 
-        mainicon.style = (active ? "color: #ff0000;" : "color: revert;");
-        sLabel.set_text(active ? _("active") : "");
+        active = this.aout.indexOf('active') >= 0
+
+        let vout = GLib.spawn_command_line_sync(
+                this._getCommand(volumes.join(' '), 'is-active', 'system'))[1].toString().split('\n');
+        mounted = vout.indexOf('active') >= 0
+
+        this.bkpsubmenu.icon.style = (active ? "color: #ff0000;" : "color: revert;");
+        mainicon.style = (mounted ? "color: #ff0000;" : "color: revert;");
+        sLabel.set_text(mounted ? _("mounted") : "");
 
 		if (this.menu.isOpen) {
             //Menu is open
@@ -380,75 +385,81 @@ const BackupManager = new Lang.Class({
 
 	_refresh: function() {
 		let me = this.bkpsubmenu.menu._getMenuItems();
-		this._entries.forEach(Lang.bind(this, function(service) {
-            service.enabled = false;
-            service.active = false;
-            service.staticserv = false;
-            service.found = false;
+        //log(this.services.join(' '))
+
+        let eout = GLib.spawn_command_line_sync(
+            this._getCommand(this.services.join(' '), 'is-enabled', 'system'))[1].toString().split('\n');
+        //log(eout);
+
+
+		this._entries.forEach(Lang.bind(this, function(service,index,arr) {
+            if (! arr[index].enabled == (eout[index] == 'enabled')) 
+                arr[index].changed = true
+            arr[index].enabled = (eout[index] == 'enabled' ? true : false)
+
+            if (! arr[index].active == (this.aout[index] == 'active')) 
+                arr[index].changed = true
+            arr[index].active = (this.aout[index] == 'active' ? true : false)
+        }));
+
+		this._entries.forEach(Lang.bind(this, function(service,index,arr) {
 			let serviceItem
-			
-			let [_, eout, eerr, estat] = GLib.spawn_command_line_sync(
-				this._getCommand(service['service'], 'is-enabled', 'system'));
-
-            if ( eout.toString().replace(/\n$/, "") == 'static' ) 
-                service.staticserv = true;
-
-			service.enabled = (estat == 0);
-
-			let [_, aout, aerr, astat] = GLib.spawn_command_line_sync(
-				this._getCommand(service['service'], 'is-active', 'system'));
-
-			service.active = (astat == 0);
-
 			me.forEach(Lang.bind(this, function(item) {
 				if ( item.label.text == service['name'] ) {
-					service.found = true;
+					arr[index].found = true;
 					serviceItem = item;
 					me.splice(me.indexOf(item),1);
 				} 
 			}));
 
-			if (service.found) {
-				//log('update',service['name']);
-				if ( service.staticserv ) {
-					serviceItem.setToggleState(service.active);
-				} else  {
-					serviceItem.setToggleState(service.enabled);
-				}
-			} else {
-				//log('new',service['name']);
-				if ( service.staticserv ) {
-					serviceItem = new PopupTargetItem(service['name'], service.active);
-					this.bkpsubmenu.menu.addMenuItem(serviceItem);
-					
-					serviceItem.connect('toggled', Lang.bind(this, function() {
-						GLib.spawn_command_line_async(
-							this._getCommand(service['service'], (this._check_service(service.service, 'active') ? 'stop' : 'start'), service["type"]));
-					}));
-				} else {
-					serviceItem = new PopupServiceItem(service['name'], service.enabled);
-					this.bkpsubmenu.menu.addMenuItem(serviceItem);
+            if ( arr[index].changed ) {
+                if (arr[index].found) {
+                    //log('update',service['name']);
+                    if ( service.staticserv ) {
+                        serviceItem.setToggleState(service.active);
+                    } else  {
+                        serviceItem.setToggleState(service.enabled);
+                    }
+                } else {
+                    //log('new',service['name']);
+                    if ( service.staticserv ) {
+                        serviceItem = new PopupTargetItem(service['name'], service.active);
+                        this.bkpsubmenu.menu.addMenuItem(serviceItem);
+                        
+                        serviceItem.connect('toggled', Lang.bind(this, function() {
+                            GLib.spawn_command_line_async(
+                                this._getCommand(service['service'], (this._check_service(service.service, 'active') ? 'stop' : 'start'), service["type"]));
+                        }));
+                    } else {
+                        serviceItem = new PopupServiceItem(service['name'], service.enabled);
+                        this.bkpsubmenu.menu.addMenuItem(serviceItem);
 
-					serviceItem.connect('toggled', Lang.bind(this, function() {
-						GLib.spawn_command_line_async(
-							this._getCommand(service['service'], (this._check_service(service.service, 'enabled') ? 'disable' : 'enable'), service["type"]));
-					}));
+                        serviceItem.connect('toggled', Lang.bind(this, function() {
+                            GLib.spawn_command_line_async(
+                                this._getCommand(service['service'], (this._check_service(service.service, 'enabled') ? 'disable' : 'enable'), service["type"]));
+                        }));
 
-					serviceItem.actionButton.connect('clicked', Lang.bind(this, function() {
-						GLib.spawn_command_line_async(
-							this._getCommand(service['service'], (this._check_service(service.service, 'active') ? 'stop' : 'start'), service["type"]));
-						this.menu.close();
-					}));
-				}
-			}
-            if (serviceItem.actionButton.child) {
-                serviceItem.actionButton.child.icon_name = (service.active ? EnabledIcon : DisabledIcon);
-                serviceItem.actionButton.child.style = (service.active ? "color: #ff0000;" : "color: revert;");
-            };
-            if (serviceItem.transferButton) {
-                serviceItem.transferButton.style = (service.tr ? "text-decoration: revert;" : "text-decoration: line-through;");
-            };
-		}));
+                        serviceItem.actionButton.connect('clicked', Lang.bind(this, function() {
+                            GLib.spawn_command_line_async(
+                                this._getCommand(service['service'], (this._check_service(service.service, 'active') ? 'stop' : 'start'), service["type"]));
+                            this.menu.close();
+                        }));
+                    }
+                }
+                if (serviceItem.actionButton.child) {
+                    serviceItem.actionButton.child.icon_name = (service.active ? EnabledIcon : DisabledIcon);
+                    serviceItem.actionButton.child.style = (service.active ? "color: #ff0000;" : "color: revert;");
+                };
+                if (serviceItem.transferButton) {
+                    serviceItem.transferButton.style = (service.tr ? "text-decoration: revert;" : "text-decoration: line-through;");
+                };
+
+
+                //log('Changed',service.service)
+            }
+            //log('X',arr[index].service,arr[index].enabled,arr[index].active,arr[index].changed)
+            arr[index].changed = false;
+        }));
 
 		this.bkpsubmenu.menu._getMenuItems().forEach(Lang.bind(this, function(item) {
             let mic = 0
@@ -457,13 +468,10 @@ const BackupManager = new Lang.Class({
 					if (item == me[i]) {
                         log('DESTROY',me[i].label.text);
 						item.destroy();
-
 					}
-
 				}
 			}
 		}));
-
 
 		return true;
 	},
@@ -471,7 +479,7 @@ const BackupManager = new Lang.Class({
     _loadConfig: function() {
         //log('LOAD CONFIG')
         let intervals
-        let services = []
+        this.services = []
         let kf = new GLib.KeyFile()
         let obj = new Object();
         this._entries = [];
@@ -491,7 +499,14 @@ const BackupManager = new Lang.Class({
                 obj.name = i +' backups';
                 obj.interval = interval;
                 obj.service = "mkbackup@"+i+".service";
+                this.services.push(obj.service)
                 obj.type = "system";
+                obj.enabled = false;
+                obj.active = false;
+                obj.changed = true;
+                obj.found = false;
+                obj.staticserv = false;
+
                 try {
                     obj.tr = (kf.get_value(interval,"transfer").toLowerCase() === "true");
                 } catch(err) {

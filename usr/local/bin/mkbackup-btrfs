@@ -999,11 +999,15 @@ def lists(args):
             cut =  120
             for line in output.splitlines():
                 l = line.decode()
-                if "ACTIVATES" in l: cut = l.find("ACTIVATES")
-                l = l[:cut]
-                if reintv.search(l): 
-                    o = l.replace("timer-","").replace(".timer"," backup")
-                    print(o)
+                if "ACTIVATES" in l: 
+                    cut = l.find("ACTIVATES")
+                    i = l.find("UNIT")
+                    print(l[:cut])
+                elif reintv.search(l): 
+                    l = l[:cut]
+                    o = l.replace("timer-","").replace(".timer","").rstrip()
+                    x = o[i:].rstrip(),
+                    print(o+" backup","\t--> transfer" if args.config.getTransfer(x[0]) else "")
             ST=dict()
             for st in args.store:
                 ST[st]=dict()
@@ -1012,11 +1016,12 @@ def lists(args):
                     ST[st][vol]=dict()
                     for intv in args.config.ListIntervals():
                         ST[st][vol][intv] = list()
-                    for snp in glob.glob(args.config.getStorePath(st)+'/'+vol+'.*'):
-                        for intv in ST[st][vol].keys():
-                            R = re.compile(intv+'$')
-                            if R.search(snp):
-                                ST[st][vol][intv].append(os.path.basename(snp))
+                    if args.config.getStorePath(st) is not None:
+                        for snp in glob.glob(args.config.getStorePath(st)+'/'+vol+'.*'):
+                            for intv in ST[st][vol].keys():
+                                R = re.compile(intv+'$')
+                                if R.search(snp):
+                                    ST[st][vol][intv].append(os.path.basename(snp))
             for st in ST.keys():
                 print('..--==°°==--..')
                 print('Youngest snapshot in %s' % (st))
