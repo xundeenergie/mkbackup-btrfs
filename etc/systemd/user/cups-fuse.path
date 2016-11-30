@@ -1,9 +1,0 @@
-[Unit]
-Description=Starts mounting printers to %h/Desktop/printers, if this directory exists
-
-[Path]
-PathExists=%h/Desktop/Drucker
-Unit=cups-fuse.service
-
-[Install]
-WantedBy=paths.target

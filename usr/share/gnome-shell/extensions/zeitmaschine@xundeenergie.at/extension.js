@@ -24,10 +24,11 @@ var Gio = imports.gi.Gio;
 const Mainloop = imports.mainloop;
 
 const refreshTime = 3.0;
-let sLabel;
+let MainLabel;
 let icon;
-let mainicon;
+let MainIcon;
 let extMediaName = 'external backup-drive';
+let Drives = new Object();
 
 //const DisabledIcon = 'my-caffeine-off-symbolic';
 //const EnabledIcon = 'my-caffeine-on-symbolic';
@@ -50,8 +51,8 @@ const BackupManager = new Lang.Class({
         //Set a FileMonitor on the config-File. So the Config-File is only
         //read, when it changed.
         this.GF = Gio.File.new_for_path('/etc/mksnapshot.conf');
-        this._monitorGF = this.GF.monitor_file(Gio.FileMonitorFlags.NONE,null,null,null)
-        this._monitorGF.connect("changed", Lang.bind(this, function(monitor, file, o, event) {
+        this._monitorConf = this.GF.monitor_file(Gio.FileMonitorFlags.NONE,null,null,null)
+        this._monitorConf.connect("changed", Lang.bind(this, function(monitor, file, o, event) {
             // without this test, _loadConfig() is called more than once!!
             if (event == Gio.FileMonitorEvent.CHANGES_DONE_HINT && ! /~$/.test(file.get_basename())) {
                 this._loadConfig();
@@ -63,23 +64,15 @@ const BackupManager = new Lang.Class({
 
 		PanelMenu.Button.prototype._init.call(this, 0.0);
 
-		//this._settings = Convenience.getSettings();
-		//this._settings.connect('changed', Lang.bind(this, this._loadConfig));
-
-		//this._loadConfig();
-
-
 		let hbox = new St.BoxLayout({ style_class: 'panel-status-menu-box' });
-		mainicon = new St.Icon({icon_name: 'drive-harddisk-usb-symbolic', 
-			style_class: 'system-status-icon'});
+		MainIcon = new St.Icon({icon_name: 'drive-harddisk-usb-symbolic', 
+                                style_class: 'system-status-icon'});
 
-		sLabel = new St.Label({
-			text: '---',
-			//style_class: 'iospeed-label'
+		MainLabel = new St.Label({ text: '---',
 		});
 
-		hbox.add_child(sLabel);
-		hbox.add_child(mainicon);
+		hbox.add_child(MainLabel);
+		hbox.add_child(MainIcon);
 		hbox.add_child(PopupMenu.arrowIcon(St.Side.BOTTOM));
 
 		this.actor.add_actor(hbox);
@@ -101,61 +94,56 @@ const BackupManager = new Lang.Class({
 		});
 
         this.extItem = new PopupTargetItem(extMediaName, this._check_service('mkbackup@BKP.target','active'));
-        this.menu.addMenuItem(this.extItem);
-        
         this.extItem.connect('toggled', Lang.bind(this, function() {
             GLib.spawn_command_line_async(
-                this._getCommand('mkbackup@BKP.target', (this._check_service('mkbackup@BKP.target','active') ? 'stop' : 'start'), 'system'));
+                this._getCommand('mkbackup@BKP.target', 
+                                (this._check_service('mkbackup@BKP.target','active') ? 'stop' : 'start'), 
+                                'system'));
         }));
+        this.menu.addMenuItem(this.extItem);
 
-        this.bkpsubmenu = new PopupMenu.PopupSubMenuMenuItem(_('Backup-Intervalle'), true);
-        this.bkpsubmenu.icon.icon_name = 'drive-harddisk-usb-symbolic';
+		this.snapitem = new PopupMenu.PopupMenuItem(_("Take snapshot now"));
+		this.snapitem.connect('activate', Lang.bind(this, function() {
+		    GLib.spawn_command_line_async(
+			this._getCommand('mkbackup@manually.service', 'restart', 'system'));
+			this.menu.close();
+		    }));
+		this.menu.addMenuItem(this.snapitem);
+
+        this.bkpsubmenu = new PopupMenu.PopupSubMenuMenuItem(_("Backup-Intervalle"), true);
+        this.bkpsubmenu.icon.icon_name = 'system-run-symbolic';
         this.menu.addMenuItem(this.bkpsubmenu);
 
 		if(this._entries.length > 0)
 		this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 		
-		let item = new PopupMenu.PopupMenuItem(_("Make manually snapshot/backup"));
-		item.connect('activate', Lang.bind(this, function() {
-		    GLib.spawn_command_line_async(
-			this._getCommand('mkbackup@manually.service', 'restart', 'system'));
-			this.menu.close();
-		    }));
-		this.menu.addMenuItem(item);
-
         this._refreshID = Mainloop.timeout_add_seconds(refreshTime, Lang.bind(this, this._refresh_panel));
         // New Volumes to use as backup-media
         this._monitor = Gio.VolumeMonitor.get();
 
-        this._removedDriveId = this._monitor.connect('drive-disconnected', Lang.bind(this, function(monitor, drive) {
-            log('DRIVE DISCONNECTED',drive.get_name())
-            this.extItem.label.text = 'external backup-drive';
-            this.drvsubmenu.destroy();
-            //this._showDrive(mount);
-        }));
-
         this._addedDriveId = this._monitor.connect('drive-connected', Lang.bind(this, function(monitor, drive) {
             log('DRIVE CONNECTED',drive.get_name());
-            this.extItem.label.text = drive.get_name();
-            log(drive.get_volumes());
-
             this._DriveAdded(drive);
-            //this.drvsubmenu = new PopupMenu.PopupSubMenuMenuItem(_(drive.get_name()), true);
-            //this.drvsubmenu.icon.icon_name = 'drive-harddisk-usb-symbolic';
-            //this.drvsubmenu.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-            //log(mount.get_name())
-            //this._showDrive(drive);
+        }));
+
+        this._removedDriveId = this._monitor.connect('drive-disconnected', Lang.bind(this, function(monitor, drive) {
+            log('DRIVE DISCONNECTED',drive.get_name(),this._removedDriveId)
+            this._DriveRemoved(drive);
+            //this.extItem.label.text = _("external backup-drive");
+            //this.drvsubmenu.destroy();
         }));
 
         this._addedVolumeId = this._monitor.connect('volume-added', Lang.bind(this, function(monitor, volume){
+            this._addVolume(volume);
             this._VolumeAdded(volume);
+            log('VOLUMES',JSON.stringify(this._drives))
         }))
 
         this._removedVolumeId = this._monitor.connect('volume-removed', Lang.bind(this, function(monitor, volume){
-            this._VolumeRemoved(volume);
+            //this._VolumeRemoved(volume);
         }))
 
-        this._monitor.get_volumes().forEach(Lang.bind(this, function(volume) {
+        /*this._monitor.get_volumes().forEach(Lang.bind(this, function(volume) {
             this._VolumeAdded(volume);
             }));
             
@@ -167,17 +155,73 @@ const BackupManager = new Lang.Class({
             log(volume.get_name(),volume.get_uuid())
             //log(mount.get_name())
             //this._showDrive(drive);
-        }));
+        }));*/
 
         //log(Gio.UnixMountPoint.get_device_path('/var/cache/backup'))
         return;
 	},
 
     _DriveAdded: function(drive) {
-        log('Drive added',drive.get_name())
-        this.drvsubmenu = new PopupMenu.PopupSubMenuMenuItem(_(drive.get_name()), true);
+        let Dident = drive.enumerate_identifiers();
+        let u_dev = drive.get_identifier('unix-device');
+        let d_name =  drive.get_name();
+        log('DRIVE unix-device',u_dev,d_name)
+        this._drives[d_name] = new Object()
+        this._drives[d_name]['drive'] = drive;
+        this._drives[d_name]['device'] = drive.get_identifier('unix-device'); 
+        //this._drives[d_name]['uuid']   = drive.get_identifier('uuid'); 
+        this._drives[d_name]['volumes'] = new Object()
+        /*if (drive.has_volumes()) {
+            log('DHV',drive.get_volumes());
+            let VList = drive.get_volumes();
+            VList.forEach(Lang.bind(this, function(volume){
+                let v_name = volume.get_name();
+                log(v_name)
+                this._drives[d_name]['volumes'][v_name] = this._addVolume(volume);
+            }));
+            //VList.free()
+        } else {
+            log('DHNV',drive.get_volumes());
+        };
+        log('VOLUMES',JSON.stringify(this._drives))
+        log('X',this._drives['ST1000LM024 HN-M101MBB']['device'])
+        */
+        this.drvsubmenu = new PopupMenu.PopupSubMenuMenuItem(drive.get_name(), true);
         this.drvsubmenu.icon.icon_name = 'drive-harddisk-usb-symbolic';
+        this.menu.addMenuItem(this.drvsubmenu);
+
+        //log('Drive added',drive.get_name())
+        //this.drvsubmenu = new PopupMenu.PopupSubMenuMenuItem(_(drive.get_name()), true);
+        //this.drvsubmenu.icon.icon_name = 'drive-harddisk-usb-symbolic';
         //this.drvsubmenu.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+    },
+
+    _addVolume: function(volume) {
+        let drives = volume.get_drive();
+        log('D',drives.get_name())
+        log('V',volume.get_name())
+        this._drives[drives.get_name()][volume.get_name()] = volume;
+        volume.enumerate_identifiers();
+        let vol = new Object()
+        log(volume.get_identifier('uuid'))
+        log(volume.get_identifier('unix-device'))
+        log(volume.get_identifier('class'))
+        log(volume.get_identifier('label'))
+        vol['volume'] = volume;
+        vol['uuid'] = volume.get_identifier('uuid');
+        vol['u_device'] = volume.get_identifier('unix-device');
+        vol['vclass'] = volume.get_identifier('class');
+        vol['label'] = volume.get_identifier('label');
+        //this._drives[drives.get_name()]['volumes'][volume.get_name()] = v_name;
+        return vol
+    },
+
+    _DriveRemoved: function(drive) {
+        let me = this.menu._getMenuItems();
+        this._removeItemByLabel(this.menu, drive.get_name());
+
+
+        //this.drvsubmenu.destroy();
     },
 
     _VolumeRemoved: function(volume) {
@@ -200,6 +244,10 @@ const BackupManager = new Lang.Class({
         log(volume.get_identifier('unix-device'))
         log(volume.get_identifier('class'))
         log(volume.get_identifier('label'))
+        let dr = volume.get_drive()
+        log(dr.get_name())
+        log(dr.enumerate_identifiers())
+        log(dr.get_identifier('unix-device'))
 
         let me
         try {
@@ -221,7 +269,7 @@ const BackupManager = new Lang.Class({
         }
 
 
-        this._removeItemByLabel(volume.get_name());
+        //this._removeItemByLabel(this.drvsubmenu.menu, volume.get_name());
         this.drvsubmenu.menu.addMenuItem(menuItem);
         let connID = menuItem.connect('toggled', Lang.bind(this, function() {
             log('ACTIVE?',menuItem.state,menuItem.label.text)
@@ -237,14 +285,15 @@ const BackupManager = new Lang.Class({
         this.menu.addMenuItem(this.drvsubmenu,1);
     },
 
-    _removeItemByLabel: function(label) { 
+    _removeItemByLabel: function(menu, label) { 
         log('LAB',label)
-        let children = this.drvsubmenu.menu._getMenuItems(); 
+        let children = menu._getMenuItems(); 
         for (let i = 0; i < children.length; i++) { 
             let item = children[i]; 
             log('REM',item.label.text,label)
             if (item.label.text == label)
-                item.destroy(); 
+                log('DESTROY',item.label.text)
+                //item.destroy(); 
         } 
     }, 
 
@@ -329,8 +378,16 @@ const BackupManager = new Lang.Class({
 		return 'sh -c "' + command + '; exit;"'
 	},
 
+    _getDriveMounted: function(udevice) {
+        command = "/bin/grep"
+        command += " " + udevice
+        command += "/proc/mounts"
+        return 'sh -c "' + command + '; exit:"'
+    },
+
     _refresh_panel : function() {
 
+        //log('YY',this._drives['ST1000LM024 HN-M101MBB']['volumes'])
         let active = false;
         let volumes = []
         let mounted = false;
@@ -340,6 +397,9 @@ const BackupManager = new Lang.Class({
         // volumes to the list
         volumes.push('home-jakob-Videos-extern.mount')
         volumes.push('home-media.mount')
+        for (let d in this._drives) {
+            log('N',d);
+        };
 
         this.aout = GLib.spawn_command_line_sync(
             this._getCommand(this.services.join(' '), 'is-active', 'system'))[1].toString().split('\n');
@@ -352,8 +412,8 @@ const BackupManager = new Lang.Class({
         mounted = vout.indexOf('active') >= 0
 
         this.bkpsubmenu.icon.style = (active ? "color: #ff0000;" : "color: revert;");
-        mainicon.style = (mounted ? "color: #ff0000;" : "color: revert;");
-        sLabel.set_text(mounted ? _("mounted") : "");
+        MainIcon.style = (mounted ? "color: #ff0000;" : "color: revert;");
+        MainLabel.set_text(mounted ? _("mounted") : "");
 
 		if (this.menu.isOpen) {
             //Menu is open
@@ -367,7 +427,8 @@ const BackupManager = new Lang.Class({
             if (this.bkpsubmenu.menu.isOpen)  {
                 //Submenu Backu-intervals open
                 this._refresh();
-            }
+            };
+            this._refresh();
         }
 
         if (this._refreshID != 0)

@@ -2,6 +2,7 @@ import sys
 import subprocess
 import socket
 import os
+import errno
 
 __author__ = "Jakobus Schuerz <jakobus.schuerz@gmail.com>"
 __version__ = "0.01.0"
@@ -123,6 +124,10 @@ class Config():
             path = '/'+self.config.get('DEFAULT','SNPMNT').strip('/')+'/'+self.__trnName(self.config.get('DEFAULT','snpstore').strip('/'))
         if store == 'BKP':
             path = '/'+self.config.get('DEFAULT','BKPMNT').strip('/')+'/'+self.__trnName(self.config.get('DEFAULT','bkpstore').strip('/'))
+
+        # listing in / raises error, when next return is deleted. 
+        return('/'+path.strip('/'))
+        # avoid deleting of / - but it's buggy, so return above is inserted
         if '/'+path.strip('/') != "/":
             return('/'+path.strip('/'))
         else:
@@ -136,6 +141,9 @@ class Config():
         elif store == 'BKP':
             path = '/'+self.config.get('DEFAULT','BKPMNT').strip('/')
 
+        # listing in / raises error, when next return is deleted. 
+        return('/'+path.strip('/'))
+        # avoid deleting of / - but it's buggy, so return above is inserted
         if '/'+path.strip('/') != "/":
             return('/'+path.strip('/'))
         else:

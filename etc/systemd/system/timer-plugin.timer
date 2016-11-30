@@ -7,6 +7,7 @@ PartOf=mkbackup@BKP.target
 OnActiveSec=30s
 AccuracySec=10min
 Unit=timer-plugin.target
+RemainAfterElapse=false
 
 [Install]
 WantedBy=mkbackup@BKP.target
