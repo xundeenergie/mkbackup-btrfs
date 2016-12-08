@@ -5,7 +5,7 @@ Priority: extra
 Architecture: all
 Maintainer: Jakobus Schürz <xundeenergie@gmail.com>
 Homepage: http://github.com/xundeenergie/mksnapshot
-Provides: libreoffice-cups
+Provides: mkbackup-btrfs
 Depends: python3, python3-progressbar, btrfs-progs
 Description: Backup-Suite for btrfs written in python3 
  This backup-suite handles all around making backups on btrfs-filesystems, including a gnome-shell-extension 

@@ -165,7 +165,7 @@ const BackupManager = new Lang.Class({
         let Dident = drive.enumerate_identifiers();
         let u_dev = drive.get_identifier('unix-device');
         let d_name =  drive.get_name();
-        log('DRIVE unix-device',u_dev,d_name)
+        //log('DRIVE unix-device',u_dev,d_name)
         this._drives[d_name] = new Object()
         this._drives[d_name]['drive'] = drive;
         this._drives[d_name]['device'] = drive.get_identifier('unix-device'); 
@@ -186,10 +186,11 @@ const BackupManager = new Lang.Class({
         log('VOLUMES',JSON.stringify(this._drives))
         log('X',this._drives['ST1000LM024 HN-M101MBB']['device'])
         */
+        /*
         this.drvsubmenu = new PopupMenu.PopupSubMenuMenuItem(drive.get_name(), true);
         this.drvsubmenu.icon.icon_name = 'drive-harddisk-usb-symbolic';
         this.menu.addMenuItem(this.drvsubmenu);
-
+        */
         //log('Drive added',drive.get_name())
         //this.drvsubmenu = new PopupMenu.PopupSubMenuMenuItem(_(drive.get_name()), true);
         //this.drvsubmenu.icon.icon_name = 'drive-harddisk-usb-symbolic';
@@ -198,20 +199,20 @@ const BackupManager = new Lang.Class({
 
     _addVolume: function(volume) {
         let drives = volume.get_drive();
-        log('D',drives.get_name())
-        log('V',volume.get_name())
+        //log('D',drives.get_name())
+        //log('V',volume.get_name())
         this._drives[drives.get_name()][volume.get_name()] = volume;
         volume.enumerate_identifiers();
         let vol = new Object()
-        log(volume.get_identifier('uuid'))
-        log(volume.get_identifier('unix-device'))
-        log(volume.get_identifier('class'))
-        log(volume.get_identifier('label'))
-        vol['volume'] = volume;
-        vol['uuid'] = volume.get_identifier('uuid');
-        vol['u_device'] = volume.get_identifier('unix-device');
-        vol['vclass'] = volume.get_identifier('class');
-        vol['label'] = volume.get_identifier('label');
+        //log(volume.get_identifier('uuid'))
+        //log(volume.get_identifier('unix-device'))
+        //log(volume.get_identifier('class'))
+        //log(volume.get_identifier('label'))
+        //vol['volume'] = volume;
+        //vol['uuid'] = volume.get_identifier('uuid');
+        //vol['u_device'] = volume.get_identifier('unix-device');
+        //vol['vclass'] = volume.get_identifier('class');
+        //vol['label'] = volume.get_identifier('label');
         //this._drives[drives.get_name()]['volumes'][volume.get_name()] = v_name;
         return vol
     },
@@ -397,9 +398,9 @@ const BackupManager = new Lang.Class({
         // volumes to the list
         volumes.push('home-jakob-Videos-extern.mount')
         volumes.push('home-media.mount')
-        for (let d in this._drives) {
+        /*for (let d in this._drives) {
             log('N',d);
-        };
+        };*/
 
         this.aout = GLib.spawn_command_line_sync(
             this._getCommand(this.services.join(' '), 'is-active', 'system'))[1].toString().split('\n');
