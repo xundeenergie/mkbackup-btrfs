@@ -701,8 +701,17 @@ class SubVolume(SubVolumeInfo):
                 except:
                     raise TransferError
             listing.TransferedSubvolumes.push(re.sub('\.part$','',sname))
+            for t in reversed(sorted(transfers.keys())):
+                dest = args.config.getStorePath('BKP')+'/'+t
+                destdir = os.path.dirname(dest.rstrip('/'))+'/'
+                print("set readonly: %s" % dest)
+                try:
+                    cmd = ['btrfs','property','set','-ts',dest,'ro','true']
+                    sp_call(self.args,cmd,level=2)
+                except:
+                    raise TransferError
             if self.args.npb: pt.finish()
-            return
+            return(sname)
 
     def send_receive(self,source,dest,parent=None):
         if parent == None:
