@@ -1,3 +1,0 @@
-[Unit]
-Description=Target for manually backups
-StopWhenUnneeded=yes

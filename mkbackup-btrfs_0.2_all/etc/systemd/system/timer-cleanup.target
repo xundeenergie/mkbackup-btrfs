@@ -1,3 +1,0 @@
-[Unit]
-Description=Cleanup-btrfs Timer Target
-StopWhenUnneeded=yes

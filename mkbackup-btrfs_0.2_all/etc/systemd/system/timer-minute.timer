@@ -1,9 +1,0 @@
-[Unit]
-Description=1-Minute Timer
-
-[Timer]
-OnUnitActiveSec=1min
-Unit=timer-minute.target
-
-[Install]
-WantedBy=timers.target

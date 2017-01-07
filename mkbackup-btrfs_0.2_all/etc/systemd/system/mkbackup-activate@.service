@@ -1,6 +1,0 @@
-[Unit]
-Description=Activate external Drive/Partition for mkbackup/mksnapshot for device %I.
-
-[Service]
-Type=oneshot
-ExecStart=/etc/systemd/system/scripts/mksnapshot-create-volume.sh enable /%I
