@@ -1,0 +1,9 @@
+[Unit]
+#Description=status email for %I to root 
+Description=status email for %i to root 
+
+[Service]
+Type=simple
+ExecStart=/etc/systemd/system/systemd-email root@localhost %i
+#User=nobody
+Group=systemd-journal

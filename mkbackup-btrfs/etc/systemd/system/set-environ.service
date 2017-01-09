@@ -3,7 +3,7 @@ Description=Set Environment syssubvol for systemd
 
 [Service]
 Type=simple
-ExecStart=/bin/sh -c '/bin/systemctl set-environment SYSSUBVOL=`/usr/local/bin/syssubvol`'
+ExecStart=/bin/sh -c '/bin/systemctl set-environment SYSSUBVOL=`/etc/systemd/system/scripts/syssubvol`'
 
 [Install]
 WantedBy=basic.target

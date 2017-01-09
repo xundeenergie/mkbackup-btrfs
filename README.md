@@ -26,8 +26,10 @@ The other one for data you will need accurat even if you boot from an older snap
 The first is called for example: "@debian"
 The second one is hardcoded with "__ALWAYSCURRENT__"
 
+```
 btrfs subvol create /var/cache/btrfs_pool_SYSTEM/@debian
 btrfs subvol create /var/cache/btrfs_pool_SYSTEM/__ALWAYSCURRENT__
+```
 
 The system mounts the default-subvolume on bootup. So be sure, that @debian is your default-subvolume.
 prepare your /etc/fstab to mount the always current subvolumes from __ALWAYSCURRENT__

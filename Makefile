@@ -24,7 +24,6 @@ update:
 	for i in $(ORIGS); do sudo cp -u $$i $(DIR)$$i;done
 
 publish-git: $(FILESGIT)
-	for i in $(FILESGIT);do echo $$i;done
 	sudo git add .
 	git commit -m $(COMMIT)
 	git push origin master
