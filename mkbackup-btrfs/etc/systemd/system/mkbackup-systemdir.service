@@ -1,8 +1,0 @@
-[Unit]
-Description=Show all backups in /backup
-BindsTo=mkbackup.target
-
-[Service]
-ExecStart=/etc/systemd/system/scripts/MksnapshotFS.py -f /backup
-ExecStop=-/bin/fusermount -u /backup
-Restart=on-success

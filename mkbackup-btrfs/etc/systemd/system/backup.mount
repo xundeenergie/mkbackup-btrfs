@@ -2,7 +2,7 @@
 Before=local-fs.target
 
 [Mount]
-What=/etc/systemd/system/scripts/MksnapshotFS.py
+What=MksnapshotFS.py#
 Where=/backup
 Type=fuse
 TimeoutSec=10s
