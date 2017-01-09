@@ -17,13 +17,13 @@ $(DIR)/DEBIAN/control: $(FILES)
 	echo DIR $(DIR)
 	sed -e "s/^Version:.*/`gawk -f ../increment.awk $(DIR)/DEBIAN/control`/" $(DIR)/DEBIAN/control > $(DIR)/DEBIAN/control.tmp
 	mv $(DIR)/DEBIAN/control.tmp $(DIR)/DEBIAN/control
-	sudo dpkg-deb --build $(DIR) "$(DIR)_$(VERSION)_$(ARCH).deb"
+	fakeroot dpkg-deb --build $(DIR) "$(DIR)_$(VERSION)_$(ARCH).deb"
 	aptly repo add xundeenergie "$(DIR)_$(VERSION)_$(ARCH).deb"
 
 update: 
 	for i in $(ORIGS); do sudo cp -u $$i $(DIR)$$i;done
 
 publish-git: $(FILESGIT)
-	sudo git add .
-	sudo git commit -m $(COMMIT) && git push origin master || exit 0
+	fakeroot git add .
+	fakeroot git commit -m $(COMMIT) && git push origin master || exit 0
 	
