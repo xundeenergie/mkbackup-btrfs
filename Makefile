@@ -14,7 +14,8 @@ FILESGIT := $(filter-out $(abspath .git%), $(abspath $(shell find . -mindepth 1 
 all: $(DIR)/DEBIAN/control 
 
 $(DIR)/DEBIAN/control: $(FILES)
-	echo DIR $(DIR)
+	@#echo DIR $(DIR)
+	@echo `gawk -f ../increment.awk $(DIR)/DEBIAN/control`
 	sed -e "s/^Version:.*/`gawk -f ../increment.awk $(DIR)/DEBIAN/control`/" $(DIR)/DEBIAN/control > $(DIR)/DEBIAN/control.tmp
 	mv $(DIR)/DEBIAN/control.tmp $(DIR)/DEBIAN/control
 	fakeroot dpkg-deb --build $(DIR) "$(DIR)_$(VERSION)_$(ARCH).deb"
