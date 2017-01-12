@@ -17,8 +17,8 @@ FILESGIT := $(filter-out $(abspath .git%), $(abspath $(shell find . -mindepth 1 
 
 all: .builddeb
 .builddeb: $(FILES)
-	@echo FILT $(FILTER)
-	@echo FILE $(FILES)
+	#@echo FILT $(FILTER)
+	#@echo FILE $(FILES)
 	@echo `gawk -f ../increment.awk $(DIR)/DEBIAN/control`
 	sed -e "s/^Version:.*/`gawk -f ../increment.awk $(DIR)/DEBIAN/control`/" $(DIR)/DEBIAN/control > $(DIR)/DEBIAN/control.tmp
 	mv $(DIR)/DEBIAN/control.tmp $(DIR)/DEBIAN/control
