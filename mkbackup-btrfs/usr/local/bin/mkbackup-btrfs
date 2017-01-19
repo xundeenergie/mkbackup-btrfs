@@ -1195,6 +1195,55 @@ def transfer(args):
             raise
     cleanup(args)
 
+def restore(args):
+    print('RESTORE FILES', args)
+    if os.getuid() == 0:
+        uroot = True  
+    else:
+        uroot = False
+
+    for f in args.file:
+        print('restore',os.getcwd(),f,os.path.realpath(f))
+        fpath = os.path.realpath(f)
+        bkpsubdir = '/'
+        mountp = fpath
+        while mountp > '/':
+            cmd=['mountpoint',mountp]
+            try:
+                res = subprocess.Popen(cmd,stdout=subprocess.PIPE, stderr=args.stderr)
+                output,error = res.communicate()
+                if res.returncode > 0:
+                    bkpsubdir = mountp
+                    mountp = os.path.dirname(mountp)
+                else:
+                    break
+            except:
+                raise
+        print(mountp,bkpsubdir,fpath.replace(bkpsubdir,''))
+        mounts = open('/proc/mounts','r')
+        R = re.compile(' '+mountp+' ')
+        for line in mounts.readlines():
+            if R.search(line):
+                FS = line.split(' ')[2]
+                print(FS,uroot)
+                if FS == "fuse.MksnapshotFS.py":
+                    if uroot:
+                        dest = fpath.replace(bkpsubdir,'')
+                    else:
+                        dest = os.environ['HOME']+fpath.replace(bkpsubdir,'')
+                else:
+                    if mountp in [args.config.getMountPath('BKP'), args.config.getMountPath('SNP')]:
+                        dest = fpath.replace(bkpsubdir,'')
+                        print(dest)
+                    else:
+                        dest = ''
+                        print('no backup - no restore')
+                print('fpath',fpath,'dest',dest)
+                print('cp', '-b', '--suffix=.'+args.timestamp+'.bak', fpath, dest)
+                        
+
+
+
 # PARSER
 
 parser = argparse.ArgumentParser()
@@ -1308,6 +1357,18 @@ setprop_parser.add_argument("-r", "--ro",
 setprop_parser.set_defaults(func=setprop)
 setprop_parser.set_defaults(action='setprop')
 
+restore_parser=subparsers.add_parser('restore')
+restore_parser.add_argument("file", 
+                        nargs='*',
+                        help='''restore all given files''')
+restore_parser.add_argument("-n", "--no-preserve", 
+                        default=False,
+                        action='store_true',
+                        help='''if set, the original file will be overwritten. If not set,
+                        the original file is renamed to filename.restore-${TIMESTAMP}''' )
+restore_parser.set_defaults(func=restore)
+restore_parser.set_defaults(action='restore')
+
 
 
 if __name__ == '__main__':
@@ -1410,7 +1471,7 @@ if __name__ == '__main__':
                     DEBUG('Symlink missing: %s/%s.%s' % (st,vol,sln),level=4,verbose=args.verbose)
 
     # print summary over all actions 
-    if not args.action == 'list':
+    if not args.action == 'list' and not args.action == 'restore':
         DEBUG('---=== SUMMARY ===---',level=0,verbose=args.verbose)
         DEBUG('''Stores: %s
 snapshots: %s

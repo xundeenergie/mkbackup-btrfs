@@ -6,8 +6,8 @@ COMMIT = $(shell date "+xe%Y%m%d_%H%M%S")
 
 SUBDIRS := $(shell find $(DIR) -type d -print)
 FILTER := $(abspath .git% %.deb .publish-git .builddeb %.swp Makefile)
-FILTERORIG := $(abspath .git% %.deb .publish-git .builddeb %.swp Makefile) /DEBIAN%
-FILES := $(filter-out $(FILTER), $(abspath $(shell find . -mindepth 1 -type f -print) ./README.md))
+FILTERORIG := $(abspath .git% %.deb .publish-git .builddeb %.swp Makefile) $(shell test -e noupdate.files && cat noupdate.files) /DEBIAN%
+FILES := $(filter-out $(FILTER), $(abspath $(shell find . -mindepth 1 -type f -print) ))
 ORIGS := $(filter-out $(FILTERORIG), $(realpath $(subst ./$(DIR),,$(shell find . -mindepth 2 -type f -print))))
 FILESGIT := $(filter-out $(abspath .git%), $(abspath $(shell find . -mindepth 1 -type f -print)))
 
@@ -16,10 +16,11 @@ FILESGIT := $(filter-out $(abspath .git%), $(abspath $(shell find . -mindepth 1 
 #$(DIR)/DEBIAN/control: $(FILES)
 
 all: .builddeb
+	#@echo FILE $(FILES)
 
 .builddeb: $(FILES)
 	#@echo FILT $(FILTER)
-	@echo FILE $(FILES)
+	#@echo FILE $(FILES)
 	@echo `gawk -f ../increment.awk $(DIR)/DEBIAN/control`
 	sed -e "s/^Version:.*/`gawk -f ../increment.awk $(DIR)/DEBIAN/control`/" $(DIR)/DEBIAN/control > $(DIR)/DEBIAN/control.tmp
 	mv $(DIR)/DEBIAN/control.tmp $(DIR)/DEBIAN/control
