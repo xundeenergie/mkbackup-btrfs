@@ -9,6 +9,7 @@ import sys
 import errno
 import glob
 import progressbar as pb
+import shutil
 
 try:
     from anytree import Node, RenderTree
@@ -99,6 +100,7 @@ def check_lockfile(args,lf):
     if os.path.isfile(lf):
         file = open(lf, 'r')
         pid = file.readline()
+        file.close()
         if len(pid) > 0 and os.path.isfile('/proc/'+pid+'/cmdline'):
             #self.DEBUG(pid+' is running: '+lf)
             DEBUG('lockfile %s in use with process %s' % (lf,pid),level=3,verbose=args.verbose)
@@ -1196,17 +1198,21 @@ def transfer(args):
     cleanup(args)
 
 def restore(args):
-    print('RESTORE FILES', args)
+    #print('RESTORE FILES', args)
     if os.getuid() == 0:
         uroot = True  
     else:
         uroot = False
 
+    if args.no_preserve:
+        cpopts=['-b','--suffix=.'+args.timestamp+'.bak']
+
+
     for f in args.file:
-        print('restore',os.getcwd(),f,os.path.realpath(f))
-        fpath = os.path.realpath(f)
+        #print('restore',os.getcwd(),f,os.path.realpath(f))
+        src = os.path.realpath(f)
         bkpsubdir = '/'
-        mountp = fpath
+        mountp = src
         while mountp > '/':
             cmd=['mountpoint',mountp]
             try:
@@ -1219,27 +1225,45 @@ def restore(args):
                     break
             except:
                 raise
-        print(mountp,bkpsubdir,fpath.replace(bkpsubdir,''))
+        #print(mountp,bkpsubdir,src.replace(bkpsubdir,''))
         mounts = open('/proc/mounts','r')
         R = re.compile(' '+mountp+' ')
         for line in mounts.readlines():
             if R.search(line):
                 FS = line.split(' ')[2]
-                print(FS,uroot)
+                #print(FS,uroot)
                 if FS == "fuse.MksnapshotFS.py":
                     if uroot:
-                        dest = fpath.replace(bkpsubdir,'')
+                        dst = src.replace(bkpsubdir,'')
                     else:
-                        dest = os.environ['HOME']+fpath.replace(bkpsubdir,'')
+                        dst = os.environ['HOME']+src.replace(bkpsubdir,'')
                 else:
                     if mountp in [args.config.getMountPath('BKP'), args.config.getMountPath('SNP')]:
-                        dest = fpath.replace(bkpsubdir,'')
-                        print(dest)
+                        dst = src.replace(bkpsubdir,'')
+                        #print(dst)
                     else:
-                        dest = ''
+                        dst = ''
                         print('no backup - no restore')
-                print('fpath',fpath,'dest',dest)
-                print('cp', '-b', '--suffix=.'+args.timestamp+'.bak', fpath, dest)
+                #print('cp', '-b', '--suffix=.'+args.timestamp+'.bak', src, dst)
+                if not args.no_preserve:
+                    bkp = dst+'.'+args.timestamp+'.bak~'
+                    try:
+                        os.rename(dst,bkp)
+                    except:
+                        raise
+
+                #print('cp',src,dst)
+                #print('no copy - do it manually - activate in code')
+                try:
+                    shutil.copytree(src, dst)
+                    print("File restored from %s: %s" % (src,dst))
+                except OSError as exc: # python >2.5
+                    if exc.errno == errno.ENOTDIR:
+                        shutil.copy(src, dst)
+                        print("File restored from %s: %s" % (src,dst))
+                    else: raise
+                #shutil.copy(src,dest)
+        mounts.close()
                         
 
 
