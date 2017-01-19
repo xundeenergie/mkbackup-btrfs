@@ -23,7 +23,7 @@ def s2bool(s):
     return s.lower() in ['true','yes','y','1'] if s else False
 
 class Config():
-    def __init__(self,cfile='/etc/mksnapshot.conf'):
+    def __init__(self,cfile='/etc/mkbackup-btrfs.conf'):
         self.cfile = cfile
         self.config = ConfigParser()
         #self.hostname = subprocess.check_output("/bin/hostname",shell=True).decode('utf8').split('\n')[0]

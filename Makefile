@@ -27,7 +27,8 @@ all: .builddeb
 	touch .builddeb
 
 update: 
-	for i in $(ORIGS); do sudo cp -u $$i $(DIR)$$i;done
+	@echo "Copy originals to make-dir"
+	@for i in $(ORIGS); do sudo cp -uv $$i $(DIR)$$i;done
 
 .publish-git: $(FILESGIT)
 	fakeroot git add .
