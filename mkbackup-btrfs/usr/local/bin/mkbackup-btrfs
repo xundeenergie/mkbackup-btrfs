@@ -135,9 +135,16 @@ class NoSubvolumeError(Error):
         print("ERROR - Snapshot not found" )
     pass
 
+class ScanFsError(Error):
+    def __init__(self,vol='unknown'):
+        print("ERROR - scanfs. Volume not found: %s"  % (vol))
+        pass
+    pass
+
 class NoBtrfsVolumeError(Error):
-    def __init__(self):
-        print("ERROR - Read systemvolume failed. Volume not found" )
+    def __init__(self,vol='unknown'):
+        #print("BlaERROR - Read systemvolume failed. Volume not found: %s"  % (vol))
+        pass
     pass
 
 class TransferError(Error):
@@ -191,8 +198,8 @@ class listing:
             res = subprocess.Popen(cmd,stdout=subprocess.PIPE, stderr=self.args.stderr)
             output,error = res.communicate()
             if res.returncode > 0:
-                print('scanfs error',error)
-                raise NoBtrfsVolumeError
+                #print('scanfs error',self.StorePath,output,error)
+                raise ScanFsError(self.StorePath)
         except:
             raise
         #if output[0] == 0:
@@ -242,10 +249,11 @@ class listing:
         if younger == None: younger = self.args.younger
         for sub in sorted(self.svols.keys(),key=int):
             if self.svols[sub]['puuid'] == self.svols[ID]['puuid'] and not sub == ID:
+                #print('XXX',self.svols[sub]['gen'],self.svols[ID]['gen'],self.svols[sub]['cgen'],self.svols[ID]['cgen'],self.svols[sub]['path'],self.svols[ID]['path'])
                 if older:
-                    if self.svols[sub]['gen'] >= self.svols[ID]['gen']: continue
+                    if int(self.svols[sub]['cgen']) >= int(self.svols[ID]['cgen']): continue
                 if younger:
-                    if self.svols[sub]['gen'] <= self.svols[ID]['gen']: continue
+                    if int(self.svols[sub]['cgen']) <= int(self.svols[ID]['cgen']): continue
                 self.DEBUG('SISTER',self.svols[sub]['id'],self.svols[sub]['path'],level=5)
                 result.append(self.svols[sub]['path']) if names else result.append(sub)
         return(self._ret(result,reverse=rev))
@@ -255,8 +263,8 @@ class listing:
         for sub in sorted(self.svols.keys(),key=int):
             if self.svols[sub]['uuid'] == puuid:
                 self.DEBUG('PARENT',self.svols[sub]['path'],level=5)
-                self.result.append(self.svols[sub]['path']) if names else self.result.append(sub)
-        return(self._ret(reverse=rev))
+                result.append(self.svols[sub]['path']) if names else result.append(sub)
+        return(self._ret(result,reverse=rev))
 
     def list_snapshots(self,uuid,rev=False,names=True):
         result = []
@@ -299,6 +307,21 @@ class listing:
         for sub in self._lssub(id):
             result.append(self.svols[sub]['path'].partition(self.svols[id]['path']+'/')[2]) if names else result.append(sub)
         return(self._ret(result,reverse=rev))
+
+    def get_oldest(self,ID,rev=False,older=None,younger=None,names=True):
+        result = []
+        if older   == None: older = self.args.older
+        if younger == None: younger = self.args.younger
+        for sub in sorted(self.svols.keys(),key=int):
+            if self.svols[sub]['puuid'] == self.svols[ID]['puuid'] and not sub == ID:
+                if older:
+                    if self.svols[sub]['gen'] >= self.svols[ID]['gen']: continue
+                if younger:
+                    if self.svols[sub]['gen'] <= self.svols[ID]['gen']: continue
+                self.DEBUG('SISTER',self.svols[sub]['id'],self.svols[sub]['path'],level=5)
+                result.append(self.svols[sub]['path']) if names else result.append(sub)
+        return(self._ret(result,reverse=rev))
+
     
     def main(self):
         self.scanfs()
@@ -983,16 +1006,6 @@ def issubvol(path):
     if not path == None:
         return True if os.path.isdir(path) and os.stat(path).st_ino == 256 else False
 
-#def symlink_force(target, link_name):
-#    try:
-#        os.symlink(target, link_name)
-#    except OSError as e:
-#        if e.errno == errno.EEXIST:
-#                os.remove(link_name)
-#                os.symlink(target, link_name)
-#        else:
-#            raise e
-
 def create(args):
     SRC=dict()
     for snap in args.snapshots:
@@ -1010,7 +1023,7 @@ def create(args):
             else:
                 raise e
         except (NoSubvolumeError, NoBtrfsVolumeError):
-            print('Something (%s) not found -> continue' % (snap))
+            print("Create Error: %s not found -> continue" % (snap))
             pass
         except:
             raise
@@ -1028,11 +1041,11 @@ def delete(args):
                 SRC[snap].delete()
             except RuntimeError as e:
                 if e.args[1] == 0: 
-                    print('nicht so schlimm')
+                    print("delete error - nicht so schlimm")
                 else:
                     raise e
             except (NoSubvolumeError, NoBtrfsVolumeError):
-                print('Something (<%s> %s) not found -> continue' % (st,snap))
+                print("Delete Error: <%s> %s not found -> continue" % (st,snap))
                 pass
             except:
                 raise
@@ -1050,11 +1063,11 @@ def setprop(args):
             except RuntimeError as e:
                 print(e.args,e.args[1])
                 if e.args[1] == 0: 
-                    print('nicht so schlimm')
+                    print("setprop error - nicht so schlimm")
                 else:
                     raise e
             except (NoSubvolumeError, NoBtrfsVolumeError):
-                print('Something (<%s> %s) not found -> continue' % (st,snap))
+                print("Setprop Error: <%s> %s not found -> continue" % (st,snap))
                 pass
             except:
                 raise
@@ -1127,20 +1140,24 @@ def lists(args):
                             #print('\t\t'+"is missing: %s" % (intv))
                     for i in reversed(sorted(s.keys())):
                         print('\t\t'+s[i])
-                    print('\t\tmissing: %s' % (', '.join(missing)))
-        print('--finish--')
+                    print("\t\tmissing: %s" % (', '.join(missing)))
+        print("--finish--")
     else:
-        text = 'subvolumes in'
+        text = "subvolumes in"
         if args.snap:
-            text = 'snapshots from'
+            text = "snapshots from"
         elif args.sisters or args.older or args.younger:
-            text = 'sisters from'
+            text = "sisters from"
             if args.older:
                 text = 'older '+text
             elif args.younger:
                 text = 'younger '+text
             else:
                 text = 'all '+text
+        elif args.tree:
+            text = "treeview from"
+        elif args.parents:
+            text = "parent from"
 
         for st in args.sourcepath.keys():
             SRC=dict()
@@ -1148,35 +1165,50 @@ def lists(args):
                 for snap in args.snapshots:
                     try:
                         SRC[snap]=SubVolume(args,snap,store=st,single=True if args.tree else False)
-                        DEBUG('[II]  list %s <%s>/%s' %(text,st,SRC[snap].SourceName),level=1,verbose=args.verbose)
+                        DEBUG("[II]  <%s> is %s" %(st,args.config.getStorePath()),level=1,verbose=args.verbose)
+                        DEBUG("[II]  list %s <%s>/%s" %(text,st,SRC[snap].SourceName),level=1,verbose=args.verbose)
                         fp=''
-                        if args.shortpath == True: fp='/'
-                        if args.mountpath == True: fp=SRC[snap].StoreName+'/'
-                        if args.fullpath  == True: fp=SRC[snap].StorePath+'/'
+                        if args.sisters or args.older or args.younger or args.parents:
+                            if args.shortpath == True: fp='/'
+                            if args.mountpath == True: fp=SRC[snap].StoreName+'/'
+                            if args.fullpath  == True: fp=SRC[snap].StorePath+'/'
+                        else:
+                            if args.shortpath == True: fp='/'+SRC[snap].SourceName+'/'
+                            if args.mountpath == True: fp=SRC[snap].StoreName+'/'+SRC[snap].SourceName+'/'
+                            if args.fullpath  == True: fp=SRC[snap].StorePath+'/'+SRC[snap].SourceName+'/'
 
                         if args.snap:
+                            
                             for i in SRC[snap].list_snapshots(SRC[snap].uuid,rev=args.reverse): print(fp+SRC[snap].SourceName+i)
                         elif args.sisters or args.older or args.younger:
+                            # List sisters of snapshot (same parent)
                             for i in SRC[snap].list_sisters(SRC[snap].id,rev=args.reverse): print(fp+i)
                         elif args.tree:
-                            print("Treeview of snapshots - in development")
+                            #print("Treeview of snapshots under %s - in development" % (snap))
                             SRC[snap].build_tree(snap=snap,st=st)
+                        elif args.parents:
+                            #print("Parentview of snapshots - in development")
+                            for i in SRC[snap].list_parent(SRC[snap].puuid): print(fp+i)
                         else:
-                            for i in SRC[snap].list_subvolumes(SRC[snap].id,rev=args.reverse): print(fp+SRC[snap].SourceName+i)
+                            #DEBUG("List subvolumes in given snapshot %s" % (snap),level=1,verbose=args.verbose)
+                            for i in SRC[snap].list_subvolumes(SRC[snap].id,rev=args.reverse): print(fp+i)
                     except RuntimeError as e:
                         print(e.args,e.args[1])
                         if e.args[1] == 0: 
-                            print("nicht so schlimm")
+                            print("list error - nicht so schlimm")
                         else:
                             raise e
                     except (NoSubvolumeError, NoBtrfsVolumeError):
-                        print("Something (%s) not found -> continue" % (snap))
+                        print("List Error: <%s>/%s not found -> continue" % (st,snap))
+                        pass
+                    except ScanFsError:
+                        print('BLA')
                         pass
                     except:
                         raise
             else:
                 #if args.tree:
-                    print("Treeview of snapshots - in development")
+                    print("Treeview of snapshots in %s - in development" % (st))
                     SRC['.']=SubVolume(args,'.',store=st,single=True if args.tree else False)
                     SRC['.'].build_tree(snap='.',st=st)
 
@@ -1191,7 +1223,8 @@ def transfer(args):
             SRC[snap].transfer()
             SRC[snap].unlock(store=list(args.sourcepath.keys())[0])
         except (NoSubvolumeError, NoBtrfsVolumeError):
-            print('Something (%s) not found -> continue' % (snap))
+            #print("Transfer Error: <%s> %s not found -> continue" % (st,snap))
+            print("Transfer Error: %s not found -> continue" % (snap))
             pass
         except:
             raise
@@ -1277,7 +1310,7 @@ parser.add_argument('-V', '--systemvolumes', action='store_true',
         always SNP''')
 parser.add_argument('-t', '--tag', default='misc', help='''one of %s''' % (Config().ListIntervals()))
 parser.add_argument('-v', '--verbose', action='count', default=0, help='''verbose output''' )
-parser.add_argument('-i', '--info', action='store_true', default=False, help='''Print infos, action is "list"''')
+#parser.add_argument('-i', '--info', action='store_true', default=False, help='''Print infos, action is "list"''')
 parser.add_argument('-n', '--no-progressbar', dest='npb', action='store_false', default=True, help='''Dont show progressbar (for use in systemctl-unit for example)''')
 parser.add_argument('-B', '--backup-mount-path', 
         dest='bkpmount', 
@@ -1304,21 +1337,23 @@ list_parser.add_argument("store",
                         default='SRC', 
                         metavar='stores and snapshots',
                         nargs='*',
-                        help='''one of SRC, BKP or SNP - where is the snapshot
-                        located and one ore more snapshots''')
+                        help="""one of SRC, BKP or SNP - where is the snapshot
+                        located and one ore more snapshots""")
 list_parser.add_argument('-r', '--reverse', action='store_true', default=False)
 #list_parser.add_argument('--snap', action='store_true', default=False, help='list snapshots from the queried snapshot')
-list_parser.add_argument('-c', '--children', dest='snap', action='store_true', default=False, help='list snapshots from the queried snapshot')
-list_parser.add_argument('-S', '--sisters', action='store_true', default=False, help='list snapshots from the queried snapshot with same parent (=sisters)')
-list_parser.add_argument('-O', '--older-sisters', action='store_true', dest='older', default=False, help='list snapshots from the queried snapshot with same parent (=sisters) and smaller cgen')
-list_parser.add_argument('-Y', '--younger-sisters', action='store_true', dest='younger', default=False, help='list snapshots from the queried snapshot with same parent (=sisters) and bigger cgen')
-list_parser.add_argument('-f', '--fullpath', action='store_true', default=False, help='print full path from /')
-list_parser.add_argument('-s', '--shortpath', action='store_true', default=False, help='print path including snapshotname')
-list_parser.add_argument('-m', '--mountpath', action='store_true', default=False, help='print path relative to mountpoint of btrfs')
-list_parser.add_argument('-P', '--show-StorePath', dest='showpathstore', action='store_true', default=False, help='''Print path of given stores''')
-list_parser.add_argument('-t', '--show-tags', dest='showtags', action='store_true', default=False, help='''Print all available tags''')
-list_parser.add_argument('-T', '--show-transfers', dest='showtransfers', action='store_true', default=False, help='''Print volumes to transfer by choosen tag''')
-list_parser.add_argument('--tree', dest='tree', action='store_true', default=False, help='''Build tree from all snapshots (without subvolumes in it)''')
+list_parser.add_argument('-p', '--parents', action='store_true', default=False, help="list parent snapshot from the queried snapshots")
+list_parser.add_argument('-S', '--sisters', action='store_true', default=False, help="list snapshots from the queried snapshot with same parent (=sisters)")
+list_parser.add_argument('-O', '--older-sisters', action='store_true', dest='older', default=False, help="list snapshots from the queried snapshot with same parent (=sisters) and smaller cgen")
+list_parser.add_argument('-Y', '--younger-sisters', action='store_true', dest='younger', default=False, help="list snapshots from the queried snapshot with same parent (=sisters) and bigger cgen")
+list_parser.add_argument('-c', '--children', dest='snap', action='store_true', default=False, help="""list snapshots from the queried snapshot""")
+list_parser.add_argument('-f', '--fullpath', action='store_true', default=False, help="print full path from /")
+list_parser.add_argument('-s', '--shortpath', action='store_true', default=False, help="print path including snapshotname")
+list_parser.add_argument('-m', '--mountpath', action='store_true', default=False, help="print path relative to mountpoint of btrfs")
+list_parser.add_argument('-i', '--info', dest='info', action='store_true', default=False, help="""Show infos on mkbackup""")
+list_parser.add_argument('-P', '--show-StorePath', dest='showpathstore', action='store_true', default=False, help="""Print path of given stores""")
+list_parser.add_argument('-t', '--show-tags', dest='showtags', action='store_true', default=False, help="""Print all available tags""")
+list_parser.add_argument('-T', '--show-transfers', dest='showtransfers', action='store_true', default=False, help="""Print volumes to transfer by choosen tag""")
+list_parser.add_argument('--tree', dest='tree', action='store_true', default=False, help="""Build tree from all snapshots (without subvolumes in it)""")
 list_parser.set_defaults(func=lists)
 list_parser.set_defaults(action='list')
 
@@ -1327,9 +1362,9 @@ create_parser.add_argument("store",
                         default='SRC', 
                         metavar='stores and snapshots',
                         nargs='*',
-                        help='''one of SRC or SNP - where is the snapshot located and one ore more snapshots
+                        help="""one of SRC or SNP - where is the snapshot located and one ore more snapshots
                         which to be created in the same store.
-                        BKP is ignored!!!''')
+                        BKP is ignored!!!""")
 create_parser.set_defaults(func=create)
 create_parser.set_defaults(action='create')
 
@@ -1338,8 +1373,8 @@ delete_parser.add_argument("store",
                         default='SRC', 
                         metavar='stores and snapshots',
                         nargs='*',
-                        help='''one of SRC, BKP or SNP - where is the snapshot
-                        located and one ore more snapshots''')
+                        help="""one of SRC, BKP or SNP - where is the snapshot
+                        located and one ore more snapshots""")
 delete_parser.set_defaults(func=delete)
 delete_parser.set_defaults(action='delete')
 
@@ -1347,14 +1382,14 @@ transfer_parser=subparsers.add_parser('transfer')
 transfer_parser.add_argument("snapshots", 
                         default='SRC', 
                         nargs='*',
-                        help='''one of SRC or SNP - where is the snapshot located and one ore more snapshots
+                        help="""one of SRC or SNP - where is the snapshot located and one ore more snapshots
                         which to be transfered to the external backup-device.
-                        BKP is ignored!!!''')
+                        BKP is ignored!!!""")
 transfer_parser.add_argument('-i', '--info', 
         dest='transferinfo', 
         action='store_true', 
         default=False, 
-        help='''show only if initial or incremental transfer is done and the parents''')
+        help="""show only if initial or incremental transfer is done and the parents""")
 transfer_parser.set_defaults(func=transfer)
 transfer_parser.set_defaults(action='transfer')
 
@@ -1384,12 +1419,12 @@ setprop_parser.set_defaults(action='setprop')
 restore_parser=subparsers.add_parser('restore')
 restore_parser.add_argument("file", 
                         nargs='*',
-                        help='''restore all given files''')
+                        help="""restore all given files""")
 restore_parser.add_argument("-n", "--no-preserve", 
                         default=False,
                         action='store_true',
-                        help='''if set, the original file will be overwritten. If not set,
-                        the original file is renamed to filename.restore-${TIMESTAMP}''' )
+                        help="""if set, the original file will be overwritten. If not set,
+                        the original file is renamed to filename.restore-${TIMESTAMP}""" )
 restore_parser.set_defaults(func=restore)
 restore_parser.set_defaults(action='restore')
 
@@ -1477,6 +1512,7 @@ if __name__ == '__main__':
         args.tag = 'misc'
 
     # Run action
+    DEBUG('Arguments',args,level=2,verbose=args.verbose)
     args.func(args)
 
     # Check symlinks in stores, if they exist and ok or missing.
@@ -1487,30 +1523,30 @@ if __name__ == '__main__':
                 link = p+'/'+vol+'.'+sln
                 if os.path.exists(link):
                     if os.path.islink(link):
-                        DEBUG('Symlink ok: %s/%s.%s' % (st,vol,sln),level=4,verbose=args.verbose)
+                        DEBUG("Symlink ok: %s/%s.%s" % (st,vol,sln),level=4,verbose=args.verbose)
                     else:
-                        DEBUG('Symlink broken: %s/%s.%s --> remove it' % (st,vol,sln),level=4,verbose=args.verbose)
+                        DEBUG("Symlink broken: %s/%s.%s --> remove it" % (st,vol,sln),level=4,verbose=args.verbose)
                         os.remove(link)
                 else:
-                    DEBUG('Symlink missing: %s/%s.%s' % (st,vol,sln),level=4,verbose=args.verbose)
+                    DEBUG("Symlink missing: %s/%s.%s" % (st,vol,sln),level=4,verbose=args.verbose)
 
     # print summary over all actions 
     if not args.action == 'list' and not args.action == 'restore':
-        DEBUG('---=== SUMMARY ===---',level=0,verbose=args.verbose)
-        DEBUG('''Stores: %s
+        DEBUG("---=== SUMMARY ===---",level=0,verbose=args.verbose)
+        DEBUG("""Stores: %s
 snapshots: %s
-                ''' % (args.store,args.snapshots))
-        DEBUG('Created Subvolumes:',level=0,verbose=args.verbose)
+                """ % (args.store,args.snapshots))
+        DEBUG("Created Subvolumes:",level=0,verbose=args.verbose)
         while not listing.CreatedSubvolumes.is_empty():
             print(listing.CreatedSubvolumes.pop())
         print('''---
 ''')
-        DEBUG('Transfered Subvolumes:',level=0,verbose=args.verbose)
+        DEBUG("Transfered Subvolumes:",level=0,verbose=args.verbose)
         while not listing.TransferedSubvolumes.is_empty():
             print(listing.TransferedSubvolumes.pop())
         print('''---
 ''')
-        DEBUG('Deleted Subvolumes:',level=0,verbose=args.verbose)
+        DEBUG("Deleted Subvolumes:",level=0,verbose=args.verbose)
         while not listing.DeletedSubvolumes.is_empty():
             print(listing.DeletedSubvolumes.pop())
         print('---')
