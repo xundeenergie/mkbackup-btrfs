@@ -137,7 +137,7 @@ class NoSubvolumeError(Error):
 
 class ScanFsError(Error):
     def __init__(self,vol='unknown'):
-        print("ERROR - scanfs. Volume not found: %s"  % (vol))
+        print("ERROR - scanfs. Volume not found or no Permissions: %s"  % (vol))
         pass
     pass
 
@@ -193,13 +193,15 @@ class listing:
             cmd=['btrfs','subvolume','list','-R','-u','-q','-c','-o',self.StorePath]
         else:
             cmd=['btrfs','subvolume','list','-R','-u','-q','-c',self.StorePath]
+
         try:
-            #output,error = sp_co(self.args,cmd)
             res = subprocess.Popen(cmd,stdout=subprocess.PIPE, stderr=self.args.stderr)
             output,error = res.communicate()
             if res.returncode > 0:
-                #print('scanfs error',self.StorePath,output,error)
+                #print('scanfs error',self.StorePath,output,error,res.returncode)
                 raise ScanFsError(self.StorePath)
+        except subprocess.CalledProcessError as e:
+            raise ScanFsError(self.StorePath)
         except:
             raise
         #if output[0] == 0:
@@ -1202,7 +1204,6 @@ def lists(args):
                         print("List Error: <%s>/%s not found -> continue" % (st,snap))
                         pass
                     except ScanFsError:
-                        print('BLA')
                         pass
                     except:
                         raise
