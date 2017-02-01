@@ -8,7 +8,7 @@ SUBDIRS := $(shell find $(DIR) -type d -print)
 FILTER := $(abspath .git% %.deb .publish-git .builddeb %.swp Makefile)
 FILTERORIG := $(abspath .git% %.deb .publish-git .builddeb %.swp Makefile) $(shell test -e noupdate.files && cat noupdate.files) /DEBIAN%
 FILES := $(filter-out $(FILTER), $(abspath $(shell find . -mindepth 1 -type f -print) ))
-ORIGS := $(filter-out $(FILTERORIG), $(realpath $(subst ./$(DIR),,$(shell find . -mindepth 2 -type f -print))))
+ORIGS := $(filter-out $(FILTERORIG), $(realpath $(subst ./$(DIR),,$(shell sudo find . -mindepth 2 -type f -print))))
 FILESGIT := $(filter-out $(abspath .git%), $(abspath $(shell find . -mindepth 1 -type f -print)))
 
 #all: $(DIR)/DEBIAN/control 
@@ -29,9 +29,11 @@ all: .builddeb
 	aptly repo add xundeenergie "$(DIR)_$(VERSION)_$(ARCH).deb"
 	touch .builddeb
 
-update: 
-	@echo "Copy originals to make-dir"
+.update: $(ORIGS)
+	@for i in $(ORIGS); do $$i;done
+	@echo "Copy originals to $(DIR)"
 	@for i in $(ORIGS); do sudo cp -uv $$i $(DIR)$$i;done
+	touch .update
 
 .publish-git: $(FILESGIT)
 	fakeroot git add .
