@@ -16,15 +16,16 @@ FILESGIT := $(filter-out $(abspath .git%), $(abspath $(shell find . -mindepth 1 
 #$(DIR)/DEBIAN/control: $(FILES)
 
 all: .builddeb
-	#@echo FILE $(FILES)
+	@#echo FILE $(FILES)
 
 .builddeb: $(FILES)
-	#@echo FILT $(FILTER)
-	#@echo FILE $(FILES)
+	@#echo FILT $(FILTER)
+	@#echo FILE $(FILES)
 	@echo `gawk -f ../increment.awk $(DIR)/DEBIAN/control`
 	sed -e "s/^Version:.*/`gawk -f ../increment.awk $(DIR)/DEBIAN/control`/" $(DIR)/DEBIAN/control > $(DIR)/DEBIAN/control.tmp
 	mv $(DIR)/DEBIAN/control.tmp $(DIR)/DEBIAN/control
 	fakeroot dpkg-deb --build $(DIR) "$(DIR)_$(VERSION)_$(ARCH).deb"
+	ln -sf "$(DIR)_$(VERSION)_$(ARCH).deb" "$(DIR).deb"
 	aptly repo add xundeenergie "$(DIR)_$(VERSION)_$(ARCH).deb"
 	touch .builddeb
 
