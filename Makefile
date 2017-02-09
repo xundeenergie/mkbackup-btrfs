@@ -16,7 +16,7 @@ FILESGIT := $(filter-out $(abspath .git%), $(abspath $(shell find . -mindepth 1 
 #$(DIR)/DEBIAN/control: $(FILES)
 
 all: .builddeb
-	@echo FILE $(FILESGIT)
+	@#echo FILE $(FILESGIT)
 
 .builddeb: $(FILES)
 	@#echo FILT $(FILTER)
