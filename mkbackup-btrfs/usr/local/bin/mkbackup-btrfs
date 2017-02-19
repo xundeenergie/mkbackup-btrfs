@@ -1116,6 +1116,7 @@ def lists(args):
                 ST[st]=dict()
                 #for vol in args.config.getVolumes():
                 for vol in args.snapshots:
+                    print('VOL',vol)
                     ST[st][vol]=dict()
                     for intv in args.config.ListIntervals():
                         ST[st][vol][intv] = list()
@@ -1128,6 +1129,7 @@ def lists(args):
             for st in ST.keys():
                 print('..--==°°==--..')
                 print('Youngest snapshot in %s' % (st))
+                print('XXX',ST[st])
                 for vol in ST[st].keys():
                     s = dict()
                     missing = list()
