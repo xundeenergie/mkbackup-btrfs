@@ -24,14 +24,7 @@ case "$1" in
 
   configure)
     # restart systemd-user for all users to reread the printer-configuration
-    echo "postinstall-script for mkbackup-btrfs"
-    loginctl --no-legend -o cat|awk '{print $2,$3}'|sort|uniq|while read i u ; do
-    	echo "restart user-systemd for $u $i"
-	/bin/systemctl is-active "user@${i}.service" >/dev/null && /bin/systemctl restart "user@${i}.service"
-    	#systemctl |grep "user@{$i}.service"  && echo systemctl restart "user@{$i}.service"
-    done
     /usr/bin/python3 -m pip install -U anytree
-
   ;;
 
   abort-upgrade|abort-remove|abort-deconfigure)
