@@ -10,6 +10,7 @@ import errno
 import glob
 import progressbar as pb
 import shutil
+import psutil
 
 try:
     from anytree import Node, RenderTree
@@ -641,12 +642,12 @@ class SubVolume(SubVolumeInfo):
                         elif issubvol(self.StorePath+'/'+dest) == False:
                             # If destination exists and is a directory and not a snapshot, delete dir and create snapshot (for subvolumes of snapshot)
                             self.DEBUG(' =create>  <%s>/%s' % (self.store,dest),level=1)
-                            sp_call(args,['rm','-r','-f',self.StorePath+'/'+dest])
-                            sp_call(args,cmd)                           
+                            sp_call(self.args,['rm','-r','-f',self.StorePath+'/'+dest])
+                            sp_call(self.args,cmd)                           
                         else:
                             # If destination doesnt exist, create the snapshot
                             self.DEBUG(' =create>  <%s>/%s' % (self.store,dest),level=1)
-                            sp_call(args,cmd)                           
+                            sp_call(self.args,cmd)                           
                         sync()
 
                     elif issubvol(self.OrigName+'/'+sub) == False:
@@ -694,20 +695,63 @@ class SubVolume(SubVolumeInfo):
             uuidS = self.config.getUUID(store=self.store)
             uuidB = self.config.getUUID(store='BKP')
             if None == uuidS:
-                self.DEBUG(" =no-transfer: Filesystem not mounted: %s" % (self.config.getDevice(store=self.store)))
+                self.DEBUG(" |no-transfer: Filesystem not mounted: %s" % (self.config.getDevice(store=self.store)))
                 return
             if None == uuidB:
-                self.DEBUG(" =no-transfer: Filesystem not mounted: %s" % (self.config.getMountPath(store='BKP')))
+                self.DEBUG(" |no-transfer: Filesystem not mounted: %s" % (self.config.getMountPath(store='BKP')))
                 return
 
 
             if uuidS == uuidB: 
                 # Same Filesystem on SRC/SNP and BKP. No transfer
+                self.DEBUG(' |no-transfer: external backupmedia obviously not mounted')
                 return
             else:
                 # Test if path to external backup-store is a btrfs-subvolume. if not, no transfer
-                if not issubvol(self.BkpPath): 
-                    self.DEBUG(' =no-transfer: no subvolume for backup on external media')
+                # first check if BKP-mount is btrfs, then check if BKP-Store exists and is a subvolume.
+                # If BKP-mount is btrfs, and BKPStore does not exist, create it as subvolume
+                # If BKPStore exists and is a directory, change it to subvolume
+                if isbtrfs(self.config.getMountPath(store='BKP')):
+                    if os.path.exists(self.BkpPath):
+                        if issubvol(self.BkpPath):
+                            print('%s is subvolume' % (self.BkpPath))
+                        else:
+                            self.DEBUG(" |no-transfer: %s should be subvolume, is directory on external media" % (self.BkpPath))
+                            return
+#                           # TODO move ro-subvolumes to another place... this code is not working
+#                            try:
+#                                print("%s exists; is directory" % (self.BkpPath))
+#                                print("%s -> change to subvolume, this may take a while" % (self.BkpPath))
+#                                # rename original BKPStore 
+#                                print('A ren')
+#                                cmd = ['mv',self.BkpPath,self.BkpPath+'.orig']
+#                                sp_call(self.args,cmd)
+#                                # Create a new Subvolume
+#                                print('B cr')
+#                                cmd = ['btrfs','subvolume','create',self.BkpPath]
+#                                sp_call(self.args,cmd)
+#                                # move content to new snapshot
+#                                print('C mv')
+#                                cmd = ['mv',self.BkpPath+'.orig/*',self.BkpPath]
+#                                sp_call(self.args,cmd)
+#                                # delete old directory
+#                                print('D rm')
+#                                cmd = ['rm','-rf',self.BkpPath+'.orig']
+#                                sp_call(self.args,cmd)
+#                                print('E')
+#                            except:
+#                                return
+
+                    else:
+                        print('%s not exists -> create subvolume' % (self.BkpPath))
+                        self.DEBUG('isdir ==> delete ==> transfer',self.BkpPath,level=3)
+                        cmd = ['btrfs','subvolume','create',self.BkpPath]
+                        sp_call(self.args,cmd)
+#                    if not issubvol(self.BkpPath): 
+#                        self.DEBUG(' =no-transfer: no subvolume for backup on external media')
+#                        return
+                else:
+                    self.DEBUG(' |no-transfer: no subvolume for backup on external media')
                     return
 
 
@@ -741,7 +785,7 @@ class SubVolume(SubVolumeInfo):
                     if os.path.exists(dest):
                         self.DEBUG('isdir ==> delete ==> transfer',dest,level=3)
                         cmd = ['rm','-r','-f',dest]
-                        sp_call(args,cmd)
+                        sp_call(self.args,cmd)
                     else:
                         pass
                         self.DEBUG('notexist ==> transfer', dest,level=3)
@@ -1008,6 +1052,15 @@ def issubvol(path):
     if not path == None:
         return True if os.path.isdir(path) and os.stat(path).st_ino == 256 else False
 
+def isbtrfs(path):
+    if not path == None:
+        for p in psutil.disk_partitions():
+            if (p.mountpoint == path and p.device != 'systemd-1') and p.fstype == 'btrfs':
+                print(p)
+                return True
+        else:
+            return False
+                
 def create(args):
     SRC=dict()
     for snap in args.snapshots:

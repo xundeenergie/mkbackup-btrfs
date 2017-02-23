@@ -157,7 +157,10 @@ class Config():
         if amount == '':
             pass
         elif amount == 'systemd-1':
-            os.stat(self.getStorePath(store=store))
+            try:
+                os.stat(self.getStorePath(store=store))
+            except:
+                os.stat(os.path.dirname(self.getStorePath(store=store)))
         else:
             print("don't know")
             return None

@@ -30,7 +30,7 @@ case $2 in
 		PARTUUID="$(blkid $DEV -o value -s PARTUUID)"
 		;;
 	*)
-		DEV=$2
+		DEV="$(/bin/systemd-escape -p -u $2)"
 		UUID="$(blkid $DEV -o value -s UUID)"
 		#PARTUUID="$(blkid $DEV -o value -s PARTUUID)"
 		PRE="d-"
