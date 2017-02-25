@@ -45,6 +45,7 @@ case "$1" in
     *)
         echo "postrm called with unknown argument \`$1'" >&2
         exit 0
+        ;;
 esac
 
 SERVICES="backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service mkbackup@manually.service mkbackup@aptupgrade.service mkbackup@daily.service mkbackup@weekly.service mkbackup@monthly.service"
@@ -69,5 +70,6 @@ case "$1" in
     *)
         echo "postrm called with unknown argument \`$1'" >&2
         exit 0
+        ;;
 
 esac
