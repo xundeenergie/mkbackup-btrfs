@@ -23,17 +23,23 @@ set -e
 # the debian-policy package
 
 # source debconf library
-. /usr/share/debconf/confmodule
+#. /usr/share/debconf/confmodule
 
 # For user-services only, for earch target an extra section! for system-services user deb-systemd*
+# put in full unit-name. for example "mkbackup@hourly.service"
 SERVICES="mkbackup-userdir.path"
-TARGET="paths.target"
 case "$1" in
 
     configure)
         for SERVICE in $SERVICES; do
-            [ -e "/etc/systemd/user/${TARGET}.wants/" ] || mkdir -p "/etc/systemd/user/${TARGET}.wants/"
-            [ -e "/usr/lib/systemd/user/${SERVICE}" ] && ln -sf "/usr/lib/systemd/user/${SERVICE}" "/etc/systemd/user/${TARGET}.wants/${SERVICE}"
+            UNIT_NAME=$(echo $SERVICE|sed -e 's/\@.*\.\([a-z][a-z]*\)$/@.\1/')
+            for TARGET in $(gawk -F "=" '\
+                    $1 ~ /WantedBy/ {split($2,wants," ")} \
+                    $1 ~ /RequiredBy/ {split($2,requ," ")} \
+                    END{for (w in wants){print wants[w]".wants"};for (r in requ){print requ[r]".requires"}}' "/usr/lib/systemd/user/${UNIT_NAME}");do
+                [ -e "/etc/systemd/user/${TARGET}/" ] || echo mkdir -p "/etc/systemd/user/${TARGET}/"
+                [ -e "/usr/lib/systemd/user/${SERVICE}" ] && echo ln -sf "/usr/lib/systemd/user/${SERVICE}" "/etc/systemd/user/${TARGET}/${SERVICE}"
+            done
         done
         ;;
 
@@ -48,6 +54,9 @@ case "$1" in
 
 esac
 
+
+# System-Services:
+# put in full unit-name. for example "mkbackup@hourly.service"
 SERVICES="backup.automount
 var-cache-backup.automount
 btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service
