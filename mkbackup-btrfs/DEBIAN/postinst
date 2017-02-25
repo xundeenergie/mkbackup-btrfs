@@ -35,8 +35,8 @@ case "$1" in
                     $1 ~ /WantedBy/ {split($2,wants," ")} \
                     $1 ~ /RequiredBy/ {split($2,requ," ")} \
                     END{for (w in wants){print wants[w]".wants"};for (r in requ){print requ[r]".requires"}}' "/usr/lib/systemd/user/${UNIT_NAME}");do
-                [ -e "/etc/systemd/user/${TARGET}/" ] || echo mkdir -p "/etc/systemd/user/${TARGET}/"
-                [ -e "/usr/lib/systemd/user/${SERVICE}" ] && echo ln -sf "/usr/lib/systemd/user/${SERVICE}" "/etc/systemd/user/${TARGET}/${SERVICE}"
+                [ -e "/etc/systemd/user/${TARGET}/" ] || mkdir -p "/etc/systemd/user/${TARGET}/"
+                [ -e "/usr/lib/systemd/user/${SERVICE}" ] && ln -sf "/usr/lib/systemd/user/${SERVICE}" "/etc/systemd/user/${TARGET}/${SERVICE}"
             done
         done
         ;;
