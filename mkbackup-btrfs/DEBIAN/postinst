@@ -6,6 +6,8 @@
 #
 # see: dh_installdeb(1)
 
+#_DEB_SYSTEMD_HELPER_DEBUG=1
+
 set -e
 
 # summary of how this script can be called:
@@ -25,19 +27,31 @@ set -e
 
 # For user-services only, for earch target an extra section! for system-services user deb-systemd*
 # put in full unit-name. for example "mkbackup@hourly.service"
+
+USERLOCS="/etc/systemd/user/ /usr/lib/systemd/user/"
+
 SERVICES="mkbackup-userdir.path"
 case "$1" in
 
     configure)
         for SERVICE in $SERVICES; do
             UNIT_NAME=$(echo $SERVICE|sed -e 's/\@.*\.\([a-z][a-z]*\)$/@.\1/')
-            for TARGET in $(gawk -F "=" '\
-                    $1 ~ /WantedBy/ {split($2,wants," ")} \
-                    $1 ~ /RequiredBy/ {split($2,requ," ")} \
-                    END{for (w in wants){print wants[w]".wants"};for (r in requ){print requ[r]".requires"}}' "/usr/lib/systemd/user/${UNIT_NAME}");do
-                [ -e "/etc/systemd/user/${TARGET}/" ] || mkdir -p "/etc/systemd/user/${TARGET}/"
-                [ -e "/usr/lib/systemd/user/${SERVICE}" ] && ln -sf "/usr/lib/systemd/user/${SERVICE}" "/etc/systemd/user/${TARGET}/${SERVICE}"
+            for loc in USERLOCS;do
+                if [ -e "${loc}${UNIT_NAME}" ]; then
+                    UNIT_LOC="$loc"
+                    break
+                fi
             done
+            
+            if [ x${UNIT_LOC} != "x" ]; then
+                for TARGET in $(gawk -F "=" '\
+                        $1 ~ /WantedBy/ {split($2,wants," ")} \
+                        $1 ~ /RequiredBy/ {split($2,requ," ")} \
+                        END{for (w in wants){print wants[w]".wants"};for (r in requ){print requ[r]".requires"}}' "${UNIT_LOC}${UNIT_NAME}");do
+                    [ -e "/etc/systemd/user/${TARGET}/" ] || mkdir -p "/etc/systemd/user/${TARGET}/"
+                    [ -e "${UNIT_LOC}${SERVICE}" ] && ln -sf "${UNIT_LOC}${SERVICE}" "/etc/systemd/user/${TARGET}/${SERVICE}"
+                done
+            fi
         done
         ;;
 
