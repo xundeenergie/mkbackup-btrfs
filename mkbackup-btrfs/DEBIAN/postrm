@@ -12,13 +12,6 @@ fi
 # For user-services only, for earch target an extra section! for system-services user deb-systemd*
 SERVICES="mkbackup-userdir.path"
 TARGET="default.target"
-case "$1" in
-
-    configure)
-        for SERVICE in $SERVICES; do
-            [ -e "/etc/systemd/user/${TARGET}.wants/" ] || mkdir -p "/etc/systemd/user/${TARGET}.wants/"
-            [ -e "/usr/lib/systemd/user/${SERVICE}" ] && ln -sf "/usr/lib/systemd/user/${SERVICE}" "/etc/systemd/user/${TARGET}.wants/${SERVICE}"
-        done
 
 [ -e /etc/systemd/user/default.target.wants/ ] || mkdir -p /etc/systemd/user/default.target.wants/
 case "$1" in
