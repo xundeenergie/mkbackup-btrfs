@@ -2,6 +2,7 @@
 
 set -e
 
+_DEB_SYSTEMD_HELPER_DEBUG=1
 # In case this system is running systemd, we make systemd reload the unit files
 # to pick up changes.
 if [ -d /run/systemd/system ] ; then

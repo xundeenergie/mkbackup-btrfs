@@ -6,6 +6,8 @@
 #
 # see: dh_installdeb(1)
 
+_DEB_SYSTEMD_HELPER_DEBUG=1
+
 set -e
 
 # summary of how this script can be called:
