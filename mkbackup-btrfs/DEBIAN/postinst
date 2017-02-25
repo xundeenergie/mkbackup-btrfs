@@ -47,6 +47,7 @@ case "$1" in
                 for TARGET in $(gawk -F "=" '\
                         $1 ~ /WantedBy/ && $1 !~ /^#/{split($2,wants," ");for (w in wants){print wants[w]".wants"}} \
                         $1 ~ /RequiredBy/ && $1 !~ /^#/{split($2,requ," ");for (r in requ){print requ[r]".requires"}}' "${UNIT_LOC}${UNIT_NAME}");do
+                    echo "XXX $TARGET $SERVICE $UNIT_LOC"
                     [ -e "/etc/systemd/user/${TARGET}/" ] || mkdir -p "/etc/systemd/user/${TARGET}/"
                     [ -e "${UNIT_LOC}${SERVICE}" ] && ln -sf "${UNIT_LOC}${SERVICE}" "/etc/systemd/user/${TARGET}/${SERVICE}"
                 done
