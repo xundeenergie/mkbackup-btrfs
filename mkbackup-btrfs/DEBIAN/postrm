@@ -27,8 +27,8 @@ case "$1" in
             done
             
             for TARGET in $(gawk -F "=" '\
-                    $1 ~ /WantedBy/ {split($2,wants," ")} \
-                    $1 ~ /RequiredBy/ {split($2,requ," ")} \
+                    $1 ~ /WantedBy/ && $1 !~ /^#/{split($2,wants," ")} \
+                    $1 ~ /RequiredBy/ && $1 !~ /^#/{split($2,requ," ")} \
                     END{for (w in wants){print wants[w]".wants"};for (r in requ){print requ[r]".requires"}}' "${UNIT_LOC}${UNIT_NAME}");do
                 [ -e "/etc/systemd/user/${SERVICE}" ] || rf -rf "/etc/systemd/user/${SERVICE}"
                 [ -e "/etc/systemd/user/${TARGET}/${SERVICE}" ] || rm -rf "/etc/systemd/user/${TARGET}/${SERVICE}"
@@ -51,8 +51,8 @@ case "$1" in
                 fi
             done
             for TARGET in $(gawk -F "=" '\
-                    $1 ~ /WantedBy/ {split($2,wants," ")} \
-                    $1 ~ /RequiredBy/ {split($2,requ," ")} \
+                    $1 ~ /WantedBy/ && $1 !~ /^#/{split($2,wants," ")} \
+                    $1 ~ /RequiredBy/ && $1 !~ /^#/{split($2,requ," ")} \
                     END{for (w in wants){print wants[w]".wants"};for (r in requ){print requ[r]".requires"}}' "${UNIT_LOC}${UNIT_NAME}");do
                 [ -e "/etc/systemd/user/${TARGET}" ] || mkdir -p "/etc/systemd/user/${TARGET}"
                 ln -sf "/dev/null" "/etc/systemd/user/${TARGET}/${SERVICE}"
@@ -72,16 +72,16 @@ SERVICES="backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrf
 
 case "$1" in
     purge)
-	if [ -x "/usr/bin/deb-systemd-helper" ]; then
-		deb-systemd-helper purge $SERVICES >/dev/null
-		deb-systemd-helper unmask $SERVICES >/dev/null
+	if [ -x "/usr/bin/deb-systemd-helper-xe" ]; then
+		deb-systemd-helper-xe purge $SERVICES >/dev/null
+		deb-systemd-helper-xe unmask $SERVICES >/dev/null
 	fi
         ;;
     abort-upgrade)
         ;;
     remove)
-        if [ -x "/usr/bin/deb-systemd-helper" ]; then
-                deb-systemd-helper mask $SERVICES >/dev/null
+        if [ -x "/usr/bin/deb-systemd-helper-xe" ]; then
+                deb-systemd-helper-xe mask $SERVICES >/dev/null
         fi
         ;;
     upgrade|failed-upgrade|abort-install|disappear)
