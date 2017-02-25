@@ -19,7 +19,7 @@ case "$1" in
     purge)
         for SERVICE in $SERVICES; do
             UNIT_NAME=$(echo $SERVICE|sed -e 's/\@.*\.\([a-z][a-z]*\)$/@.\1/')
-            for loc in USERLOCS;do
+            for loc in $USERLOCS;do
                 if [ -e "${loc}${UNIT_NAME}" ]; then
                     UNIT_LOC="$loc"
                     break
@@ -43,7 +43,7 @@ case "$1" in
     remove)
         for SERVICE in $SERVICES; do
             UNIT_NAME=$(echo $SERVICE|sed -e 's/\@.*\.\([a-z][a-z]*\)$/@.\1/')
-            for loc in USERLOCS;do
+            for loc in $USERLOCS;do
                 if [ -e "${loc}${UNIT_NAME}" ]; then
                     UNIT_LOC="$loc"
                     break
