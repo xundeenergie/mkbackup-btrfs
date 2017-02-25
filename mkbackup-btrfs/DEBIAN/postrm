@@ -27,9 +27,8 @@ case "$1" in
             done
             
             for TARGET in $(gawk -F "=" '\
-                    $1 ~ /WantedBy/ && $1 !~ /^#/{split($2,wants," ")} \
-                    $1 ~ /RequiredBy/ && $1 !~ /^#/{split($2,requ," ")} \
-                    END{for (w in wants){print wants[w]".wants"};for (r in requ){print requ[r]".requires"}}' "${UNIT_LOC}${UNIT_NAME}");do
+                    $1 ~ /WantedBy/ && $1 !~ /^#/{split($2,wants," ");for (w in wants){print wants[w]".wants"}} \
+                    $1 ~ /RequiredBy/ && $1 !~ /^#/{split($2,requ," ");for (r in requ){print requ[r]".requires"}}' "${UNIT_LOC}${UNIT_NAME}");do
                 [ -e "/etc/systemd/user/${SERVICE}" ] || rf -rf "/etc/systemd/user/${SERVICE}"
                 [ -e "/etc/systemd/user/${TARGET}/${SERVICE}" ] || rm -rf "/etc/systemd/user/${TARGET}/${SERVICE}"
             done
@@ -51,9 +50,8 @@ case "$1" in
                 fi
             done
             for TARGET in $(gawk -F "=" '\
-                    $1 ~ /WantedBy/ && $1 !~ /^#/{split($2,wants," ")} \
-                    $1 ~ /RequiredBy/ && $1 !~ /^#/{split($2,requ," ")} \
-                    END{for (w in wants){print wants[w]".wants"};for (r in requ){print requ[r]".requires"}}' "${UNIT_LOC}${UNIT_NAME}");do
+                    $1 ~ /WantedBy/ && $1 !~ /^#/{split($2,wants," ");for (w in wants){print wants[w]".wants"}} \
+                    $1 ~ /RequiredBy/ && $1 !~ /^#/{split($2,requ," ");for (r in requ){print requ[r]".requires"}}' "${UNIT_LOC}${UNIT_NAME}");do
                 [ -e "/etc/systemd/user/${TARGET}" ] || mkdir -p "/etc/systemd/user/${TARGET}"
                 ln -sf "/dev/null" "/etc/systemd/user/${TARGET}/${SERVICE}"
             done
