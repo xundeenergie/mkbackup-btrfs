@@ -1,0 +1,8 @@
+[Unit]
+Description=Automounting of /backup - activated by backup.path
+Before=local-fs.target
+PartOf=backup.path
+
+[Automount]
+TimeoutIdleSec=15s
+Where=/backup

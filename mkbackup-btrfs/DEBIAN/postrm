@@ -1,0 +1,73 @@
+#! /bin/sh
+
+set -e
+
+# In case this system is running systemd, we make systemd reload the unit files
+# to pick up changes.
+if [ -d /run/systemd/system ] ; then
+	systemctl --system daemon-reload >/dev/null || true
+fi
+
+
+# For user-services only, for earch target an extra section! for system-services user deb-systemd*
+SERVICES="mkbackup-userdir.path"
+TARGET="default.target"
+case "$1" in
+
+    configure)
+        for SERVICE in $SERVICES; do
+            [ -e "/etc/systemd/user/${TARGET}.wants/" ] || mkdir -p "/etc/systemd/user/${TARGET}.wants/"
+            [ -e "/usr/lib/systemd/user/${SERVICE}" ] && ln -sf "/usr/lib/systemd/user/${SERVICE}" "/etc/systemd/user/${TARGET}.wants/${SERVICE}"
+        done
+
+[ -e /etc/systemd/user/default.target.wants/ ] || mkdir -p /etc/systemd/user/default.target.wants/
+case "$1" in
+    purge)
+        for SERVICE in $SERVICES; do
+            [ -e "/etc/systemd/user/${SERVICE}" ] || rf -rf "/etc/systemd/user/${SERVICE}"
+            [ -e "/etc/systemd/user/${TARGET}.wants/${SERVICE}" ] || rm -rf "/etc/systemd/user/${TARGET}.wants/${SERVICE}"
+        done
+	#rm -rf /etc/systemd/user/cups-fuse.service
+        #rm -rf /etc/systemd/user/default.target.wants/cups-fuse.service
+	;;
+    abort-upgrade|upgrade)
+        ;;
+    failed-upgrade|abort-install|disappear)
+        ;;
+    remove)
+        for SERVICE in $SERVICES; do
+            [ -e "/etc/systemd/user/${TARGET}.wants/" ] || mkdir -p "/etc/systemd/user/${TARGET}.wants/"
+            ln -sf "/dev/null" "/etc/systemd/user/${TARGET}.wants/${SERVICE}"
+        done
+        #ln -sf /dev/null /etc/systemd/user/default.target.wants/cups-fuse.service
+        ;;
+
+    *)
+        echo "postrm called with unknown argument \`$1'" >&2
+        exit 0
+esac
+
+SERVICES="backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service mkbackup@manually.service mkbackup@aptupgrade.service mkbackup@daily.service mkbackup@weekly.service mkbackup@monthly.service"
+
+case "$1" in
+    purge)
+	if [ -x "/usr/bin/deb-systemd-helper" ]; then
+		deb-systemd-helper purge $SERVICES >/dev/null
+		deb-systemd-helper unmask $SERVICES >/dev/null
+	fi
+        ;;
+    abort-upgrade)
+        ;;
+    remove)
+        if [ -x "/usr/bin/deb-systemd-helper" ]; then
+                deb-systemd-helper mask $SERVICES >/dev/null
+        fi
+        ;;
+    upgrade|failed-upgrade|abort-install|disappear)
+        ;;
+
+    *)
+        echo "postrm called with unknown argument \`$1'" >&2
+        exit 0
+
+esac
