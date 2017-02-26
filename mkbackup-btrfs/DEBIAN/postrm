@@ -46,7 +46,6 @@ case "$1" in
             if [ -x "/usr/bin/deb-systemd-helper-xeuser" ]; then
                     deb-systemd-helper-xeuser mask $SERVICES >/dev/null
             fi
-            ;;
 #            echo "B"
 #            UNIT_NAME=$(echo $SERVICE|sed -e 's/\@.*\.\([a-z][a-z]*\)$/@.\1/')
 #            for loc in $USERLOCS;do
