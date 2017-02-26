@@ -18,6 +18,7 @@ USERLOCS="/etc/systemd/user/ /usr/lib/systemd/user/"
 case "$1" in
     purge)
         for SERVICE in $SERVICES; do
+            echo "A"
             UNIT_NAME=$(echo $SERVICE|sed -e 's/\@.*\.\([a-z][a-z]*\)$/@.\1/')
             for loc in $USERLOCS;do
                 if [ -e "${loc}${UNIT_NAME}" ]; then
@@ -42,6 +43,7 @@ case "$1" in
         ;;
     remove)
         for SERVICE in $SERVICES; do
+            echo "B"
             UNIT_NAME=$(echo $SERVICE|sed -e 's/\@.*\.\([a-z][a-z]*\)$/@.\1/')
             for loc in $USERLOCS;do
                 if [ -e "${loc}${UNIT_NAME}" ]; then
@@ -66,7 +68,7 @@ esac
 
 # System-Services:
 # put in full unit-name. for example "mkbackup@hourly.service"
-SERVICES="mkbackup.target mkbackup@SNP.target backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service mkbackup@manually.service mkbackup@aptupgrade.service mkbackup@daily.service mkbackup@weekly.service mkbackup@monthly.service"
+SERVICES="mkbackup.target backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service mkbackup@manually.service mkbackup@aptupgrade.service mkbackup@daily.service mkbackup@weekly.service mkbackup@monthly.service"
 
 case "$1" in
     purge)
