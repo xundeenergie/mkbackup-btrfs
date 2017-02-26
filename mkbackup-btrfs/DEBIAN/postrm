@@ -43,23 +43,29 @@ case "$1" in
         ;;
     remove)
         for SERVICE in $SERVICES; do
-            echo "B"
-            UNIT_NAME=$(echo $SERVICE|sed -e 's/\@.*\.\([a-z][a-z]*\)$/@.\1/')
-            for loc in $USERLOCS;do
-                echo $loc : $UNIT_NAME
-                if [ -e "${loc}${UNIT_NAME}" ]; then
-                    UNIT_LOC="$loc"
-                    echo XXX $UNIT_LOC
-                    break
-                fi
-            done
-            echo "C ${UNIT_LOC} : ${UNIT_NAME}"
-            for TARGET in $(gawk -F "=" '\
-                    $1 ~ /WantedBy/ && $1 !~ /^#/{split($2,wants," ");for (w in wants){print wants[w]".wants"}} \
-                    $1 ~ /RequiredBy/ && $1 !~ /^#/{split($2,requ," ");for (r in requ){print requ[r]".requires"}}' "${UNIT_LOC}${UNIT_NAME}");do
-                [ -e "/etc/systemd/user/${TARGET}" ] || mkdir -p "/etc/systemd/user/${TARGET}"
-                ln -sf "/dev/null" "/etc/systemd/user/${TARGET}/${SERVICE}"
-            done
+            if [ -x "/usr/bin/deb-systemd-helper-xeuser" ]; then
+                    deb-systemd-helper-xeuser mask $SERVICES >/dev/null
+            fi
+            ;;
+#            echo "B"
+#            UNIT_NAME=$(echo $SERVICE|sed -e 's/\@.*\.\([a-z][a-z]*\)$/@.\1/')
+#            for loc in $USERLOCS;do
+#                echo $loc : $UNIT_NAME
+#                if [ -e "${loc}${UNIT_NAME}" ]; then
+#                    UNIT_LOC="$loc"
+#                    echo XXX $UNIT_LOC
+#                    break
+#                else
+#                    echo YYY $UNIT_LOC
+#                fi
+#            done
+#            echo "C ${UNIT_LOC} : ${UNIT_NAME}"
+#            for TARGET in $(gawk -F "=" '\
+#                    $1 ~ /WantedBy/ && $1 !~ /^#/{split($2,wants," ");for (w in wants){print wants[w]".wants"}} \
+#                    $1 ~ /RequiredBy/ && $1 !~ /^#/{split($2,requ," ");for (r in requ){print requ[r]".requires"}}' "${UNIT_LOC}${UNIT_NAME}");do
+#                [ -e "/etc/systemd/user/${TARGET}" ] || mkdir -p "/etc/systemd/user/${TARGET}"
+#                ln -sf "/dev/null" "/etc/systemd/user/${TARGET}/${SERVICE}"
+#            done
         done
         ;;
 
@@ -71,7 +77,7 @@ esac
 
 # System-Services:
 # put in full unit-name. for example "mkbackup@hourly.service"
-SERVICES="mkbackup.target backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service mkbackup@manually.service mkbackup@aptupgrade.service mkbackup@daily.service mkbackup@weekly.service mkbackup@monthly.service"
+SERVICES="mkbackup.target backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service mkbackup@manually.service mkbackup@aptupgrade.service mkbackup@daily.service mkbackup@weekly.service mkbackup@monthly.service mkbackup@plugin.service mkbackup@manually.service"
 
 case "$1" in
     purge)
