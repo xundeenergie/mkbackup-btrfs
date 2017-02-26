@@ -28,22 +28,22 @@ set -e
 # For user-services only, for earch target an extra section! for system-services user deb-systemd*
 # put in full unit-name. for example "mkbackup@hourly.service"
 
-USERLOCS="/etc/systemd/user/ /usr/lib/systemd/user/"
+#USERLOCS="/etc/systemd/user/ /usr/lib/systemd/user/"
 
 SERVICES="mkbackup-userdir.path"
 for SERVICE in $SERVICES; do
     # This will only remove masks created by d-s-h on package removal.
-    deb-systemd-helper-xeuser unmask $SERVICE >/dev/null || true
+    deb-systemd-helper-xeuser unmask user $SERVICE >/dev/null || true
 
     # was-enabled defaults to true, so new installations run enable.
-    if deb-systemd-helper-xeuser --quiet was-enabled $SERVICE; then
+    if deb-systemd-helper-xeuser --quiet was-enabled user $SERVICE; then
             # Enables the unit on first installation, creates new
             # symlinks on upgrades if the unit file has changed.
-            deb-systemd-helper-xeuser enable $SERVICE >/dev/null || true
+            deb-systemd-helper-xeuser enable user $SERVICE >/dev/null || true
     else
             # Update the statefile to add new symlinks (if any), which need to be
             # cleaned up on purge. Also remove old symlinks.
-            deb-systemd-helper-xeuser update-state $SERVICE >/dev/null || true
+            deb-systemd-helper-xeuser update-state user $SERVICE >/dev/null || true
     fi
 done
 
@@ -91,17 +91,17 @@ SERVICES="mkbackup.target backup.automount var-cache-backup.automount btrfs-scru
 
 for SERVICE in $SERVICES; do
     # This will only remove masks created by d-s-h on package removal.
-    deb-systemd-helper-xe unmask $SERVICE >/dev/null || true
+    deb-systemd-helper-xeuser unmask $SERVICE >/dev/null || true
 
     # was-enabled defaults to true, so new installations run enable.
-    if deb-systemd-helper-xe --quiet was-enabled $SERVICE; then
+    if deb-systemd-helper-xeuser --quiet was-enabled $SERVICE; then
             # Enables the unit on first installation, creates new
             # symlinks on upgrades if the unit file has changed.
-            deb-systemd-helper-xe enable $SERVICE >/dev/null || true
+            deb-systemd-helper-xeuser enable $SERVICE >/dev/null || true
     else
             # Update the statefile to add new symlinks (if any), which need to be
             # cleaned up on purge. Also remove old symlinks.
-            deb-systemd-helper-xe update-state $SERVICE >/dev/null || true
+            deb-systemd-helper-xeuser update-state $SERVICE >/dev/null || true
     fi
 done
 

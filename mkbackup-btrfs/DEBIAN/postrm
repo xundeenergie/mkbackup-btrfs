@@ -18,9 +18,9 @@ USERLOCS="/etc/systemd/user/ /usr/lib/systemd/user/"
 case "$1" in
     purge)
         for SERVICE in $SERVICES; do
-            if [ -x "/usr/bin/deb-systemd-helper-xe" ]; then
-                    deb-systemd-helper-xe purge $SERVICES >/dev/null
-                    deb-systemd-helper-xe unmask $SERVICES >/dev/null
+            if [ -x "/usr/bin/deb-systemd-helper-xeuser" ]; then
+                    deb-systemd-helper-xe purge user $SERVICES >/dev/null
+                    deb-systemd-helper-xe unmask user $SERVICES >/dev/null
             fi
 #            echo "A"
 #            UNIT_NAME=$(echo $SERVICE|sed -e 's/\@.*\.\([a-z][a-z]*\)$/@.\1/')
@@ -48,7 +48,7 @@ case "$1" in
     remove)
         for SERVICE in $SERVICES; do
             if [ -x "/usr/bin/deb-systemd-helper-xeuser" ]; then
-                    deb-systemd-helper-xeuser mask $SERVICES >/dev/null
+                    deb-systemd-helper-xeuser mask user $SERVICES >/dev/null
             fi
 #            echo "B"
 #            UNIT_NAME=$(echo $SERVICE|sed -e 's/\@.*\.\([a-z][a-z]*\)$/@.\1/')
@@ -85,16 +85,16 @@ SERVICES="mkbackup.target backup.automount var-cache-backup.automount btrfs-scru
 
 case "$1" in
     purge)
-	if [ -x "/usr/bin/deb-systemd-helper-xe" ]; then
-		deb-systemd-helper-xe purge $SERVICES >/dev/null
-		deb-systemd-helper-xe unmask $SERVICES >/dev/null
+	if [ -x "/usr/bin/deb-systemd-helper-xeuser" ]; then
+		deb-systemd-helper-xeuser purge $SERVICES >/dev/null
+		deb-systemd-helper-xeuser unmask $SERVICES >/dev/null
 	fi
         ;;
     abort-upgrade)
         ;;
     remove)
-        if [ -x "/usr/bin/deb-systemd-helper-xe" ]; then
-                deb-systemd-helper-xe mask $SERVICES >/dev/null
+        if [ -x "/usr/bin/deb-systemd-helper-xeuser" ]; then
+                deb-systemd-helper-xeuser mask $SERVICES >/dev/null
         fi
         ;;
     upgrade|failed-upgrade|abort-install|disappear)
