@@ -18,21 +18,25 @@ USERLOCS="/etc/systemd/user/ /usr/lib/systemd/user/"
 case "$1" in
     purge)
         for SERVICE in $SERVICES; do
-            echo "A"
-            UNIT_NAME=$(echo $SERVICE|sed -e 's/\@.*\.\([a-z][a-z]*\)$/@.\1/')
-            for loc in $USERLOCS;do
-                if [ -e "${loc}${UNIT_NAME}" ]; then
-                    UNIT_LOC="$loc"
-                    break
-                fi
-            done
-            
-            for TARGET in $(gawk -F "=" '\
-                    $1 ~ /WantedBy/ && $1 !~ /^#/{split($2,wants," ");for (w in wants){print wants[w]".wants"}} \
-                    $1 ~ /RequiredBy/ && $1 !~ /^#/{split($2,requ," ");for (r in requ){print requ[r]".requires"}}' "${UNIT_LOC}${UNIT_NAME}");do
-                [ -e "/etc/systemd/user/${SERVICE}" ] || rf -rf "/etc/systemd/user/${SERVICE}"
-                [ -e "/etc/systemd/user/${TARGET}/${SERVICE}" ] || rm -rf "/etc/systemd/user/${TARGET}/${SERVICE}"
-            done
+            if [ -x "/usr/bin/deb-systemd-helper-xe" ]; then
+                    deb-systemd-helper-xe purge $SERVICES >/dev/null
+                    deb-systemd-helper-xe unmask $SERVICES >/dev/null
+            fi
+#            echo "A"
+#            UNIT_NAME=$(echo $SERVICE|sed -e 's/\@.*\.\([a-z][a-z]*\)$/@.\1/')
+#            for loc in $USERLOCS;do
+#                if [ -e "${loc}${UNIT_NAME}" ]; then
+#                    UNIT_LOC="$loc"
+#                    break
+#                fi
+#            done
+#            
+#            for TARGET in $(gawk -F "=" '\
+#                    $1 ~ /WantedBy/ && $1 !~ /^#/{split($2,wants," ");for (w in wants){print wants[w]".wants"}} \
+#                    $1 ~ /RequiredBy/ && $1 !~ /^#/{split($2,requ," ");for (r in requ){print requ[r]".requires"}}' "${UNIT_LOC}${UNIT_NAME}");do
+#                [ -e "/etc/systemd/user/${SERVICE}" ] || rf -rf "/etc/systemd/user/${SERVICE}"
+#                [ -e "/etc/systemd/user/${TARGET}/${SERVICE}" ] || rm -rf "/etc/systemd/user/${TARGET}/${SERVICE}"
+#            done
         done
 	#rm -rf /etc/systemd/user/cups-fuse.service
         #rm -rf /etc/systemd/user/default.target.wants/cups-fuse.service
