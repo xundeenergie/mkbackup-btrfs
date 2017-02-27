@@ -22,24 +22,7 @@ case "$1" in
                     deb-systemd-helper-xe purge user $SERVICES >/dev/null
                     deb-systemd-helper-xe unmask user $SERVICES >/dev/null
             fi
-#            echo "A"
-#            UNIT_NAME=$(echo $SERVICE|sed -e 's/\@.*\.\([a-z][a-z]*\)$/@.\1/')
-#            for loc in $USERLOCS;do
-#                if [ -e "${loc}${UNIT_NAME}" ]; then
-#                    UNIT_LOC="$loc"
-#                    break
-#                fi
-#            done
-#            
-#            for TARGET in $(gawk -F "=" '\
-#                    $1 ~ /WantedBy/ && $1 !~ /^#/{split($2,wants," ");for (w in wants){print wants[w]".wants"}} \
-#                    $1 ~ /RequiredBy/ && $1 !~ /^#/{split($2,requ," ");for (r in requ){print requ[r]".requires"}}' "${UNIT_LOC}${UNIT_NAME}");do
-#                [ -e "/etc/systemd/user/${SERVICE}" ] || rf -rf "/etc/systemd/user/${SERVICE}"
-#                [ -e "/etc/systemd/user/${TARGET}/${SERVICE}" ] || rm -rf "/etc/systemd/user/${TARGET}/${SERVICE}"
-#            done
         done
-	#rm -rf /etc/systemd/user/cups-fuse.service
-        #rm -rf /etc/systemd/user/default.target.wants/cups-fuse.service
 	;;
     abort-upgrade|upgrade)
         ;;
@@ -50,25 +33,6 @@ case "$1" in
             if [ -x "/usr/bin/deb-systemd-helper-xeuser" ]; then
                     deb-systemd-helper-xeuser mask user $SERVICES >/dev/null
             fi
-#            echo "B"
-#            UNIT_NAME=$(echo $SERVICE|sed -e 's/\@.*\.\([a-z][a-z]*\)$/@.\1/')
-#            for loc in $USERLOCS;do
-#                echo $loc : $UNIT_NAME
-#                if [ -e "${loc}${UNIT_NAME}" ]; then
-#                    UNIT_LOC="$loc"
-#                    echo XXX $UNIT_LOC
-#                    break
-#                else
-#                    echo YYY $UNIT_LOC
-#                fi
-#            done
-#            echo "C ${UNIT_LOC} : ${UNIT_NAME}"
-#            for TARGET in $(gawk -F "=" '\
-#                    $1 ~ /WantedBy/ && $1 !~ /^#/{split($2,wants," ");for (w in wants){print wants[w]".wants"}} \
-#                    $1 ~ /RequiredBy/ && $1 !~ /^#/{split($2,requ," ");for (r in requ){print requ[r]".requires"}}' "${UNIT_LOC}${UNIT_NAME}");do
-#                [ -e "/etc/systemd/user/${TARGET}" ] || mkdir -p "/etc/systemd/user/${TARGET}"
-#                ln -sf "/dev/null" "/etc/systemd/user/${TARGET}/${SERVICE}"
-#            done
         done
         ;;
 
