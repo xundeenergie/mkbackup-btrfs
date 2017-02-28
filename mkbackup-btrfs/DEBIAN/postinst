@@ -32,6 +32,8 @@ set -e
 case "$1" in
 
     configure)
+        SERVICES="mkbackup.target backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service"
+        systemctl enable $SERVICES
         INTERVALS="dmin hourly daily weekly monthly yearly aptupgrade plugin afterboot"
         CINT=$(for i in $INTERVALS;do echo "mkbackup@${i}.service" ; done)
         systemctl enable $CINT

@@ -45,11 +45,12 @@ fi
 # System-Services:
 # put in full unit-name. for example "mkbackup@hourly.service"
 #SERVICES="mkbackup.target backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service mkbackup@manually.service mkbackup@aptupgrade.service mkbackup@daily.service mkbackup@weekly.service mkbackup@monthly.service mkbackup@plugin.service mkbackup@manually.service"
-SERVICES="mkbackup.target backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service mkbackup@.service"
+SERVICES="mkbackup.target backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service"
 
 case "$1" in
     purge)
-        systemctl disable $SERVICES
+        systemctl disable $SERVICES mkbackup@.service
+        rm -rf /lib/systemd/system/mkbackup@.service
         
 #	if [ -x "/usr/bin/deb-systemd-helper-xeuser" ]; then
 #		deb-systemd-helper-xeuser purge $SERVICES >/dev/null
@@ -60,6 +61,7 @@ case "$1" in
         ;;
     remove)
         systemctl mask $SERVICES
+        ln -s /dev /null /lib/systemd/system/mkbackup@.service
 #        if [ -x "/usr/bin/deb-systemd-helper-xeuser" ]; then
 #                deb-systemd-helper-xeuser mask $SERVICES >/dev/null
 #        fi
