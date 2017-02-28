@@ -28,28 +28,15 @@ set -e
 # For user-services only, for earch target an extra section! for system-services user deb-systemd*
 # put in full unit-name. for example "mkbackup@hourly.service"
 
-#USERLOCS="/etc/systemd/user/ /usr/lib/systemd/user/"
 
-SERVICES="mkbackup-userdir.path"
-for SERVICE in $SERVICES; do
-    # This will only remove masks created by d-s-h on package removal.
-    deb-systemd-helper-xeuser unmask user $SERVICE >/dev/null || true
+case "$1" in
 
-    # was-enabled defaults to true, so new installations run enable.
-    if deb-systemd-helper-xeuser --quiet was-enabled user $SERVICE; then
-            # Enables the unit on first installation, creates new
-            # symlinks on upgrades if the unit file has changed.
-            deb-systemd-helper-xeuser enable user $SERVICE >/dev/null || true
-    else
-            # Update the statefile to add new symlinks (if any), which need to be
-            # cleaned up on purge. Also remove old symlinks.
-            deb-systemd-helper-xeuser update-state user $SERVICE >/dev/null || true
-    fi
-done
-
-#case "$1" in
-#
-#    configure)
+    configure)
+        INTERVALS="dmin hourly daily weekly monthly yearly aptupgrade plugin afterboot"
+        CINT=$(for i in $INTERVALS;do echo "mkbackup@${i}.service" ; done)
+        systemctl enable $CINT
+        ;;
+#        whiptail --checklist
 #        for SERVICE in $SERVICES; do
 #            UNIT_NAME=$(echo $SERVICE|sed -e 's/\@.*\.\([a-z][a-z]*\)$/@.\1/')
 #            for loc in $USERLOCS;do
@@ -73,38 +60,38 @@ done
 #        done
 #        ;;
 #
-#    abort-upgrade|abort-remove|abort-deconfigure)
-#        exit 0
-#        ;;
-#
-#    *)
-#        echo "postinst called with unknown argument \`$1'" >&2
-#        exit 1
-#        ;;
-#
-#esac
+    abort-upgrade|abort-remove|abort-deconfigure)
+        exit 0
+        ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+
+esac
 
 
 # System-Services:
 # put in full unit-name. for example "mkbackup@hourly.service"
-SERVICES="mkbackup.target backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service mkbackup@manually.service mkbackup@aptupgrade.service mkbackup@daily.service mkbackup@weekly.service mkbackup@monthly.service mkbackup@plugin.service mkbackup@manually.service"
-
-for SERVICE in $SERVICES; do
-    # This will only remove masks created by d-s-h on package removal.
-    deb-systemd-helper-xeuser unmask $SERVICE >/dev/null || true
-
-    # was-enabled defaults to true, so new installations run enable.
-    if deb-systemd-helper-xeuser --quiet was-enabled $SERVICE; then
-            # Enables the unit on first installation, creates new
-            # symlinks on upgrades if the unit file has changed.
-            deb-systemd-helper-xeuser enable $SERVICE >/dev/null || true
-    else
-            # Update the statefile to add new symlinks (if any), which need to be
-            # cleaned up on purge. Also remove old symlinks.
-            deb-systemd-helper-xeuser update-state $SERVICE >/dev/null || true
-    fi
-done
-
+#SERVICES="mkbackup.target backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service mkbackup@manually.service mkbackup@aptupgrade.service mkbackup@daily.service mkbackup@weekly.service mkbackup@monthly.service mkbackup@plugin.service mkbackup@manually.service"
+#
+#for SERVICE in $SERVICES; do
+#    # This will only remove masks created by d-s-h on package removal.
+#    deb-systemd-helper-xeuser unmask $SERVICE >/dev/null || true
+#
+#    # was-enabled defaults to true, so new installations run enable.
+#    if deb-systemd-helper-xeuser --quiet was-enabled $SERVICE; then
+#            # Enables the unit on first installation, creates new
+#            # symlinks on upgrades if the unit file has changed.
+#            deb-systemd-helper-xeuser enable $SERVICE >/dev/null || true
+#    else
+#            # Update the statefile to add new symlinks (if any), which need to be
+#            # cleaned up on purge. Also remove old symlinks.
+#            deb-systemd-helper-xeuser update-state $SERVICE >/dev/null || true
+#    fi
+#done
+#
 
 #db_stop
 
