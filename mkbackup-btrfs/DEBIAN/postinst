@@ -32,38 +32,15 @@ set -e
 case "$1" in
 
     configure)
-        SERVICES="mkbackup.target backup.path var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service"
+        SERVICES="mkbackup.target backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service"
         systemctl unmask $SERVICES
         systemctl enable $SERVICES
-        INTERVALS="dmin hourly daily weekly monthly yearly aptupgrade plugin afterboot"
+        #INTERVALS="dmin hourly daily weekly monthly yearly aptupgrade plugin afterboot"
+        INTERVALS="hourly daily weekly aptupgrade plugin afterboot manually"
         CINT=$(for i in $INTERVALS;do echo "mkbackup@${i}.service" ; done)
         systemctl unmask $CINT
         systemctl enable $CINT
         ;;
-#        whiptail --checklist
-#        for SERVICE in $SERVICES; do
-#            UNIT_NAME=$(echo $SERVICE|sed -e 's/\@.*\.\([a-z][a-z]*\)$/@.\1/')
-#            for loc in $USERLOCS;do
-#                echo "LOC ${loc}${UNIT_NAME}"
-#                if [ -e "${loc}${UNIT_NAME}" ]; then
-#                    UNIT_LOC="$loc"
-#                    break
-#                fi
-#            done
-#            echo "AAA $UNIT_NAME : $SERVICE : $UNIT_LOC"
-#            
-#            if [ x${UNIT_LOC} != "x" ]; then
-#                for TARGET in $(gawk -F "=" '\
-#                        $1 ~ /WantedBy/ && $1 !~ /^#/{split($2,wants," ");for (w in wants){print wants[w]".wants"}} \
-#                        $1 ~ /RequiredBy/ && $1 !~ /^#/{split($2,requ," ");for (r in requ){print requ[r]".requires"}}' "${UNIT_LOC}${UNIT_NAME}");do
-#                    echo "XXX $TARGET : $SERVICE : $UNIT_LOC"
-#                    [ -e "/etc/systemd/user/${TARGET}/" ] || mkdir -p "/etc/systemd/user/${TARGET}/"
-#                    [ -e "${UNIT_LOC}${SERVICE}" ] && ln -sf "${UNIT_LOC}${SERVICE}" "/etc/systemd/user/${TARGET}/${SERVICE}"
-#                done
-#            fi
-#        done
-#        ;;
-#
     abort-upgrade|abort-remove|abort-deconfigure)
         exit 0
         ;;
@@ -74,29 +51,5 @@ case "$1" in
         ;;
 
 esac
-
-
-# System-Services:
-# put in full unit-name. for example "mkbackup@hourly.service"
-#SERVICES="mkbackup.target backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service mkbackup@manually.service mkbackup@aptupgrade.service mkbackup@daily.service mkbackup@weekly.service mkbackup@monthly.service mkbackup@plugin.service mkbackup@manually.service"
-#
-#for SERVICE in $SERVICES; do
-#    # This will only remove masks created by d-s-h on package removal.
-#    deb-systemd-helper-xeuser unmask $SERVICE >/dev/null || true
-#
-#    # was-enabled defaults to true, so new installations run enable.
-#    if deb-systemd-helper-xeuser --quiet was-enabled $SERVICE; then
-#            # Enables the unit on first installation, creates new
-#            # symlinks on upgrades if the unit file has changed.
-#            deb-systemd-helper-xeuser enable $SERVICE >/dev/null || true
-#    else
-#            # Update the statefile to add new symlinks (if any), which need to be
-#            # cleaned up on purge. Also remove old symlinks.
-#            deb-systemd-helper-xeuser update-state $SERVICE >/dev/null || true
-#    fi
-#done
-#
-
-#db_stop
 
 exit 0

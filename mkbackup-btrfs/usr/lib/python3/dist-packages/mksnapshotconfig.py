@@ -255,6 +255,13 @@ class Config():
             VOLSTRANS.append('\t'+intv+': '+' '.join(VOLS))
         return(VOLSTRANS)
 
+    def getIgnores(self,intv='misc'):
+        try:
+            return(self.config.get(intv,'ignore'))
+            print("A")
+        except:
+            return(self.config.get('DEFAULT','ignore'))
+            print("B")
 
     def __trnName(self,short):
         if short == "$S": return(self.syssubvol)

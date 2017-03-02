@@ -625,6 +625,8 @@ class SubVolume(SubVolumeInfo):
                 
     def create(self):
         self.DEBUG(' =create-snapshot=> from »<%s>/%s«' % (self.store, self.SourceName),level=1)
+        #for x in self.config.getIgnores():
+        #    self.DEBUG(x,level=0)
         if self.args.npb: pt = progress_timer(description= ' =create-snapshot=> from »<%s>/%s«: ' % (self.store, self.SourceName), n_iter=len(self.list_subvolumes(self.id,names=True)))
         #if self.exist:
         if issubvol(self.StorePath+'/'+self.SourceName):
@@ -633,6 +635,7 @@ class SubVolume(SubVolumeInfo):
                     # Test the Source for local snapshotting
                     if issubvol(self.StorePath+'/'+self.SourceName+'/'+sub):
                         dest = self.SnapLock+'/'+sub
+                        #TODO: Test on ignores
                         cmd = ['btrfs','subvolume','snapshot',self.StorePath+'/'+self.SourceName+'/'+sub,self.StorePath+'/'+dest]
 
                         # Test the destination for local snapshotting

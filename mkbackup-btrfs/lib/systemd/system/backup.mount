@@ -1,9 +1,9 @@
 [Unit]
-Before=local-fs.target
-BindsTo=backup.path
+#Before=local-fs.target
+#BindsTo=backup.automount
 
 [Mount]
-What=MksnapshotFS.py#
+What=MksnapshotFS.py
 Where=/backup
 Type=fuse
 TimeoutSec=10s

@@ -1,6 +1,8 @@
 [Unit]
-Description=Starts mounting backups to /backup, if this directory exists
-BindsTo=mkbackup.target
+Description=Start automounter for /backup, if this directory exists
+PartOf=mkbackup.target
+#Before=local-fs.target
+#DefaultDependencies = no
 
 [Path]
 PathExists=/backup

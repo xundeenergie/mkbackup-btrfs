@@ -1,5 +1,7 @@
 [Unit]
 Description=Show all userspezific backups in %h/backup
+BindsTo=mkbackup-userdir.path
+Conflicts=shutdown.target
 
 [Service]
 ExecStart=/usr/bin/MksnapshotFS.py -f %h/backup -o ro,allow_root
