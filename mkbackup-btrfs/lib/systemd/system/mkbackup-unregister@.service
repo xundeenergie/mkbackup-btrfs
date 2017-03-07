@@ -3,4 +3,4 @@ Description=Deactivate external Drive/Partition for mkbackup/mksnapshot for devi
 
 [Service]
 Type=oneshot
-ExecStart=/etc/systemd/system/scripts/mksnapshot-create-volume.sh unregister %i
+ExecStart=/usr/lib/systemd/scripts/mksnapshot-create-volume.sh unregister %i

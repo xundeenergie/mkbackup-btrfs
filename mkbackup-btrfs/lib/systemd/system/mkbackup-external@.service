@@ -5,4 +5,4 @@ Before=mkbackup@BKP.target
 
 [Service]
 Type=oneshot
-ExecStart=/etc/systemd/system/scripts/mksnapshot-create-volume.sh start %i
+ExecStart=/usr/lib/systemd/scripts/mksnapshot-create-volume.sh start %i
