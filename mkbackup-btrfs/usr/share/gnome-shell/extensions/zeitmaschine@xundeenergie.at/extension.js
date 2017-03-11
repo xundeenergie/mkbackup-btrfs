@@ -34,6 +34,7 @@ let Drives = new Object();
 //const EnabledIcon = 'my-caffeine-on-symbolic';
 const DisabledIcon = 'system-run-symbolic';
 const EnabledIcon = 'system-run-symbolic';
+const ConfFile = '/etc/mkbackup-btrfs.conf';
 
 
 const BackupManager = new Lang.Class({
@@ -50,7 +51,7 @@ const BackupManager = new Lang.Class({
 
         //Set a FileMonitor on the config-File. So the Config-File is only
         //read, when it changed.
-        this.GF = Gio.File.new_for_path('/etc/mksnapshot.conf');
+        this.GF = Gio.File.new_for_path(ConfFile);
         this._monitorConf = this.GF.monitor_file(Gio.FileMonitorFlags.NONE,null,null,null)
         this._monitorConf.connect("changed", Lang.bind(this, function(monitor, file, o, event) {
             // without this test, _loadConfig() is called more than once!!
@@ -546,7 +547,7 @@ const BackupManager = new Lang.Class({
         let obj = new Object();
         this._entries = [];
 
-        if(kf.load_from_file('/etc/mksnapshot.conf',GLib.KeyFileFlags.NONE)){
+        if(kf.load_from_file(ConfFile,GLib.KeyFileFlags.NONE)){
             //intervals = kf.get_groups()[0];
             this.bkpmnt = kf.get_value('DEFAULT','bkpmnt')
 

@@ -300,7 +300,7 @@ const ServicesSystemdSettings = new GObject.Class({
 
         this._store.clear();
 
-        let currentItems = this._settings.get_strv("zeitmaschine");
+        let currentItems = this._settings.get_strv("zeitmaschien");
         let validItems = [ ];
 
         for (let i = 0; i < currentItems.length; i++) {
