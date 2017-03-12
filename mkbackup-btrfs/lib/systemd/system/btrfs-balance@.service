@@ -1,13 +1,13 @@
 [Unit]
 Description=Balance btrfs-filesystem %f
 
-ConditionPathExists=!/run/btrfs-actions
-ConditionDirectoryNotEmpty=!/run/btrfs-actions
-ConditionPathExists=!/run/mkbackup
-ConditionDirectoryNotEmpty=!/run/mkbackup
+#ConditionPathExists=!/run/btrfs-actions
+#ConditionDirectoryNotEmpty=!/run/btrfs-actions
+#ConditionPathExists=!/run/mkbackup
+#ConditionDirectoryNotEmpty=!/run/mkbackup
 ConditionACPower=true
 
-Conflicts=suspend.target shutdown.target
+Conflicts=sleep.target suspend.target shutdown.target
 Wants=btrfs-scrub@%i.service
 OnFailure=status-email-root@%n.service
 Wants=status-email-root@%n.service

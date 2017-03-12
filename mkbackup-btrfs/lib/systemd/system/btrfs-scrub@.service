@@ -4,16 +4,16 @@ Description=Scrubs filesystem on %f weekly
 Wants=btrfs-balance@%i.service
 After=btrfs-balance@%i.service
 
-ConditionPathExists=!/run/btrfs-actions
-ConditionDirectoryNotEmpty=!/run/btrfs-actions
-ConditionPathExists=!/run/mkbackup
-ConditionDirectoryNotEmpty=!/run/mkbackup
-ConditionACPower=true
+#ConditionPathExists=!/run/btrfs-actions
+#ConditionDirectoryNotEmpty=!/run/btrfs-actions
+#ConditionPathExists=!/run/mkbackup
+#ConditionDirectoryNotEmpty=!/run/mkbackup
+#ConditionACPower=true
 
 
 #Wants=btrfs-status-email-root@%i.service
 #Before=btrfs-status-email-root@%i.service
-Conflicts=suspend.target shutdown.target
+Conflicts=sleep.target suspend.target shutdown.target
 OnFailure=status-email-root@%n.service
 
 [Service]
