@@ -1,8 +1,15 @@
 #!/bin/bash
 
+# Create a partition with btrfs
+# Mount it to a free mountpoint (for example /mnt)
+# change directory to this mountpoint (cd /mnt)
+# run this script
+
 SUBS="boot-grub-x86_64-efi home opt srv subs usr-local var-cache var-lib-mpd var-lib-named var-log var-opt var-spool var-spool-dovecot var-tmp var-virutal_machines var-www"
-MAIN=@debian
-ALWAYS=__ALWAYSCURRENT__
+ARCH="amd64"
+DIST="stretch"
+MAIN="@debian-${DIST}"
+ALWAYS="__ALWAYSCURRENT__"
 SSD=true
 
 NO=""
@@ -15,7 +22,7 @@ then
 fi
 
 BTRFS=/bin/btrfs
-AWK=/usr/bin/gawk
+AWK=/usr/bin/awk
 GREP=/bin/grep
 FINDMNT=/bin/findmnt
 BLKID=/sbin/blkid
@@ -38,15 +45,18 @@ done
 cd ..
 mkdir -p "${MAIN}/etc"
 
-echo "UUID=$UUID	/	btrfs	defaults,compress=lzo,nospace_cache,inode_cache,relatime${SSDOPTS}	0	0" > "${MAIN}/etc/fstab"
+echo "UUID=$UUID	/	btrfs	defaults,compress=lzo,${NO}nospace_cache,${NO}inode_cache,${RELATIME}atime${SSDOPTS}	0	0" > "${MAIN}/etc/fstab"
+echo "UUID=$UUID	/var/cache/btrfs_pool_SYSTEM	btrfs	defaults,compress=lzo,${NO}space_cache,${NO}inode_cache,${RELATIME}atime${SSDOPTS},subvol=/	0	0" >> "${MAIN}/etc/fstab"
 
 for i in $SUBS
 do
 	echo "UUID=$UUID	/$(echo $i|sed 's@-@/@g')	btrfs	defaults,compress=lzo,${NO}space_cache,${NO}inode_cache,${RELATIME}atime${SSDOPTS},subvol=${ALWAYS}/${i}	0	0" >> "${MAIN}/etc/fstab"
 done
+
+
 cp "${MAIN}/etc/fstab" "${MAIN}/etc/fstab.orig"
 
-$DEBOOTSTRAP --arch amd64 jessie "${MAIN}" http://ftp.at.debian.org/debian
+$DEBOOTSTRAP --arch "${ARCH}" "${DIST}" "${MAIN}" http://ftp.at.debian.org/debian
 
 $MOUNT -o bind /dev "${MAIN}/dev"
 $MOUNT -o bind /dev/pts "${MAIN}/dev/pts"
@@ -56,9 +66,14 @@ cp /proc/mounts "${MAIN}/etc/mtab"
 cp /etc/resolv.conf "${MAIN}/etc/resolv.conf"
 
 chroot "${MAIN}"
+echo "You are now in the chroot, groundsystem is now installed. Now install other packages."
+echo "try apt install linux-image task-desktop task-german-desktop console-setup tzdata"
+echo "add new users, and add them to several groups"
+echo "add grub2 and initramfs"
+
 exit
 
-UUID=03d34c21-a150-4e91-8470-a6346d04287a	/			btrfs	defaults,compress=lzo,nospace_cache,inode_cache,relatime,ssd,discard							0	0
-UUID=03d34c21-a150-4e91-8470-a6346d04287a	/boot/grub/x86_64/efi	btrfs	defaults,compress=lzo,nospace_cache,inode_cache,relatime,ssd,discard,subvol=__ALWAYSCURRENT__/boot-grub-x86_64-efi	0	0
+#UUID=03d34c21-a150-4e91-8470-a6346d04287a	/			btrfs	defaults,compress=lzo,nospace_cache,inode_cache,relatime,ssd,discard							0	0
+#UUID=03d34c21-a150-4e91-8470-a6346d04287a	/boot/grub/x86_64/efi	btrfs	defaults,compress=lzo,nospace_cache,inode_cache,relatime,ssd,discard,subvol=__ALWAYSCURRENT__/boot-grub-x86_64-efi	0	0
 
 
