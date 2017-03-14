@@ -27,7 +27,8 @@ import socket
 from time import strptime, strftime
 from datetime import datetime,date,time,timedelta
 
-from mksnapshotconfig import *
+#from mksnapshotconfig import *
+from mkbackup_btrfs_config import *
 
 DEBUG = False
 
