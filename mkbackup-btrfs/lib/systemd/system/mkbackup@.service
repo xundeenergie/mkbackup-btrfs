@@ -4,7 +4,7 @@ Description=Make %i-backup from system-subvolume
 #ConditionPathExists=!/run/btrfs-actions
 #ConditionDirectoryNotEmpty=!/run/btrfs-actions
 #ConditionPathExists=!/run/mkbackup
-ConditionPathExistsGlob=!/run/mkbackup*
+ConditionPathExistsGlob=!/run/mkbackup/*
 #ConditionPathExists=!/run/btrfs-actions
 #ConditionDirectoryNotEmpty=!/run/mkbackup
 
@@ -23,7 +23,7 @@ OnFailure=status-email-root@%n.service
 #Type=simple
 Type=idle
 #EnvironmentFile=/etc/mkbtrbackup.conf.d/%i.conf
-RuntimeDirectory=mkbackup-%i
+RuntimeDirectory=mkbackup
 
 Nice=10
 IOSchedulingClass=3
@@ -31,9 +31,9 @@ IOSchedulingClass=3
 CPUSchedulingPolicy=idle
 
 ExecStartPre=/bin/sh -c "(/bin/systemctl is-active -q mkbackup.target)"
-ExecStartPre=/bin/touch /run/mkbackup-%i/systemd.lock
+#ExecStartPre=/bin/touch /run/mkbackup-%i/systemd.lock
 ExecStart=/usr/local/bin/mkbackup -V -v -t %i create SNP
-ExecStopPost=-/bin/rm /run/mkbackup-%i/systemd.lock
+#ExecStopPost=-/bin/rm /run/mkbackup-%i/systemd.lock
 
 [Install]
 WantedBy=timer-%i.target 
