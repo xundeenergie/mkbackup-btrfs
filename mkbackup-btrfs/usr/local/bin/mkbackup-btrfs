@@ -626,38 +626,50 @@ class SubVolume(SubVolumeInfo):
                 
     def create(self):
         self.DEBUG(' =create-snapshot=> from »<%s>/%s«' % (self.store, self.SourceName),level=1)
-        #for x in self.config.getIgnores():
-        #    self.DEBUG(x,level=0)
+        #compile regular expression for ignoring subvolume-names
+        if self.args.ignore == None:
+            if not self.config.getIgnores() == None:
+                re_ign = re.compile('|'.join(self.config.getIgnores()[0].split('\n')))
+            else:
+                re_ign = None
+        else:
+            re_ign = re.compile('|'.join(self.args.ignore))
+        print(re_ign)
         if self.args.npb: pt = progress_timer(description= ' =create-snapshot=> from »<%s>/%s«: ' % (self.store, self.SourceName), n_iter=len(self.list_subvolumes(self.id,names=True)))
         #if self.exist:
         if issubvol(self.StorePath+'/'+self.SourceName):
             try:
                 for sub in self.list_subvolumes(self.id,names=True):
-                    # Test the Source for local snapshotting
-                    if issubvol(self.StorePath+'/'+self.SourceName+'/'+sub):
-                        dest = self.SnapLock+'/'+sub
-                        #TODO: Test on ignores
-                        cmd = ['btrfs','subvolume','snapshot',self.StorePath+'/'+self.SourceName+'/'+sub,self.StorePath+'/'+dest]
-
-                        # Test the destination for local snapshotting
-                        if issubvol(self.StorePath+'/'+dest):
-                            # Test if top level snapshot is existing and a snapshot
-                            raise RuntimeError('FAILURE - Destination exists: %s' % (self.StorePath+'/'+dest), 0)
-                        elif issubvol(self.StorePath+'/'+dest) == False:
-                            # If destination exists and is a directory and not a snapshot, delete dir and create snapshot (for subvolumes of snapshot)
-                            self.DEBUG(' =create>  <%s>/%s' % (self.store,dest),level=1)
-                            sp_call(self.args,['rm','-r','-f',self.StorePath+'/'+dest])
-                            sp_call(self.args,cmd)                           
-                        else:
-                            # If destination doesnt exist, create the snapshot
-                            self.DEBUG(' =create>  <%s>/%s' % (self.store,dest),level=1)
-                            sp_call(self.args,cmd)                           
-                        sync()
-
-                    elif issubvol(self.OrigName+'/'+sub) == False:
-                        raise RuntimeError('FAILURE - Source is directory, not a subvolume. No creation possible: %s' % (sub), 0)
+                    # Test if subvolume is in ignorelist - only debug-output now
+                    if re_ign != None and re_ign.search('/'+sub):
+                        print('IGNORE','/'+sub)
                     else:
-                        self.DEBUG( " Source-subvolume not existing: %s" % (self.OrigName+'/'+sub),level=3)
+                        #print('/'+sub,re_ign,re_ign.search('/'+sub))
+                        # Test the Source for local snapshotting
+                        if issubvol(self.StorePath+'/'+self.SourceName+'/'+sub):
+                            dest = self.SnapLock+'/'+sub
+                            #TODO: Test on ignores
+                            cmd = ['btrfs','subvolume','snapshot',self.StorePath+'/'+self.SourceName+'/'+sub,self.StorePath+'/'+dest]
+
+                            # Test the destination for local snapshotting
+                            if issubvol(self.StorePath+'/'+dest):
+                                # Test if top level snapshot is existing and a snapshot
+                                raise RuntimeError('FAILURE - Destination exists: %s' % (self.StorePath+'/'+dest), 0)
+                            elif issubvol(self.StorePath+'/'+dest) == False:
+                                # If destination exists and is a directory and not a snapshot, delete dir and create snapshot (for subvolumes of snapshot)
+                                self.DEBUG(' =create>  <%s>/%s' % (self.store,dest),level=1)
+                                sp_call(self.args,['rm','-r','-f',self.StorePath+'/'+dest])
+                                sp_call(self.args,cmd)                           
+                            else:
+                                # If destination doesnt exist, create the snapshot
+                                self.DEBUG(' =create>  <%s>/%s' % (self.store,dest),level=1)
+                                sp_call(self.args,cmd)                           
+                            sync()
+
+                        elif issubvol(self.OrigName+'/'+sub) == False:
+                            raise RuntimeError('FAILURE - Source is directory, not a subvolume. No creation possible: %s' % (sub), 0)
+                        else:
+                            self.DEBUG( " Source-subvolume not existing: %s" % (self.OrigName+'/'+sub),level=3)
                     if self.args.npb: pt.update()
                 else:
                     if self.args.npb: pt.update()
@@ -1371,6 +1383,8 @@ parser.add_argument('-V', '--systemvolumes', action='store_true',
 parser.add_argument('-t', '--tag', default='misc', help='''one of %s''' % (Config().ListIntervals()))
 parser.add_argument('-v', '--verbose', action='count', default=0, help='''verbose output''' )
 #parser.add_argument('-i', '--info', action='store_true', default=False, help='''Print infos, action is "list"''')
+parser.add_argument('-i', '--ignore', action='append', help='''Regular expression pattern for ignoring several subvolumes to be not backed up (and subvolumes unter them)
+        Use it more than once''')
 parser.add_argument('-n', '--no-progressbar', dest='npb', action='store_false', default=True, help='''Dont show progressbar (for use in systemctl-unit for example)''')
 parser.add_argument('-B', '--backup-mount-path', 
         dest='bkpmount', 
@@ -1571,34 +1585,9 @@ if __name__ == '__main__':
     if args.tag == None: 
         args.tag = 'misc'
 
-    runtimedir = '/run/mkbackup'
-    pidfile = runtimedir + '/'+ args.tag +'-pidfile'
-    pid = str(os.getpid())
-
-    if not os.path.exists(runtimedir):
-        os.makedirs(runtimedir)
-        # Run action
-        pidf = open(pidfile, 'w')
-        pidf.write(pid)
-        pidf.close()
-        DEBUG('Arguments',args,level=2,verbose=args.verbose)
-        args.func(args)
-        os.remove(pidfile)
-    else:
-        #print('LSRUN',len(os.listdir(runtimedir)))
-        if os.path.exists(pidfile) or len(os.listdir(runtimedir)) > 0:
-            print("Pidfile %s exists, process is probably running" % (pidfile))
-        else:
-            pidf = open(pidfile, 'w')
-            pidf.write(pid)
-            pidf.close()
-            DEBUG('Arguments',args,level=2,verbose=args.verbose)
-            args.func(args)
-            os.remove(pidfile)
-
     # Run action
-    #DEBUG('Arguments',args,level=2,verbose=args.verbose)
-    #args.func(args)
+    DEBUG('Arguments',args,level=2,verbose=args.verbose)
+    args.func(args)
 
     # Check symlinks in stores, if they exist and ok or missing.
     for vol in Config().getVolumes():
@@ -1614,7 +1603,6 @@ if __name__ == '__main__':
                         os.remove(link)
                 else:
                     DEBUG("Symlink missing: %s/%s.%s" % (st,vol,sln),level=4,verbose=args.verbose)
-
 
     # print summary over all actions 
     if not args.action == 'list' and not args.action == 'restore':

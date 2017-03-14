@@ -49,8 +49,8 @@ class Config():
                     csup[csuplst].read(self.csupdir+'/'+csuplst)
         
         for i in csup.keys():
-            for j in csup[i].keys():
-                for k in csup[i][j].keys():
+            for j in csup[i].sections():
+                for k in csup[i].items(j):
                     if k == 'ignore':
                         orig = self.config.get(j,k) if self.config.has_option(j,'ignore') else ''
                         if csup[i][j][k][0] == '+':
@@ -296,8 +296,11 @@ class Config():
             return(self.config.get(intv,'ignore'))
             print("A")
         except:
-            return(self.config.get('DEFAULT','ignore'))
-            print("B")
+            try:
+                return(self.config.get('DEFAULT','ignore'))
+                print("B")
+            except:
+                return(None)
 
     def __trnName(self,short):
         ret = list()
