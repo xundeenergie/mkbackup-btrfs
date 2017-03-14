@@ -1570,9 +1570,34 @@ if __name__ == '__main__':
     if args.tag == None: 
         args.tag = 'misc'
 
+    runtimedir = '/run/mkbackup'
+    pidfile = runtimedir + '/'+ args.tag +'-pidfile'
+    pid = str(os.getpid())
+
+    if not os.path.exists(runtimedir):
+        os.makedirs(runtimedir)
+        # Run action
+        pidf = open(pidfile, 'w')
+        pidf.write(pid)
+        pidf.close()
+        DEBUG('Arguments',args,level=2,verbose=args.verbose)
+        args.func(args)
+        os.remove(pidfile)
+    else:
+        #print('LSRUN',len(os.listdir(runtimedir)))
+        if os.path.exists(pidfile) or len(os.listdir(runtimedir)) > 0:
+            print("Pidfile %s exists, process is probably running" % (pidfile))
+        else:
+            pidf = open(pidfile, 'w')
+            pidf.write(pid)
+            pidf.close()
+            DEBUG('Arguments',args,level=2,verbose=args.verbose)
+            args.func(args)
+            os.remove(pidfile)
+
     # Run action
-    DEBUG('Arguments',args,level=2,verbose=args.verbose)
-    args.func(args)
+    #DEBUG('Arguments',args,level=2,verbose=args.verbose)
+    #args.func(args)
 
     # Check symlinks in stores, if they exist and ok or missing.
     for vol in Config().getVolumes():
@@ -1588,6 +1613,7 @@ if __name__ == '__main__':
                         os.remove(link)
                 else:
                     DEBUG("Symlink missing: %s/%s.%s" % (st,vol,sln),level=4,verbose=args.verbose)
+
 
     # print summary over all actions 
     if not args.action == 'list' and not args.action == 'restore':
