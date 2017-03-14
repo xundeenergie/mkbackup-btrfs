@@ -35,7 +35,28 @@ class Config():
         else:
             print('Default-Config created at %s' % (self.cfile))
             self.CreateConfig()
+        self._read()
+        
+    def _read(self):
+        csup = dict()
+        self.config = ConfigParser()
         self.config.read(self.cfile)
+        self.csupdir = self.cfile+'.d'
+        if os.path.exists(str(self.csupdir)) and os.path.isdir(str(self.csupdir)):
+            for csuplst in os.listdir(self.csupdir):
+                if csuplst.endswith('conf'):
+                    csup[csuplst] = ConfigParser()
+                    csup[csuplst].read(self.csupdir+'/'+csuplst)
+        
+        for i in csup.keys():
+            for j in csup[i].keys():
+                for k in csup[i][j].keys():
+                    if k == 'ignore':
+                        orig = self.config.get(j,k) if self.config.has_option(j,'ignore') else ''
+                        if csup[i][j][k][0] == '+':
+                            self.config.set(j,k,orig+','+csup[i][j][k][1:])
+                        else:
+                            self.config.set(j,k,csup[i][j][k])
         psrc = os.getcwd()
         if   '/'+psrc.strip('/') == self.config.get('DEFAULT','SNPMNT')+'/'+self.config.get('DEFAULT','snpstore').strip('/'):
             self.config.set('DEFAULT','SRC', self.config.get('DEFAULT','SNPMNT'))
@@ -52,8 +73,6 @@ class Config():
         else:
             self.config.set('DEFAULT','SRC', psrc)
             self.config.set('DEFAULT','srcstore', '')
-        
-        self.config.read(self.cfile)
 
     def CreateConfig(self):
         self.config['DEFAULT'] = {'SNPMNT': '/var/cache/btrfs_pool_SYSTEM',
@@ -83,15 +102,16 @@ class Config():
         return(self.config)
 
     def ReadConfig(self):
-        self.config.read(self.cfile)
+        self._read()
         for i in self.config:
-            #print(i)
+            print('Section: ',i)
             for j in self.config[i]:
-                print(j+':',self.config[i][j])
+                print(j+':',self.__trnName(self.config[i][j]))
+            print('------------------------------')
 
     def ListIntervals(self):
+        self._read()
         LST = []
-        self.config.read(self.cfile)
         for i in self.config:
             if i != 'DEFAULT':
                 LST.append(i) 
@@ -100,8 +120,8 @@ class Config():
         return(LST)
 
     def ListIntervalsFull(self):
+        self._read()
         LST = []
-        self.config.read(self.cfile)
         for i in self.config:
             if i != 'DEFAULT':
                 LST.append(i+': '+str(self.config.get(i,'interval'))) 
@@ -110,14 +130,15 @@ class Config():
         return(LST)
 
     def ListSymlinkNames(self):
+        self._read()
         LST = []
-        self.config.read(self.cfile)
         for i in self.config:
             LST.append(self.config.get(i,'symlink'))
         return(list(set(LST)))
 
 
     def getStorePath(self,store='SRC'):
+        self._read()
         if store == 'SRC':
             path = '/'+self.config.get('DEFAULT','SRC').strip('/')+'/'+self.config.get('DEFAULT','srcstore').strip('/')
         if store == 'SNP':
@@ -134,6 +155,7 @@ class Config():
             return(None)
 
     def getMountPath(self,store='SRC'):
+        self._read()
         if store == 'SRC':
             path = '/'+self.config.get('DEFAULT','SRC').strip('/')
         elif store == 'SNP':
@@ -150,6 +172,7 @@ class Config():
             return(None)
 
     def getDevice(self,store='SRC'):
+        self._read()
         mp = self.getMountPath(store=store)
         #cmd = """awk -F " " '$1 !~ /systemd-1/ && $2 == "%s" && $3 == "btrfs" {printf $1}' /proc/mounts""" % (mp)
         cmd = """awk -F " " '$2 == "%s" && $3 == "autofs" {printf $1}' /proc/mounts""" % (mp)
@@ -176,6 +199,7 @@ class Config():
         #return device if device != '' else None
 
     def getUUID(self,store='SRC'):
+        self._read()
         device = self.getDevice(store=store)
         if device == None: return None
         cmd = "/sbin/blkid %s -o value -s 'UUID'" % (device)
@@ -184,18 +208,23 @@ class Config():
 
     
     def setBKPPath(self,mount):
+        self._read()
         self.config['DEFAULT']['BKPMNT'] = mount
 
     def setBKPStore(self,store):
+        self._read()
         self.config['DEFAULT']['bkpstore'] = store
 
     def setSNPPath(self,mount):
+        self._read()
         self.config['DEFAULT']['SNPMNT'] = mount
 
     def setSNPStore(self,store):
+        self._read()
         self.config['DEFAULT']['snpstore'] = store
 
     def getStoreName(self,store='SRC'):
+        self._read()
         if store == 'SRC':
             path = self.config.get('DEFAULT','srcstore').strip('/')
         elif store == 'SNP':
@@ -208,24 +237,28 @@ class Config():
             return('')
 
     def getInterval(self,intv='misc'):
+        self._read()
         try:
             return(self.config.get(intv,'interval'))
         except:
             return(self.config.get('DEFAULT','interval'))
 
     def getTransfer(self,intv='misc'):
+        self._read()
         try:
             return(s2bool(self.config.get(intv,'transfer')))
         except:
             return(s2bool(self.config.get('DEFAULT','transfer')))
 
     def getSymLink(self,intv='misc'):
+        self._read()
         try:
             return(self.config.get(intv,'symlink'))
         except:
             return(self.config.get('DEFAULT','symlink'))
 
     def getIsDefault(self,intv='misc'):
+        self._read()
         try:
             self.config.get(intv,'interval')
             return(intv)
@@ -233,6 +266,7 @@ class Config():
             return('default')
 
     def getVolumes(self,intv='default'):
+        self._read()
         VOLSTRANS = []
         try:
             VOLS = self.config.get(intv,'volumes')
@@ -243,6 +277,7 @@ class Config():
         return(VOLSTRANS)
 
     def ListIntVolumes(self):
+        self._read()
         VOLSTRANS = []
         for intv in self.ListIntervals():
             try:
@@ -256,6 +291,7 @@ class Config():
         return(VOLSTRANS)
 
     def getIgnores(self,intv='misc'):
+        self._read()
         try:
             return(self.config.get(intv,'ignore'))
             print("A")
@@ -264,7 +300,10 @@ class Config():
             print("B")
 
     def __trnName(self,short):
-        if short == "$S": return(self.syssubvol)
-        elif short == "$h": return(self.hostname)
-        else: return(short)
+        ret = list()
+        for sh in short.split(','):
+            if sh == "$S": ret.append(self.syssubvol)
+            elif sh == "$h": ret.append(self.hostname)
+            else: ret.append(sh)
+        return(','.join(ret))
 

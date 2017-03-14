@@ -1,1 +1,0 @@
-../../python3/dist-packages/mksnapshotconfig.py

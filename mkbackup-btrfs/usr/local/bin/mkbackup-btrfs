@@ -18,7 +18,8 @@ try:
 except:
     TREE=False
 
-from mksnapshotconfig import Config
+#from mksnapshotconfig import Config
+from mkbackup_btrfs_config import Config
 
 
 
