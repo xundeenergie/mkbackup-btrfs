@@ -59,13 +59,13 @@ class Config():
                 if k == 'ignore':
                     orig = self.config.get(j,k)+',' if self.config.has_option(j,'ignore') else ''
                     if csup[i].get(j,k)[0] == '+':
-                        print('A',j,k,orig+csup[i].get(j,k)[1:])
+                        #print('A',j,k,orig+csup[i].get(j,k)[1:])
                         self.config.set(j,k,orig+csup[i].get(j,k)[1:])
                     else:
-                        print('B',j,k,csup[i].get(j,k))
+                        #print('B',j,k,csup[i].get(j,k))
                         self.config.set(j,k,csup[i].get(j,k))
                 else:
-                    print('C',j,k,csup[i].get(j,k))
+                    #print('C',j,k,csup[i].get(j,k))
                     self.config.set(j,k,csup[i].get(j,k))
 
         for i in sorted(csup.keys()):
@@ -74,7 +74,7 @@ class Config():
                 for k in csup[i].options(j):
                     if k == 'ignore':
                         orig = self.config.get(j,k)+',' if self.config.has_option(j,'ignore') else ''
-                        print('D',orig)
+                        #print('D',orig)
                         if csup[i].get(j,k)[0] == '+':
                             self.config.set(j,k,orig+csup[i].get(j,k)[1:])
                         else:

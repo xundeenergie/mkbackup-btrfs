@@ -75,9 +75,9 @@ class Xmp(Fuse):
         
         CONFIG=Config()
 
-        self.root=CONFIG.getStorePath('SNP')
-        self.local=CONFIG.getStorePath('SNP')
-        self.extern=CONFIG.getStorePath('BKP')
+        self.root=CONFIG.getStorePath('SNP').encode()
+        self.local=CONFIG.getStorePath('SNP').encode()
+        self.extern=CONFIG.getStorePath('BKP').encode()
         self.snapshots={}
         self.direntries=[]
         Xmp.realpath=""
