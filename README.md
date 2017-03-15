@@ -30,7 +30,7 @@ The second one is hardcoded with "`__ALWAYSCURRENT__`"
 
 ```
 btrfs subvol create /var/cache/btrfs_pool_SYSTEM/@debian
-btrfs subvol create /var/cache/btrfs_pool_SYSTEM/`__ALWAYSCURRENT__`
+btrfs subvol create /var/cache/btrfs_pool_SYSTEM/__ALWAYSCURRENT__
 ```
 
 The system mounts the default-subvolume on bootup. So be sure, that @debian is your default-subvolume.
@@ -53,6 +53,7 @@ Create the following subvolumes there:
 Look at the fstab-example for mounting all this subvolumes.
 
 Copy your data to this subvolumes
+
     cp --reflink=always -ar source destination
 
 Reboot an check if all this subvolumes are mounted correctly. You can clean the original directories in @debian while they are overmounted with the new ones, if you go to /var/cache/btrfs_pool_SYSTEM/@debian/sub/vol/ume and delete it there. 
@@ -102,6 +103,7 @@ this replaces every ignore-list with only this subvolume "/home/gast"
 the "+" before the subvolume means, that the subvolume(s) given are being appended to a existing list. Without a "+", the list is replaced by the given.
 
 If you want to ignore a specific subvolume additionally on a specific interval (f.e. /var/www should not be backed up on hourly snapshots), place this in a file:
+
     [hourly]
     ignore = +/var/www
 
