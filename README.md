@@ -79,10 +79,40 @@ PRUNE_BIND_MOUNTS="yes"
 PRUNEPATHS="/tmp /var/spool /media /backup /backup-local /var/cache/backup /var/cache/btrfs_pool_SYSTEM"
 PRUNEFS="NFS nfs nfs4 rpc_pipefs afs binfmt_misc proc smbfs autofs iso9660 ncpfs coda devpts ftpfs devfs mfs shfs sysfs cifs lustre tmpfs usbfs udf fuse.glusterfs fuse.sshfs curlftpfs fuse.MksnapshotFS.py"
 
+==Ignore Subvolumes on creating a System-Snapshot
+If you want to ignore a subvolume from making a backup-Snapshot, you can handle this on several ways.
+The easiest way is to drop a Drop-In-File for example like this for a guest-session-home:
+
+    editor /etc/mkbackup-btrfs.conf.d/guestsession.conf
+
+    [DEFAULT]
+    ignore = +/home/gast
+
+The filename doesn't matter. But it must end in ".conf"
+This can be done by placing such a Drop-In with a debian-package, or manually. 
+You can choose, if it should be ignored generally or only on specific interval-snapshots.
+The example above appends /home/gast to an existing list of ignored snapshots. 
+
+    [DEFAULT]
+    ignore = /home/gast
+
+this replaces every ignore-list with only this subvolume "/home/gast"
+the "+" before the subvolume means, that the subvolume(s) given are being appended to a existing list. Without a "+", the list is replaced by the given.
+
+If you want to ignore a specific subvolume additionally on a specific interval (f.e. /var/www should not be backed up on hourly snapshots), place this in a file:
+    [hourly]
+    ignore = +/var/www
+
+You can set the ignore-Option in every section also in /etc/mkbackup-btrfs.conf
+It works the same way. DEFAULT is valid to every interval, and default-Values get overwritten or extended (missing or given "+") by the interval-sections
+
+
+
 
 TODO:
-Finnish and test snapshot-transfer to external HD.
-Create a systemd-unit for transferring snapshots to the external HD
+- Regular-Expressions for ignoring subvolumes. Test and describe it in Todo
+
+=Changelog
 
 18.9.2016: 
 	-added experimental new code btrfssubvols.py - not working yet!!
