@@ -1,3 +1,7 @@
+from __future__ import (absolute_import, division, print_function,
+        unicode_literals)
+#from builtins import *
+
 import sys
 import subprocess
 import socket
@@ -48,15 +52,36 @@ class Config():
                     csup[csuplst] = ConfigParser()
                     csup[csuplst].read(self.csupdir+'/'+csuplst)
         
-        for i in csup.keys():
+        for i in sorted(csup.keys()):
+            # Set Defaults
+            j = 'DEFAULT'
+            for k in csup[i].defaults():
+                if k == 'ignore':
+                    orig = self.config.get(j,k)+',' if self.config.has_option(j,'ignore') else ''
+                    if csup[i].get(j,k)[0] == '+':
+                        print('A',j,k,orig+csup[i].get(j,k)[1:])
+                        self.config.set(j,k,orig+csup[i].get(j,k)[1:])
+                    else:
+                        print('B',j,k,csup[i].get(j,k))
+                        self.config.set(j,k,csup[i].get(j,k))
+                else:
+                    print('C',j,k,csup[i].get(j,k))
+                    self.config.set(j,k,csup[i].get(j,k))
+
+        for i in sorted(csup.keys()):
+            # Set Options
             for j in csup[i].sections():
-                for k in csup[i].items(j):
+                for k in csup[i].options(j):
                     if k == 'ignore':
-                        orig = self.config.get(j,k) if self.config.has_option(j,'ignore') else ''
-                        if csup[i][j][k][0] == '+':
-                            self.config.set(j,k,orig+','+csup[i][j][k][1:])
+                        orig = self.config.get(j,k)+',' if self.config.has_option(j,'ignore') else ''
+                        print('D',orig)
+                        if csup[i].get(j,k)[0] == '+':
+                            self.config.set(j,k,orig+csup[i].get(j,k)[1:])
                         else:
-                            self.config.set(j,k,csup[i][j][k])
+                            self.config.set(j,k,csup[i].get(j,k))
+                    else:
+                        self.config.set(j,k,csup[i].get(j,k))
+
         psrc = os.getcwd()
         if   '/'+psrc.strip('/') == self.config.get('DEFAULT','SNPMNT')+'/'+self.config.get('DEFAULT','snpstore').strip('/'):
             self.config.set('DEFAULT','SRC', self.config.get('DEFAULT','SNPMNT'))
@@ -103,36 +128,32 @@ class Config():
 
     def ReadConfig(self):
         self._read()
-        for i in self.config:
+        for i in self.config.sections():
             print('Section: ',i)
-            for j in self.config[i]:
-                print(j+':',self.__trnName(self.config[i][j]))
+            for j in self.config.options(i):
+                print(j+':',self.__trnName(self.config.get(i,j)))
             print('------------------------------')
 
     def ListIntervals(self):
         self._read()
         LST = []
-        for i in self.config:
-            if i != 'DEFAULT':
-                LST.append(i) 
-            else:
-                LST.append('misc')
+        for i in self.config.sections():
+            LST.append(i) 
+        LST.append('misc')
         return(LST)
 
     def ListIntervalsFull(self):
         self._read()
         LST = []
-        for i in self.config:
-            if i != 'DEFAULT':
-                LST.append(i+': '+str(self.config.get(i,'interval'))) 
-            else:
-                LST.append('misc: '+str(self.config.get(i,'interval')))
+        for i in self.config.sections():
+            LST.append(i+': '+str(self.config.get(i,'interval'))) 
+        LST.append('misc: '+str(self.config.get(i,'interval')))
         return(LST)
 
     def ListSymlinkNames(self):
         self._read()
         LST = []
-        for i in self.config:
+        for i in self.config.sections():
             LST.append(self.config.get(i,'symlink'))
         return(list(set(LST)))
 
