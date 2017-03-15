@@ -5,9 +5,11 @@ This scripts are written in python3 and replace https://github.com/xundeenergie/
 You have to prepare your installation with some subvolumes.
 
 First create a directory
+
     mkdir -p /var/cache/btrfs_pool_SYSTEM
 
 and
+
     mkdir -p /var/cache/backup
 
 The first is for the local HD, to mount the whole btrfs-partition, the btrfs-pool.
@@ -24,15 +26,15 @@ One for your system, which is snapshotted on every upgrade/update, on successful
 The other one for data you will need accurat even if you boot from an older snapshot (recover your system, you need /home, /var/spool accurat - it's user-data!).
 
 The first is called for example: "@debian"
-The second one is hardcoded with "\__ALWAYSCURRENT__"
+The second one is hardcoded with "<pre>__ALWAYSCURRENT__</pre>"
 
 ```
 btrfs subvol create /var/cache/btrfs_pool_SYSTEM/@debian
-btrfs subvol create /var/cache/btrfs_pool_SYSTEM/\__ALWAYSCURRENT__
+btrfs subvol create /var/cache/btrfs_pool_SYSTEM/__ALWAYSCURRENT__
 ```
 
 The system mounts the default-subvolume on bootup. So be sure, that @debian is your default-subvolume.
-prepare your /etc/fstab to mount the always current subvolumes from \__ALWAYSCURRENT__
+prepare your /etc/fstab to mount the always current subvolumes from <pre>__ALWAYSCURRENT__</pre>
 Create the following subvolumes there:
   home
   opt
