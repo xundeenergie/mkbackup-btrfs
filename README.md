@@ -26,15 +26,15 @@ One for your system, which is snapshotted on every upgrade/update, on successful
 The other one for data you will need accurat even if you boot from an older snapshot (recover your system, you need /home, /var/spool accurat - it's user-data!).
 
 The first is called for example: "@debian"
-The second one is hardcoded with "<pre>__ALWAYSCURRENT__</pre>"
+The second one is hardcoded with "`__ALWAYSCURRENT__`"
 
 ```
 btrfs subvol create /var/cache/btrfs_pool_SYSTEM/@debian
-btrfs subvol create /var/cache/btrfs_pool_SYSTEM/__ALWAYSCURRENT__
+btrfs subvol create /var/cache/btrfs_pool_SYSTEM/`__ALWAYSCURRENT__`
 ```
 
 The system mounts the default-subvolume on bootup. So be sure, that @debian is your default-subvolume.
-prepare your /etc/fstab to mount the always current subvolumes from <pre>__ALWAYSCURRENT__</pre>
+prepare your /etc/fstab to mount the always current subvolumes from `__ALWAYSCURRENT__`
 Create the following subvolumes there:
   home
   opt
