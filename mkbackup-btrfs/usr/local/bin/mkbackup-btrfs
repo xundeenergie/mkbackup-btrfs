@@ -628,13 +628,13 @@ class SubVolume(SubVolumeInfo):
         self.DEBUG(' =create-snapshot=> from »<%s>/%s«' % (self.store, self.SourceName),level=1)
         #compile regular expression for ignoring subvolume-names
         if self.args.ignore == None:
-            if not self.config.getIgnores() == None:
-                re_ign = re.compile('|'.join(self.config.getIgnores()[0].split('\n')))
+            if not self.config.getIgnores(self.args.tag) == None:
+                re_ign = re.compile('|'.join(self.config.getIgnores(self.args.tag).split(',')))
             else:
                 re_ign = None
         else:
             re_ign = re.compile('|'.join(self.args.ignore))
-        print(re_ign)
+        #print(re_ign)
         if self.args.npb: pt = progress_timer(description= ' =create-snapshot=> from »<%s>/%s«: ' % (self.store, self.SourceName), n_iter=len(self.list_subvolumes(self.id,names=True)))
         #if self.exist:
         if issubvol(self.StorePath+'/'+self.SourceName):
@@ -642,7 +642,7 @@ class SubVolume(SubVolumeInfo):
                 for sub in self.list_subvolumes(self.id,names=True):
                     # Test if subvolume is in ignorelist - only debug-output now
                     if re_ign != None and re_ign.search('/'+sub):
-                        print('IGNORE','/'+sub)
+                        print(' -IGNORE-> »<%s>/%s«:' % (self.store, sub))
                     else:
                         #print('/'+sub,re_ign,re_ign.search('/'+sub))
                         # Test the Source for local snapshotting
@@ -657,12 +657,12 @@ class SubVolume(SubVolumeInfo):
                                 raise RuntimeError('FAILURE - Destination exists: %s' % (self.StorePath+'/'+dest), 0)
                             elif issubvol(self.StorePath+'/'+dest) == False:
                                 # If destination exists and is a directory and not a snapshot, delete dir and create snapshot (for subvolumes of snapshot)
-                                self.DEBUG(' =create>  <%s>/%s' % (self.store,dest),level=1)
+                                self.DEBUG(' =create>  »<%s>/%s«' % (self.store,dest),level=1)
                                 sp_call(self.args,['rm','-r','-f',self.StorePath+'/'+dest])
                                 sp_call(self.args,cmd)                           
                             else:
                                 # If destination doesnt exist, create the snapshot
-                                self.DEBUG(' =create>  <%s>/%s' % (self.store,dest),level=1)
+                                self.DEBUG(' =create>  »<%s>/%s«' % (self.store,dest),level=1)
                                 sp_call(self.args,cmd)                           
                             sync()
 
