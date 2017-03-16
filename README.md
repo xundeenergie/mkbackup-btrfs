@@ -110,7 +110,11 @@ If you want to ignore a specific subvolume additionally on a specific interval (
 You can set the ignore-Option in every section also in /etc/mkbackup-btrfs.conf
 It works the same way. DEFAULT is valid to every interval, and default-Values get overwritten or extended (missing or given "+") by the interval-sections
 
+To ignore several subvolumes when using mkbackup-btrfs from commandline, just use the -i option (more than once)
 
+    mkbackup -v -t manually -i /home/guest -i /var/www create SNP @debian
+
+This overrides settings from config-files.
 
 
 TODO:
