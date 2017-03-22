@@ -36,10 +36,22 @@ case "$1" in
         systemctl unmask $SERVICES
         systemctl enable $SERVICES
         #INTERVALS="dmin hourly daily weekly monthly yearly aptupgrade plugin afterboot"
-        INTERVALS="hourly daily weekly aptupgrade plugin afterboot manually"
-        CINT=$(for i in $INTERVALS;do echo "mkbackup@${i}.service" ; done)
-        systemctl unmask $CINT
-        systemctl enable $CINT
+#        INTERVALS="hourly daily weekly aptupgrade plugin afterboot manually"
+#        CINT=$(for i in $INTERVALS;do echo "mkbackup@${i}.service" ; done)
+#        #systemctl unmask $CINT
+#        #systemctl enable $CINT
+#        for s in $CINT; do
+#            # was-enabled defaults to true, so new installations run enable.
+#            if deb-systemd-helper-xe --quiet was-enabled $s; then
+#                    # Enables the unit on first installation, creates new
+#                    # symlinks on upgrades if the unit file has changed.
+#                    deb-systemd-helper-xe enable $s >/dev/null || true
+#            else
+#                    # Update the statefile to add new symlinks (if any), which need to be
+#                    # cleaned up on purge. Also remove old symlinks.
+#                    deb-systemd-helper-xe update-state $s >/dev/null || true
+#            fi
+#        done
         ;;
     abort-upgrade|abort-remove|abort-deconfigure)
         exit 0
@@ -52,4 +64,24 @@ case "$1" in
 
 esac
 
+
+INTERVALS="hourly daily weekly aptupgrade plugin afterboot manually"
+CINT=$(for i in $INTERVALS;do echo "mkbackup@${i}.service" ; done)
+#systemctl unmask $CINT
+#systemctl enable $CINT
+for s in $CINT; do
+    # was-enabled defaults to true, so new installations run enable.
+    if deb-systemd-helper-xe --quiet was-enabled $s; then
+            # Enables the unit on first installation, creates new
+            # symlinks on upgrades if the unit file has changed.
+            deb-systemd-helper-xe enable $s >/dev/null || true
+    else
+            # Update the statefile to add new symlinks (if any), which need to be
+            # cleaned up on purge. Also remove old symlinks.
+            deb-systemd-helper-xe update-state $s >/dev/null || true
+    fi
+done
+
 exit 0
+
+

@@ -29,6 +29,15 @@ all: .builddeb
 	aptly repo add xundeenergie "$(DIR)_$(VERSION)_$(ARCH).deb"
 	touch .builddeb
 
+buildonlydeb: $(FILES)
+	@#echo FILT $(FILTER)
+	@#echo FILE $(FILES)
+	@echo `gawk -f ../increment.awk $(DIR)/DEBIAN/control`
+	sed -e "s/^Version:.*/`gawk -f ../increment.awk $(DIR)/DEBIAN/control`/" $(DIR)/DEBIAN/control > $(DIR)/DEBIAN/control.tmp
+	mv $(DIR)/DEBIAN/control.tmp $(DIR)/DEBIAN/control
+	fakeroot dpkg-deb --build $(DIR) "$(DIR)_$(VERSION)_$(ARCH).deb"
+	ln -sf "$(DIR)_$(VERSION)_$(ARCH).deb" "$(DIR).deb"
+
 .update: $(ORIGS)
 	@#for i in $(ORIGS); do $$i;done
 	@echo "Copy originals to $(DIR)"
