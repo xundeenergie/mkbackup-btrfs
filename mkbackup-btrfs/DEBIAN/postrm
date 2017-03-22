@@ -13,7 +13,7 @@ fi
 # System-Services:
 # put in full unit-name. for example "mkbackup@hourly.service"
 #SERVICES="mkbackup.target backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service mkbackup@manually.service mkbackup@aptupgrade.service mkbackup@daily.service mkbackup@weekly.service mkbackup@monthly.service mkbackup@plugin.service mkbackup@manually.service"
-SERVICES="mkbackup.target backup.automount backuup.path var-cache-btrfs_pool_SYSTEM.automount"
+SERVICES="mkbackup.target backup.automount var-cache-btrfs_pool_SYSTEM.automount"
 INTERVALS="hourly daily weekly aptupgrade plugin afterboot manually"
 CINT=$(for i in $INTERVALS;do echo "mkbackup@${i}.service" ; done)
 INSTSERVICES="btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service $CINT"

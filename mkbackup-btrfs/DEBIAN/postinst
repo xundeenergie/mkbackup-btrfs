@@ -33,8 +33,8 @@ case "$1" in
 
     configure)
         SERVICES="mkbackup.target backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service"
-        systemctl unmask $SERVICES
-        systemctl enable $SERVICES
+#        systemctl unmask $SERVICES
+#        systemctl enable $SERVICES
         #INTERVALS="dmin hourly daily weekly monthly yearly aptupgrade plugin afterboot"
 #        INTERVALS="hourly daily weekly aptupgrade plugin afterboot manually"
 #        CINT=$(for i in $INTERVALS;do echo "mkbackup@${i}.service" ; done)
@@ -67,6 +67,7 @@ esac
 
 INTERVALS="hourly daily weekly aptupgrade plugin afterboot manually"
 CINT=$(for i in $INTERVALS;do echo "mkbackup@${i}.service" ; done)
+SERVICES="mkbackup.target backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service $CINT"
 #systemctl unmask $CINT
 #systemctl enable $CINT
 for s in $CINT; do
