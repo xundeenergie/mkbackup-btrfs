@@ -9,67 +9,38 @@ if [ -d /run/systemd/system ] ; then
 fi
 
 
-# For user-services only, for earch target an extra section! for system-services user deb-systemd*
-# put in full unit-name. for example "mkbackup@hourly.service"
-#SERVICES="mkbackup-userdir.path"
-#USERLOCS="/etc/systemd/user/ /usr/lib/systemd/user/"
-
-#[ -e /etc/systemd/user/default.target.wants/ ] || mkdir -p /etc/systemd/user/default.target.wants/
-#case "$1" in
-#    purge)
-#        for SERVICE in $SERVICES; do
-#            if [ -x "/usr/bin/deb-systemd-helper-xeuser" ]; then
-#                    deb-systemd-helper-xeuser purge user $SERVICES >/dev/null
-#                    deb-systemd-helper-xeuser unmask user $SERVICES >/dev/null
-#            fi
-#        done
-#	;;
-#    abort-upgrade|upgrade)
-#        ;;
-#    failed-upgrade|abort-install|disappear)
-#        ;;
-#    remove)
-#        for SERVICE in $SERVICES; do
-#            if [ -x "/usr/bin/deb-systemd-helper-xeuser" ]; then
-#                    deb-systemd-helper-xeuser mask user $SERVICES >/dev/null
-#            fi
-#        done
-#        ;;
-#
-#    *)
-#        echo "postrm called with unknown argument \`$1'" >&2
-#        exit 0
-#        ;;
-#esac
 
 # System-Services:
 # put in full unit-name. for example "mkbackup@hourly.service"
 #SERVICES="mkbackup.target backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service mkbackup@manually.service mkbackup@aptupgrade.service mkbackup@daily.service mkbackup@weekly.service mkbackup@monthly.service mkbackup@plugin.service mkbackup@manually.service"
 SERVICES="mkbackup.target backup.automount backuup.path var-cache-btrfs_pool_SYSTEM.automount"
-INSTSERVICES="btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service mkbackup@.service"
+INTERVALS="hourly daily weekly aptupgrade plugin afterboot manually"
+CINT=$(for i in $INTERVALS;do echo "mkbackup@${i}.service" ; done)
+INSTSERVICES="btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service $CINT"
+
 
 case "$1" in
     purge)
-        systemctl disable $SERVICES $INSTSERVICES
-        for s in $INSTSERVICES;do
-            rm -rf /lib/systemd/system/${s}
-        done
+#        systemctl disable $SERVICES $INSTSERVICES
+#        for s in $INSTSERVICES;do
+#            rm -rf /lib/systemd/system/${s}
+#        done
         
-#	if [ -x "/usr/bin/deb-systemd-helper-xeuser" ]; then
-#		deb-systemd-helper-xeuser purge $SERVICES >/dev/null
-#		deb-systemd-helper-xeuser unmask $SERVICES >/dev/null
-#	fi
+	if [ -x "/usr/bin/deb-systemd-helper-xe" ]; then
+		deb-systemd-helper-xe purge $SERVICES $INSTSERVICES >/dev/null
+		deb-systemd-helper-xe unmask $SERVICES $INSTSERVICES >/dev/null
+	fi
         ;;
     abort-upgrade)
         ;;
     remove)
-        systemctl mask $SERVICES
-        for s in $INSTSERVICES;do
-            ln -s /dev/null /lib/systemd/system/${s}
-        done
-#        if [ -x "/usr/bin/deb-systemd-helper-xeuser" ]; then
-#                deb-systemd-helper-xeuser mask $SERVICES >/dev/null
-#        fi
+#        systemctl mask $SERVICES
+#        for s in $INSTSERVICES;do
+#            ln -s /dev/null /lib/systemd/system/${s}
+#        done
+        if [ -x "/usr/bin/deb-systemd-helper-xe" ]; then
+                deb-systemd-helper-xe mask $SERVICES $INSTSERVICES >/dev/null
+        fi
         ;;
     upgrade|failed-upgrade|abort-install|disappear)
         ;;
