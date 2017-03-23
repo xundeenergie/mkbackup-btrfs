@@ -15,8 +15,8 @@ fi
 #SERVICES="mkbackup.target backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service mkbackup@manually.service mkbackup@aptupgrade.service mkbackup@daily.service mkbackup@weekly.service mkbackup@monthly.service mkbackup@plugin.service mkbackup@manually.service"
 SERVICES="mkbackup.target backup.automount var-cache-btrfs_pool_SYSTEM.automount"
 INTERVALS="hourly daily weekly aptupgrade plugin afterboot manually"
-CINT=$(for i in $INTERVALS;do echo "mkbackup@${i}.service" ; done)
-INSTSERVICES="btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service $CINT"
+CINT="btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service $(for i in $INTERVALS;do echo "mkbackup@${i}.service" ; done)"
+INSTSERVICES="btrfs-scrub@.service mkbackup@.service"
 
 
 case "$1" in
@@ -27,8 +27,8 @@ case "$1" in
 #        done
         
 	if [ -x "/usr/bin/deb-systemd-helper-xe" ]; then
-		deb-systemd-helper-xe purge $SERVICES $INSTSERVICES >/dev/null
-		deb-systemd-helper-xe unmask $SERVICES $INSTSERVICES >/dev/null
+		deb-systemd-helper-xe purge $SERVICES $INSTSERVICES $CINT >/dev/null
+		deb-systemd-helper-xe unmask $SERVICES $INSTSERVICES $CINT >/dev/null
 	fi
         ;;
     abort-upgrade)
@@ -39,7 +39,7 @@ case "$1" in
 #            ln -s /dev/null /lib/systemd/system/${s}
 #        done
         if [ -x "/usr/bin/deb-systemd-helper-xe" ]; then
-                deb-systemd-helper-xe mask $SERVICES $INSTSERVICES >/dev/null
+                deb-systemd-helper-xe mask $SERVICES $INSTSERVICES $CINT >/dev/null
         fi
         ;;
     upgrade|failed-upgrade|abort-install|disappear)
