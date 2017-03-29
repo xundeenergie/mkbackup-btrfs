@@ -11,6 +11,8 @@ import glob
 import progressbar as pb
 import shutil
 import psutil
+# sqlite3 is used for writing database about last runs - it is read by list and from gnome-extension (planned)
+import sqlite3
 
 try:
     from anytree import Node, RenderTree
@@ -20,8 +22,6 @@ except:
 
 #from mksnapshotconfig import Config
 from mkbackup_btrfs_config import Config
-
-
 
 #define progress timer class
 class progress_timer:
@@ -54,6 +54,20 @@ class progress_timer:
 # 0 - continue programm
 # 1 - raise error
 
+class create_db:
+    def __init__(self, ts=0, db='/var/lib/mkbackup-btrfs'):
+        if not os.path.exists(db):
+            os.makedirs(db)
+        print(db)
+        
+        conn = sqlite3.connect(db+'/mkbackup-btrfs.db')
+        conn.execute('''CREATE TABLE LASTRUN
+            (INTV    TEXT PRIMARY KEY NOT NULL,
+            LRUN      TEXT,
+            LTRANS  TEXT,
+            DELETED INTEGER);''')
+        conn.close()
+    
 if hasattr(os, 'sync'):
     sync = os.sync
 else:
@@ -338,6 +352,7 @@ class SubVolumeInfo(listing):
             self.SourceName  = os.path.basename(name.rstrip('/'))
         else:
             self.SourceName  = name.strip('/')
+        self.vol          = name
         self.uuid         = '' #UUID
         self.puuid        = '' #Parent-UUID
         self.ruuid        = '' #Received UUID
@@ -676,6 +691,11 @@ class SubVolume(SubVolumeInfo):
                     pass
                 if self.args.npb: pt.finish()
                 self.snapped = True
+#                print("X Insert/Update lastrun.db %s:%s" % (self.args.tag, self.args.timestamp))
+#                conn = sqlite3.connect(self.args.db+'mkbackup-btrfs.db')
+#                #conn.execute("""insert into lastrun values (self.args.tag, self.args.timestamp)""")
+#                conn.commit()
+#                conn.close()
 
                 self.scanfs() #rescan filesystem after creating the new snapshots
                 ex = re.compile(self.SnapLock+'$')
@@ -763,9 +783,6 @@ class SubVolume(SubVolumeInfo):
                         self.DEBUG('isdir ==> delete ==> transfer',self.BkpPath,level=3)
                         cmd = ['btrfs','subvolume','create',self.BkpPath]
                         sp_call(self.args,cmd)
-#                    if not issubvol(self.BkpPath): 
-#                        self.DEBUG(' =no-transfer: no subvolume for backup on external media')
-#                        return
                 else:
                     self.DEBUG(' |no-transfer: no subvolume for backup on external media')
                     return
@@ -822,6 +839,9 @@ class SubVolume(SubVolumeInfo):
                     sp_call(self.args,cmd,level=2)
                 except:
                     raise TransferError
+#            if self.transferred:
+#                print("Y Insert/Update lasttrans.db %s:%s" % (self.args.tag, self.args.timestamp))
+
             listing.TransferedSubvolumes.push(re.sub('\.part$','',sname))
             for t in reversed(sorted(transfers.keys())):
                 dest = args.config.getStorePath('BKP')+'/'+t
@@ -878,16 +898,36 @@ class SubVolume(SubVolumeInfo):
         for st in list(self.args.sourcepath.keys())[0], list(self.args.destpath.keys())[0]:
             #print('C',st,self.snapped,'T',self.transferred,args.action)
             if args.action == 'create':
+                #conn = sqlite3.connect(self.args.db+'/mkbackup-btrfs.db')
                 if  (st == 'SRC' or st == 'SNP' ) and self.snapped:
+                    print("A Insert/Update SYMLINK create lasttrans.db %s:%s - %s" % (self.args.tag, self.args.timestamp,self.vol))
+                    try:
+                        self.args.conn.execute("INSERT INTO LASTRUN (INTV, LRUN, DELETED) VALUES ('%s', '%s', 0)"% (self.vol+'|'+self.args.tag,self.args.timestamp)) ;
+                    except:
+                        self.args.conn.execute("UPDATE LASTRUN set LRUN = '%s', DELETED = 0 where INTV='%s'"% (self.args.timestamp,self.vol+'|'+self.args.tag)) ;
+
                     pass
                     #print('Symlink %s %s %s' % (st,self.snapped,self.transferred))
                 elif  st == 'BKP' and self.transferred:
+                    print("B Insert/Update SYMLINK transferred lasttrans.db %s:%s" % (self.vol+'|'+self.args.tag, self.args.timestamp))
+                    try:
+                        self.args.conn.execute("INSERT INTO LASTRUN (INTV, LTRANS, DELETED) VALUES ('%s', '%s', 0)"% (self.vol+'|'+args.tag,args.timestamp)) ;
+                    except:
+                        self.args.conn.execute("UPDATE LASTRUN set LTRANS = '%s', DELETED = 0 where INTV='%s'"% (args.timestamp,self.vol+'|'+args.tag)) ;
                     pass
                     #print('SymlinK %s %s %s' % (st,self.snapped,self.transferred))
                 else:
                     return
+                self.args.conn.commit()
+                #conn.close()
             elif args.action == 'transfer':
                 pass
+                print("C Insert/Update SYMLINK transfer lasttrans.db %s:%s" % (self.args.tag, self.args.timestamp))
+                try:
+                    self.args.conn.execute("INSERT INTO LASTRUN (INTV, LTRANS, DELETED) VALUES ('%s', '%s', 0)"% (self.vol+'|'+args.tag,args.timestamp)) ;
+                except:
+                    self.args.conn.execute("UPDATE LASTRUN set LTRANS = '%s', DELETED = 0 where INTV='%s'"% (args.timestamp,self.vol+'|'+args.tag)) ;
+                self.args.conn.commit()
             elif args.action == 'delete':
                 self.DEBUG('Test if symlink points to the youngest for tag, if not - resymlink',level=1)
                 pass
@@ -952,6 +992,14 @@ class SubVolume(SubVolumeInfo):
                     self.DEBUG(' -subvolumes-deleted>',level=1)
                     #linkName = self.basename+'.'+args.config.getSymLink(args.tag)
                     listing.DeletedSubvolumes.push((self.store,re.sub('\.part$','',sname)))
+                    self.del_vol    = self.OrigName.split('.')[0]
+                    self.del_ts     = self.OrigName.split('.')[1]
+                    self.del_tag    = self.OrigName.split('.')[2]
+                    print("DELETE LASTRUN %s - %s - %s" % (self.del_vol,self.del_ts,self.del_tag))
+                    try:
+                        self.args.conn.execute("INSERT INTO LASTRUN (INTV, LRUN, DELETED) VALUES ('%s', '%s', 1)"% (self.del_vol+'|'+self.args.tag,self.args.timestamp)) ;
+                    except:
+                        self.args.conn.execute("UPDATE LASTRUN set DELETED = 1 where INTV='%s' AND LRUN = '%s' "% (self.del_vol+'|'+self.args.tag,self.del_ts)) ;
                 except:
                     raise DeleteError
 
@@ -1560,7 +1608,9 @@ if __name__ == '__main__':
     DEBUG('DST',args.destpath,level=5,verbose=args.verbose)
 
     # Set timestamp equal for all operations
-    args.timestamp    = datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+    args.ts  = datetime.datetime.now()
+    args.timestamp = args.ts.strftime('%Y-%m-%d_%H:%M:%S')
+    #args.timestamp    = datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 
     if hasattr(args, 'transferinfo'):
         args.verbose += 1
@@ -1584,6 +1634,13 @@ if __name__ == '__main__':
     # tag = None is not allowed. Set it to misc, if not set
     if args.tag == None: 
         args.tag = 'misc'
+
+    args.db = '/var/lib/mkbackup-btrfs'
+    if not os.path.exists(args.db):
+        create_db(db=args.db)
+
+    args.conn = sqlite3.connect(args.db+'/mkbackup-btrfs.db')
+
 
     # Run action
     DEBUG('Arguments',args,level=2,verbose=args.verbose)
@@ -1624,6 +1681,11 @@ snapshots: %s
         while not listing.DeletedSubvolumes.is_empty():
             print(listing.DeletedSubvolumes.pop())
         print('---')
+
+    print(args.db+'/mkbackup-btrfs.db')
+    cursor = args.conn.execute("SELECT INTV, LRUN, LTRANS, DELETED  from LASTRUN")
+    for row in cursor:
+        print("INTV:\t%s\tLast run:\t%s\tLast Trans:\t%s\tDeleted:\t%s" % (row[0],row[1],row[2], row[3]))
    
     DEBUG("---== (%s) finnished %s %s at %s ==---" % (os.getpid(),args.func.__name__, args.tag, args.timestamp),level=1,verbose=args.verbose)
 #

@@ -127,7 +127,7 @@ class Config():
         return(self.config)
 
     def ReadConfig(self):
-        self._read()
+        #self._read()
         for i in self.config.sections():
             print('Section: ',i)
             for j in self.config.options(i):
@@ -135,7 +135,7 @@ class Config():
             print('------------------------------')
 
     def ListIntervals(self):
-        self._read()
+        #self._read()
         LST = []
         for i in self.config.sections():
             LST.append(i) 
@@ -143,7 +143,7 @@ class Config():
         return(LST)
 
     def ListIntervalsFull(self):
-        self._read()
+        #self._read()
         LST = []
         for i in self.config.sections():
             LST.append(i+': '+str(self.config.get(i,'interval'))) 
@@ -151,7 +151,7 @@ class Config():
         return(LST)
 
     def ListSymlinkNames(self):
-        self._read()
+        #self._read()
         LST = []
         for i in self.config.sections():
             LST.append(self.config.get(i,'symlink'))
@@ -159,7 +159,7 @@ class Config():
 
 
     def getStorePath(self,store='SRC'):
-        self._read()
+        #self._read()
         if store == 'SRC':
             path = '/'+self.config.get('DEFAULT','SRC').strip('/')+'/'+self.config.get('DEFAULT','srcstore').strip('/')
         if store == 'SNP':
@@ -176,7 +176,7 @@ class Config():
             return(None)
 
     def getMountPath(self,store='SRC'):
-        self._read()
+        #self._read()
         if store == 'SRC':
             path = '/'+self.config.get('DEFAULT','SRC').strip('/')
         elif store == 'SNP':
@@ -193,7 +193,7 @@ class Config():
             return(None)
 
     def getDevice(self,store='SRC'):
-        self._read()
+        #self._read()
         mp = self.getMountPath(store=store)
         #cmd = """awk -F " " '$1 !~ /systemd-1/ && $2 == "%s" && $3 == "btrfs" {printf $1}' /proc/mounts""" % (mp)
         cmd = """awk -F " " '$2 == "%s" && $3 == "autofs" {printf $1}' /proc/mounts""" % (mp)
@@ -220,7 +220,7 @@ class Config():
         #return device if device != '' else None
 
     def getUUID(self,store='SRC'):
-        self._read()
+        #self._read()
         device = self.getDevice(store=store)
         if device == None: return None
         cmd = "/sbin/blkid %s -o value -s 'UUID'" % (device)
@@ -229,23 +229,23 @@ class Config():
 
     
     def setBKPPath(self,mount):
-        self._read()
+        #self._read()
         self.config['DEFAULT']['BKPMNT'] = mount
 
     def setBKPStore(self,store):
-        self._read()
+        #self._read()
         self.config['DEFAULT']['bkpstore'] = store
 
     def setSNPPath(self,mount):
-        self._read()
+        #self._read()
         self.config['DEFAULT']['SNPMNT'] = mount
 
     def setSNPStore(self,store):
-        self._read()
+        #self._read()
         self.config['DEFAULT']['snpstore'] = store
 
     def getStoreName(self,store='SRC'):
-        self._read()
+        #self._read()
         if store == 'SRC':
             path = self.config.get('DEFAULT','srcstore').strip('/')
         elif store == 'SNP':
@@ -258,28 +258,28 @@ class Config():
             return('')
 
     def getInterval(self,intv='misc'):
-        self._read()
+        #self._read()
         try:
             return(self.config.get(intv,'interval'))
         except:
             return(self.config.get('DEFAULT','interval'))
 
     def getTransfer(self,intv='misc'):
-        self._read()
+        #self._read()
         try:
             return(s2bool(self.config.get(intv,'transfer')))
         except:
             return(s2bool(self.config.get('DEFAULT','transfer')))
 
     def getSymLink(self,intv='misc'):
-        self._read()
+        #self._read()
         try:
             return(self.config.get(intv,'symlink'))
         except:
             return(self.config.get('DEFAULT','symlink'))
 
     def getIsDefault(self,intv='misc'):
-        self._read()
+        #self._read()
         try:
             self.config.get(intv,'interval')
             return(intv)
@@ -287,7 +287,7 @@ class Config():
             return('default')
 
     def getVolumes(self,intv='default'):
-        self._read()
+        #self._read()
         VOLSTRANS = []
         try:
             VOLS = self.config.get(intv,'volumes')
@@ -298,7 +298,7 @@ class Config():
         return(VOLSTRANS)
 
     def ListIntVolumes(self):
-        self._read()
+        #self._read()
         VOLSTRANS = []
         for intv in self.ListIntervals():
             try:
@@ -312,7 +312,7 @@ class Config():
         return(VOLSTRANS)
 
     def getIgnores(self,intv='misc'):
-        self._read()
+        #self._read()
         try:
             return(self.config.get(intv,'ignore'))
             print("A")
