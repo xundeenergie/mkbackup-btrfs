@@ -64,38 +64,39 @@ case "$1" in
 
 esac
 
-
-INTERVALS="hourly daily weekly aptupgrade plugin afterboot manually"
-CINT=$(for i in $INTERVALS;do echo "mkbackup@${i}.service" ; done)
-SERVICES="mkbackup.target backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service mkbackup@.service"
-#systemctl unmask $CINT
-#systemctl enable $CINT
+# normal systemd-units
+SERVICES="mkbackup.target backup.automount var-cache-backup.automount"
 for s in $SERVICES; do
-    #deb-systemd-helper-xe unmask $s >/dev/null || true
-    deb-systemd-helper-xe unmask $s || true
-    if deb-systemd-helper-xe --quiet was-enabled $s; then
+    deb-systemd-helper-new unmask $s >/dev/null || true
+    if deb-systemd-helper-new --quiet was-enabled $s; then
             # Enables the unit on first installation, creates new
             # symlinks on upgrades if the unit file has changed.
-            deb-systemd-helper-xe enable $s >/dev/null || true
+            deb-systemd-helper-new enable $s >/dev/null || true
     else
             # Update the statefile to add new symlinks (if any), which need to be
             # cleaned up on purge. Also remove old symlinks.
-            deb-systemd-helper-xe update-state $s >/dev/null || true
+            deb-systemd-helper-new update-state $s >/dev/null || true
     fi
 done
 
-for s in $CINT; do
-    #deb-systemd-helper-xe unmask $s >/dev/null || true
-    deb-systemd-helper-xe unmask $s || true
+# instantiated systemd-units
+
+INTERVALS="hourly daily weekly aptupgrade plugin afterboot manually"
+CINT=$(for i in $INTERVALS;do echo "mkbackup@${i}.service" ; done)
+SERVICES="btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service $CINT"
+
+for s in $SERVICES; do
+    #deb-systemd-helper-new-xe unmask $s >/dev/null || true
+    deb-systemd-helper-new unmask $s || true
     # was-enabled defaults to true, so new installations run enable.
-    if deb-systemd-helper-xe --quiet was-enabled $s; then
+    if deb-systemd-helper-new --quiet was-enabled $s; then
             # Enables the unit on first installation, creates new
             # symlinks on upgrades if the unit file has changed.
-            deb-systemd-helper-xe enable $s >/dev/null || true
+            deb-systemd-helper-new enable $s >/dev/null || true
     else
             # Update the statefile to add new symlinks (if any), which need to be
             # cleaned up on purge. Also remove old symlinks.
-            deb-systemd-helper-xe update-state $s >/dev/null || true
+            deb-systemd-helper-new update-state $s >/dev/null || true
     fi
 done
 
