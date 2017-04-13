@@ -58,13 +58,23 @@ class create_db:
     def __init__(self, ts=0, db='/var/lib/mkbackup-btrfs'):
         if not os.path.exists(db):
             os.makedirs(db)
-        print(db)
+        print("DB",db)
         
         conn = sqlite3.connect(db+'/mkbackup-btrfs.db')
         conn.execute('''CREATE TABLE LASTRUN
-            (INTV    TEXT PRIMARY KEY NOT NULL,
+            (ID INTEGER PRIMARY KEY NOT NULL,
+            VOL     TEST,
+            INTV    TEXT,
             LRUN      TEXT,
             LTRANS  TEXT,
+            DELETED INTEGER);''')
+        conn.execute('''CREATE TABLE JOURNAL
+            (ID INTEGER PRIMARY KEY NOT NULL,
+            VOL TEXT,
+            INTNAME TEXT,
+            SNAPNAME TEXT,
+            SNAP_TS TEXT,
+            TRNS_TS TEXT,
             DELETED INTEGER);''')
         conn.close()
     
@@ -790,24 +800,46 @@ class SubVolume(SubVolumeInfo):
 
             BKP = listing(self.args,store='BKP')
             transfers = dict()
+            #ctransfers = dict()
+            regexpart = re.compile('\.part$|\.part/')
 
             if self.args.action == 'transfer':
                 self.scanfs() #update btrfs-list in memory
+
+            clones = dict() #clone list
+            if not self.args.no_clones:
+                for par in self.grep_volume(re.compile('^'+self.OrigName.split('.')[0]+'\.'),names=False):
+                    for bsub in sorted(BKP.svols):
+                        if BKP.svols[bsub]['path'] == self.svols[par]['path'] and not regexpart.search(self.svols[par]['path']):
+                            subbasename = re.sub('^'+self.svols[par]['path'].split('/')[0],self.basename,self.svols[par]['path'])
+                            if not subbasename in clones:
+                                clones[subbasename] = list()
+                            clones[subbasename].append(self.svols[par]['path'])
+                            self.DEBUG("Add to clones",self.svols[par]['path'],"->",subbasename,level=4)
+
             for sub in self.list_subvolumes(sid,names=False):
-                plist = dict()
+                print(self.svols[sub]['path'])
+                plist = dict() #parent list
                 for sis in self.list_sisters(self.svols[sub]['id'],older=True,younger=False,names=False):
-                    for bsub in BKP.svols:
+                    for bsub in sorted(BKP.svols):
                         if BKP.svols[bsub]['ruuid'] == self.svols[sis]['uuid']:
-                            plist[self.svols[sis]['id']] = self.svols[sis]['cgen']
+                            plist[self.svols[sis]['id']] = self.svols[sis]['gen']
+
+                
+                transfers[self.svols[sub]['path']] = dict()
                 if len(plist) > 0:
                     v=list(plist.values())
                     k=list(plist.keys())
                     parent = k[v.index(max(v))]
-                    transfers[self.svols[sub]['path']] = dict()
                     transfers[self.svols[sub]['path']]['parent'] = self.svols[parent]['path']
                 else:
-                    transfers[self.svols[sub]['path']] = dict()
+                    pass
 
+                if len(clones) > 0:
+                    transfers[self.svols[sub]['path']]['clone'] = clones[
+                            re.sub('^'+self.svols[sub]['path'].split('/')[0],
+                            self.basename,
+                            self.svols[sub]['path'])]
 
             self.DEBUG(' ==transfer=> »<%s>/%s«' % (self.store,sname),level=1)
             if self.args.npb: pt = progress_timer(description= ' ==transfer=> »<%s>/%s«: ' % (self.store,sname), n_iter=len(transfers.keys())*2)
@@ -827,8 +859,11 @@ class SubVolume(SubVolumeInfo):
                     continue
 
                 try:
-                    #print(transfers[t]['parent'] if 'parent' in transfers[t] else None)
-                    self.send_receive(t,destdir,parent=transfers[t]['parent'] if 'parent' in transfers[t] else None)
+                    self.send_receive(
+                            t,
+                            destdir,
+                            parent=transfers[t]['parent'] if 'parent' in transfers[t] else None,
+                            clone=transfers[t]['clone'] if 'clone' in transfers[t] else None)
                     self.transferred = True
                 except TransferError:
                     raise TransferError
@@ -856,13 +891,28 @@ class SubVolume(SubVolumeInfo):
             if self.args.npb: pt.finish()
             return(sname)
 
-    def send_receive(self,source,dest,parent=None):
+    def send_receive(self,source,dest,parent=None,clone=None):
+        tclones, tparent = list(), list()
         if parent == None:
-            self.DEBUG('  =init transfer=> »<%s>/%s«' % (self.store,source),level=1)
-            first = ['btrfs','send',self.StorePath+'/'+source]
+            if clone == None:
+                self.DEBUG('  =init transfer=> »<%s>/%s«' % (self.store,source),level=1)
+                #first = ['btrfs','send',self.StorePath+'/'+source]
+            else:
+                for x in sorted(clone):
+                    tclones.append('-c')
+                    tclones.append(self.StorePath + '/' + x)
+                self.DEBUG('  =incr clone-transfer=> »<%s>%s« <-clone: %s' % (self.store,source,' '.join(tclones)),level=1)
+                #first = ['btrfs','send'] + tclones + [self.StorePath+'/'+source]
         else:
             self.DEBUG('  =incr transfer=> »<%s>%s« <-parent: %s' % (self.store,source,parent),level=1)
-            first = ['btrfs','send','-p',self.StorePath+'/'+parent,self.StorePath+'/'+source]
+            tparent = ['-p',self.StorePath+'/'+parent]
+            if clone != None:
+                for x in sorted(clone):
+                    tclones.append('-c')
+                    tclones.append(self.StorePath + '/' + x)
+
+            #first = ['btrfs','send','-p',self.StorePath+'/'+parent,self.StorePath+'/'+source]
+        first = ['btrfs','send'] + tclones + tparent + [self.StorePath+'/'+source]
         second = ['btrfs','receive',dest]
         if not self.args.transferinfo:
             try:
@@ -900,20 +950,21 @@ class SubVolume(SubVolumeInfo):
             if args.action == 'create':
                 #conn = sqlite3.connect(self.args.db+'/mkbackup-btrfs.db')
                 if  (st == 'SRC' or st == 'SNP' ) and self.snapped:
-                    print("A Insert/Update SYMLINK create lasttrans.db %s:%s - %s" % (self.args.tag, self.args.timestamp,self.vol))
                     try:
-                        self.args.conn.execute("INSERT INTO LASTRUN (INTV, LRUN, DELETED) VALUES ('%s', '%s', 0)"% (self.vol+'|'+self.args.tag,self.args.timestamp)) ;
+                        print("A Insert SYMLINK create lasttrans.db %s:%s - %s" % (self.args.tag,self.vol, self.args.timestamp))
+                        self.args.conn.execute("INSERT INTO JOURNAL (VOL, INTNAME, SNAPNAME, SNAP_TS, TRNS_TS, DELETED) VALUES ('%s', '%s', '%s', '%s', '%s', '%s')"% (self.vol,self.args.tag,self.SnapName,self.args.timestamp,'',0)) ;
                     except:
-                        self.args.conn.execute("UPDATE LASTRUN set LRUN = '%s', DELETED = 0 where INTV='%s'"% (self.args.timestamp,self.vol+'|'+self.args.tag)) ;
-
+                        print("A Update SYMLINK create lasttrans.db %s:%s - %s" % (self.args.tag,self.vol, self.args.timestamp))
+                 #       self.args.conn.execute("UPDATE LASTRUN set LRUN = '%s', DELETED = 0 where VOL='%s' AND INTV='%s'"% (self.args.timestamp,self.vol,self.args.tag)) ;
+                        self.args.conn.execute("UPDATE JOURNAL set VOL = '%s', INTNAME = '%s', SNAPNAME = '%s', SNAP_TS = '%s', TRNS_TS = '%s', DELETED = 0)"% (self.vol,self.args.tag,self.SnapName,self.args.timestamp,'')) ;
                     pass
                     #print('Symlink %s %s %s' % (st,self.snapped,self.transferred))
                 elif  st == 'BKP' and self.transferred:
                     print("B Insert/Update SYMLINK transferred lasttrans.db %s:%s" % (self.vol+'|'+self.args.tag, self.args.timestamp))
                     try:
-                        self.args.conn.execute("INSERT INTO LASTRUN (INTV, LTRANS, DELETED) VALUES ('%s', '%s', 0)"% (self.vol+'|'+args.tag,args.timestamp)) ;
+                        self.args.conn.execute("UPDATE LASTRUN set LTRANS = '%s', DELETED = 0 where VOL='%s' AND INTV='%s'"% (args.timestamp,self.vol,args.tag)) ;
                     except:
-                        self.args.conn.execute("UPDATE LASTRUN set LTRANS = '%s', DELETED = 0 where INTV='%s'"% (args.timestamp,self.vol+'|'+args.tag)) ;
+                        self.args.conn.execute("INSERT INTO LASTRUN (VOL, INTV, LTRANS, DELETED) VALUES ('%s', '%s', '%s', 0)"% (self.vol,args.tag,args.timestamp)) ;
                     pass
                     #print('SymlinK %s %s %s' % (st,self.snapped,self.transferred))
                 else:
@@ -924,9 +975,9 @@ class SubVolume(SubVolumeInfo):
                 pass
                 print("C Insert/Update SYMLINK transfer lasttrans.db %s:%s" % (self.args.tag, self.args.timestamp))
                 try:
-                    self.args.conn.execute("INSERT INTO LASTRUN (INTV, LTRANS, DELETED) VALUES ('%s', '%s', 0)"% (self.vol+'|'+args.tag,args.timestamp)) ;
+                    self.args.conn.execute("UPDATE LASTRUN set LTRANS = '%s', DELETED = 0 where VOL='%s' AND INTV='%s'"% (args.timestamp,self.vol,args.tag)) ;
                 except:
-                    self.args.conn.execute("UPDATE LASTRUN set LTRANS = '%s', DELETED = 0 where INTV='%s'"% (args.timestamp,self.vol+'|'+args.tag)) ;
+                    self.args.conn.execute("INSERT INTO LASTRUN (VOL, INTV, LTRANS, DELETED) VALUES ('%s', '%s', '%s', 0)"% (self.vol+'|'+args.tag,args.timestamp)) ;
                 self.args.conn.commit()
             elif args.action == 'delete':
                 self.DEBUG('Test if symlink points to the youngest for tag, if not - resymlink',level=1)
@@ -997,9 +1048,9 @@ class SubVolume(SubVolumeInfo):
                     self.del_tag    = self.OrigName.split('.')[2]
                     print("DELETE LASTRUN %s - %s - %s" % (self.del_vol,self.del_ts,self.del_tag))
                     try:
-                        self.args.conn.execute("INSERT INTO LASTRUN (INTV, LRUN, DELETED) VALUES ('%s', '%s', 1)"% (self.del_vol+'|'+self.args.tag,self.args.timestamp)) ;
+                        self.args.conn.execute("UPDATE LASTRUN set DELETED = 1 where VOL='%s' AND INTV='%s' AND LRUN = '%s' "% (self.del_vol,self.args.tag,self.del_ts)) ;
                     except:
-                        self.args.conn.execute("UPDATE LASTRUN set DELETED = 1 where INTV='%s' AND LRUN = '%s' "% (self.del_vol+'|'+self.args.tag,self.del_ts)) ;
+                        self.args.conn.execute("INSERT INTO LASTRUN (VOL, INTV, LRUN, DELETED) VALUES ('%s', '%s', '%s', 1)"% (self.del_vol,self.args.tag,self.args.timestamp)) ;
                 except:
                     raise DeleteError
 
@@ -1204,6 +1255,14 @@ def lists(args):
                 print(' '.join(args.config.getVolumes(intv=args.tag)))
             else:
                 DEBUG('%s will transfer nothing' % (args.tag),level=1,verbose=args.verbose)
+        elif args.showdb:
+            cursor = args.conn.execute("SELECT ID, INTNAME, VOL, SNAPNAME, SNAP_TS, TRNS_TS, DELETED  from JOURNAL")
+            print("Journal")
+            tabstr = "%4s:%12s%22s%50s%22s%22s\t%s"
+            print( tabstr % ("ID","Interval","Volume", "SNAMPNAME","Last run","Last Trans","Deleted"))
+            for row in cursor:
+                print(tabstr % (row[0],row[1],row[2],row[3],row[4],row[5],row[6]))
+
         else:
             reintv = re.compile('NEXT|'+'|'.join(args.config.ListIntervals()))
             cmd=['systemctl','list-timers']
@@ -1475,6 +1534,7 @@ list_parser.add_argument('-i', '--info', dest='info', action='store_true', defau
 list_parser.add_argument('-P', '--show-StorePath', dest='showpathstore', action='store_true', default=False, help="""Print path of given stores""")
 list_parser.add_argument('-t', '--show-tags', dest='showtags', action='store_true', default=False, help="""Print all available tags""")
 list_parser.add_argument('-T', '--show-transfers', dest='showtransfers', action='store_true', default=False, help="""Print volumes to transfer by choosen tag""")
+list_parser.add_argument('-d', '--show-database', dest='showdb', action='store_true', default=False, help="""Print whole snapshot-database""")
 list_parser.add_argument('--tree', dest='tree', action='store_true', default=False, help="""Build tree from all snapshots (without subvolumes in it)""")
 list_parser.set_defaults(func=lists)
 list_parser.set_defaults(action='list')
@@ -1487,6 +1547,7 @@ create_parser.add_argument("store",
                         help="""one of SRC or SNP - where is the snapshot located and one ore more snapshots
                         which to be created in the same store.
                         BKP is ignored!!!""")
+create_parser.add_argument('--no-clones', action='store_true', default=False, help="""do not use clones for transfer, only parent (if present)""")
 create_parser.set_defaults(func=create)
 create_parser.set_defaults(action='create')
 
@@ -1507,6 +1568,7 @@ transfer_parser.add_argument("snapshots",
                         help="""one of SRC or SNP - where is the snapshot located and one ore more snapshots
                         which to be transfered to the external backup-device.
                         BKP is ignored!!!""")
+transfer_parser.add_argument('--no-clones', action='store_true', default=False, help="""do not use clones for transfer, only parent (if present)""")
 transfer_parser.add_argument('-i', '--info', 
         dest='transferinfo', 
         action='store_true', 
@@ -1636,7 +1698,7 @@ if __name__ == '__main__':
         args.tag = 'misc'
 
     args.db = '/var/lib/mkbackup-btrfs'
-    if not os.path.exists(args.db):
+    if not os.path.exists(args.db) and not os.path.exists(args.db+'/mkbackup-btrfs.db'):
         create_db(db=args.db)
 
     args.conn = sqlite3.connect(args.db+'/mkbackup-btrfs.db')
@@ -1682,10 +1744,18 @@ snapshots: %s
             print(listing.DeletedSubvolumes.pop())
         print('---')
 
-    print(args.db+'/mkbackup-btrfs.db')
-    cursor = args.conn.execute("SELECT INTV, LRUN, LTRANS, DELETED  from LASTRUN")
-    for row in cursor:
-        print("INTV:\t%s\tLast run:\t%s\tLast Trans:\t%s\tDeleted:\t%s" % (row[0],row[1],row[2], row[3]))
+#    print(args.db+'/mkbackup-btrfs.db')
+#    cursor = args.conn.execute("SELECT ID, INTV, VOL, LRUN, LTRANS, DELETED  from LASTRUN")
+#    print("Last runs")
+#    for row in cursor:
+#        print("%s: %s\t%s\tLast run:\t%s\tLast Trans:\t%s\tDeleted:\t%s" % (row[0],row[1],row[2],row[3],row[4],row[5]))
+#
+#    cursor = args.conn.execute("SELECT ID, INTNAME, VOL, SNAPNAME, SNAP_TS, TRNS_TS, DELETED  from JOURNAL")
+#    print("Journal")
+#    tabstr = "%4s:%12s%22s%50s%22s%22s\t%s"
+#    print( tabstr % ("ID","Interval","Volume", "SNAMPNAME","Last run","Last Trans","Deleted"))
+#    for row in cursor:
+#        print(tabstr % (row[0],row[1],row[2],row[3],row[4],row[5],row[6]))
    
     DEBUG("---== (%s) finnished %s %s at %s ==---" % (os.getpid(),args.func.__name__, args.tag, args.timestamp),level=1,verbose=args.verbose)
 #

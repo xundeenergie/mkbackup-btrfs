@@ -5,7 +5,7 @@
 # change directory to this mountpoint (cd /mnt)
 # run this script
 
-SUBS="boot-grub-x86_64-efi home opt srv subs usr-local var-cache var-lib-mpd var-lib-named var-log var-opt var-spool var-spool-dovecot var-tmp var-virutal_machines var-www"
+SUBS="boot-grub-x86_64-efi home opt srv subs usr-local var-cache var-lib-mpd var-lib-named var-log var-opt var-spool var-spool-dovecot var-mail var-tmp var-virutal_machines var-www"
 ARCH="amd64"
 DIST="stretch"
 MAIN="@debian-${DIST}"
@@ -29,6 +29,7 @@ BLKID=/sbin/blkid
 MKDIR=/bin/mkdir
 MOUNT=/bin/mount
 DEBOOTSTRAP=/usr/sbin/debootstrap
+SYSTEMDESCAPE=/bin/systemd-escape
 
 $BTRFS sub create "$MAIN"
 $BTRFS sub create "$ALWAYS"
@@ -39,8 +40,10 @@ cd "$ALWAYS"
 for i in $SUBS
 do
 	"$BTRFS" sub create "$i"
-	$MKDIR -p "../${MAIN}/$(echo $i|sed 's@-@/@g')"
-	$MOUNT "UUID=${UUID}" "../${MAIN}/$(echo $i|sed 's@-@/@g')" -t btrfs -o "defaults,compress=lzo,${NO}space_cache,${NO}inode_cache,${RELATIME}atime${SSDOPTS},subvol=${ALWAYS}/${i}"
+        #$MKDIR -p "../${MAIN}/$(echo $i|sed 's@-@/@g')"
+	#$MOUNT "UUID=${UUID}" "../${MAIN}/$(echo $i|sed 's@-@/@g')" -t btrfs -o "defaults,compress=lzo,${NO}space_cache,${NO}inode_cache,${RELATIME}atime${SSDOPTS},subvol=${ALWAYS}/${i}"
+	$MKDIR -p "../${MAIN}/$($SYSTEMDESCAPE -pu $i)"
+	$MOUNT "UUID=${UUID}" "../${MAIN}/$($SYSTEMDESCAPE -pu $i)" -t btrfs -o "defaults,compress=lzo,${NO}space_cache,${NO}inode_cache,${RELATIME}atime${SSDOPTS},subvol=${ALWAYS}/${i}"
 done
 cd ..
 mkdir -p "${MAIN}/etc"
@@ -50,7 +53,8 @@ echo "UUID=$UUID	/var/cache/btrfs_pool_SYSTEM	btrfs	defaults,compress=lzo,${NO}s
 
 for i in $SUBS
 do
-	echo "UUID=$UUID	/$(echo $i|sed 's@-@/@g')	btrfs	defaults,compress=lzo,${NO}space_cache,${NO}inode_cache,${RELATIME}atime${SSDOPTS},subvol=${ALWAYS}/${i}	0	0" >> "${MAIN}/etc/fstab"
+	#echo "UUID=$UUID	/$(echo $i|sed 's@-@/@g')	btrfs	defaults,compress=lzo,${NO}space_cache,${NO}inode_cache,${RELATIME}atime${SSDOPTS},subvol=${ALWAYS}/${i}	0	0" >> "${MAIN}/etc/fstab"
+	echo "UUID=$UUID	/$($SYSTEMDESCAPE -pu $i)	btrfs	defaults,compress=lzo,${NO}space_cache,${NO}inode_cache,${RELATIME}atime${SSDOPTS},subvol=${ALWAYS}/${i}	0	0" >> "${MAIN}/etc/fstab"
 done
 
 
