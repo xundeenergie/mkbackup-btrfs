@@ -904,12 +904,14 @@ class SubVolume(SubVolumeInfo):
                 self.DEBUG('  =incr clone-transfer=> »<%s>%s« <-clone: %s' % (self.store,source,' '.join(tclones)),level=1)
                 #first = ['btrfs','send'] + tclones + [self.StorePath+'/'+source]
         else:
-            self.DEBUG('  =incr transfer=> »<%s>%s« <-parent: %s' % (self.store,source,parent),level=1)
-            tparent = ['-p',self.StorePath+'/'+parent]
             if clone != None:
+                self.DEBUG('  =incr transfer=> »<%s>%s« <-parent: %s + clones' % (self.store,source,parent),level=1)
                 for x in sorted(clone):
                     tclones.append('-c')
                     tclones.append(self.StorePath + '/' + x)
+            else:
+                self.DEBUG('  =incr transfer=> »<%s>%s« <-parent: %s' % (self.store,source,parent),level=1)
+            tparent = ['-p',self.StorePath+'/'+parent]
 
             #first = ['btrfs','send','-p',self.StorePath+'/'+parent,self.StorePath+'/'+source]
         first = ['btrfs','send'] + tclones + tparent + [self.StorePath+'/'+source]
