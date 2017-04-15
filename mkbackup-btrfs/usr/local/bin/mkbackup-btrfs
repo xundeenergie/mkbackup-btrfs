@@ -475,7 +475,7 @@ class SubVolume(SubVolumeInfo):
         if os.path.isfile(self.store+'/'+lf):
             self.DEBUG('Nothing to lock',level=2)
         else:
-            self.DEBUG(" =lock>    <%s>/%s" % (self.store,ln),level=0)
+            self.DEBUG("%-12s»<%s>/%s«" % (' =lock>',self.store,ln),level=0)
             try:
                 lockfile = open(self.StorePath+'/'+lf, 'w', 1)
                 lockfile.write(str(os.getpid()))
@@ -513,24 +513,24 @@ class SubVolume(SubVolumeInfo):
         st = self.store if store == None else store
         StorePath = self.config.getStorePath(st)
         if not issubvol(StorePath): 
-            self.DEBUG("Failed to rename <%s>%s, is no btrfs-subvolume, or not existing" % (st,From),level=3)
+            self.DEBUG("Failed to rename »<%s>%s«, is no btrfs-subvolume, or not existing" % (st,From),level=3)
             return
 
-        self.DEBUG(' =try-to-rename> <%s>/%s --> %s' % (st,From,To),level=3)
+        self.DEBUG(' =try-to-rename> »<%s>/%s« --> »%s«' % (st,From,To),level=3)
         pass
 
         self.DEBUG(" =unlock>  <%s>/%s" % (st,To),level=1)
         if os.path.exists(StorePath+'/'+To):
-            self.DEBUG(' =%s: %s exists. Nothing to rename' % (Action,To),level=3)
+            self.DEBUG(' =%-10s»%s« exists. Nothing to rename' % (Action+':',To),level=3)
             return
         else:
             if self.args.action == 'create':
                 if Action == 'lock':
-                    self.DEBUG(" =%s: nothing to rename" % (Action),level=3)
+                    self.DEBUG(" =%-11s nothing to rename" % (Action+':'),level=3)
                     return
             else:
                 if issubvol(StorePath+'/'+From):
-                    self.DEBUG(' =%s-rename> <%s>/%s --> %s' % (Action,st,From,To), level=1)  
+                    self.DEBUG(' =%s-rename> »<%s>/%s« --> %s' % (Action,st,From,To), level=1)  
                 else: 
                     return
         try:
@@ -636,10 +636,10 @@ class SubVolume(SubVolumeInfo):
 
         propn = 'ro' if ro else 'rw'
         prop = 'true' if ro else 'false'
-        self.DEBUG(' =set-%s>  <%s>/%s' % (propn,self.store,sname),level=1)
+        self.DEBUG(' =set-%-6s»<%s>/%s«' % (propn+'>',self.store,sname),level=1)
         for sub in self.list_subvolumes(self.id,names=True,rev=True if ro else False):
             if issubvol(self.StorePath+'/'+sname+'/'+sub):
-                self.DEBUG('  =%s>     <%s>/%s' % (propn,self.store,sname+'/'+sub),level=1)
+                self.DEBUG('  =%-9s»<%s>/%s«' % (propn+'>',self.store,sname+'/'+sub),level=1)
                 try:
                     cmd = ['btrfs','property','set','-ts',self.StorePath+'/'+sname+'/'+sub,'ro',prop]
                     sp_call(self.args,cmd)
@@ -654,12 +654,13 @@ class SubVolume(SubVolumeInfo):
         #compile regular expression for ignoring subvolume-names
         if self.args.ignore == None:
             if not self.config.getIgnores(self.args.tag) == None:
+                #print("XXX",self.config.getIgnores(self.args.tag).split(','))
                 re_ign = re.compile('|'.join(self.config.getIgnores(self.args.tag).split(',')))
             else:
                 re_ign = None
         else:
             re_ign = re.compile('|'.join(self.args.ignore))
-        #print(re_ign)
+        #print('IGNORES',re_ign)
         if self.args.npb: pt = progress_timer(description= ' =create-snapshot=> from »<%s>/%s«: ' % (self.store, self.SourceName), n_iter=len(self.list_subvolumes(self.id,names=True)))
         #if self.exist:
         if issubvol(self.StorePath+'/'+self.SourceName):
@@ -667,7 +668,7 @@ class SubVolume(SubVolumeInfo):
                 for sub in self.list_subvolumes(self.id,names=True):
                     # Test if subvolume is in ignorelist - only debug-output now
                     if re_ign != None and re_ign.search('/'+sub):
-                        print(' -IGNORE-> »<%s>/%s«:' % (self.store, sub))
+                        print('%-12s»<%s>/%s«:' % (' -IGNORE->',self.store, sub))
                     else:
                         #print('/'+sub,re_ign,re_ign.search('/'+sub))
                         # Test the Source for local snapshotting
@@ -682,12 +683,12 @@ class SubVolume(SubVolumeInfo):
                                 raise RuntimeError('FAILURE - Destination exists: %s' % (self.StorePath+'/'+dest), 0)
                             elif issubvol(self.StorePath+'/'+dest) == False:
                                 # If destination exists and is a directory and not a snapshot, delete dir and create snapshot (for subvolumes of snapshot)
-                                self.DEBUG(' =create>  »<%s>/%s«' % (self.store,dest),level=1)
+                                self.DEBUG('%-12s»<%s>/%s«' % (' =create>',self.store,dest),level=1)
                                 sp_call(self.args,['rm','-r','-f',self.StorePath+'/'+dest])
                                 sp_call(self.args,cmd)                           
                             else:
                                 # If destination doesnt exist, create the snapshot
-                                self.DEBUG(' =create>  »<%s>/%s«' % (self.store,dest),level=1)
+                                self.DEBUG('%-12s»<%s>/%s«' % (' =create>',self.store,dest),level=1)
                                 sp_call(self.args,cmd)                           
                             sync()
 
@@ -760,7 +761,7 @@ class SubVolume(SubVolumeInfo):
                 if isbtrfs(self.config.getMountPath(store='BKP')):
                     if os.path.exists(self.BkpPath):
                         if issubvol(self.BkpPath):
-                            print('%s is subvolume' % (self.BkpPath))
+                            print("BKP-Path %s is subvolume" % (self.BkpPath))
                         else:
                             self.DEBUG(" |no-transfer: %s should be subvolume, is directory on external media" % (self.BkpPath))
                             return
@@ -818,7 +819,6 @@ class SubVolume(SubVolumeInfo):
                             self.DEBUG("Add to clones",self.svols[par]['path'],"->",subbasename,level=4)
 
             for sub in self.list_subvolumes(sid,names=False):
-                print(self.svols[sub]['path'])
                 plist = dict() #parent list
                 for sis in self.list_sisters(self.svols[sub]['id'],older=True,younger=False,names=False):
                     for bsub in sorted(BKP.svols):
@@ -836,10 +836,11 @@ class SubVolume(SubVolumeInfo):
                     pass
 
                 if len(clones) > 0:
-                    transfers[self.svols[sub]['path']]['clone'] = clones[
-                            re.sub('^'+self.svols[sub]['path'].split('/')[0],
+                    bsubvol = re.sub('^'+self.svols[sub]['path'].split('/')[0],
                             self.basename,
-                            self.svols[sub]['path'])]
+                            self.svols[sub]['path'])
+                    if bsubvol in clones:
+                        transfers[self.svols[sub]['path']]['clone'] = clones[bsubvol]
 
             self.DEBUG(' ==transfer=> »<%s>/%s«' % (self.store,sname),level=1)
             if self.args.npb: pt = progress_timer(description= ' ==transfer=> »<%s>/%s«: ' % (self.store,sname), n_iter=len(transfers.keys())*2)
@@ -895,22 +896,22 @@ class SubVolume(SubVolumeInfo):
         tclones, tparent = list(), list()
         if parent == None:
             if clone == None:
-                self.DEBUG('  =init transfer=> »<%s>/%s«' % (self.store,source),level=1)
+                self.DEBUG('%-20s»<%s>/%s«' % ('  =initial transfer=>',self.store,source),level=1)
                 #first = ['btrfs','send',self.StorePath+'/'+source]
             else:
                 for x in sorted(clone):
                     tclones.append('-c')
                     tclones.append(self.StorePath + '/' + x)
-                self.DEBUG('  =incr clone-transfer=> »<%s>%s« <-clone: %s' % (self.store,source,' '.join(tclones)),level=1)
+                self.DEBUG('%-20s»<%s>/%s« <-clone: %s' % ('  =incr-clone transfer=> ',self.store,source,' '.join(tclones)),level=1)
                 #first = ['btrfs','send'] + tclones + [self.StorePath+'/'+source]
         else:
             if clone != None:
-                self.DEBUG('  =incr transfer=> »<%s>%s« <-parent: %s + clones' % (self.store,source,parent),level=1)
+                self.DEBUG('%-20s»<%s>/%s« <-parent: %s + clones' % ('  =incr transfer=> ',self.store,source,parent),level=1)
                 for x in sorted(clone):
                     tclones.append('-c')
                     tclones.append(self.StorePath + '/' + x)
             else:
-                self.DEBUG('  =incr transfer=> »<%s>%s« <-parent: %s' % (self.store,source,parent),level=1)
+                self.DEBUG('%-20s»<%s>/%s« <-parent: %s' % ('  =incr transfer=> ',self.store,source,parent),level=1)
             tparent = ['-p',self.StorePath+'/'+parent]
 
             #first = ['btrfs','send','-p',self.StorePath+'/'+parent,self.StorePath+'/'+source]
@@ -953,16 +954,16 @@ class SubVolume(SubVolumeInfo):
                 #conn = sqlite3.connect(self.args.db+'/mkbackup-btrfs.db')
                 if  (st == 'SRC' or st == 'SNP' ) and self.snapped:
                     try:
-                        print("A Insert SYMLINK create lasttrans.db %s:%s - %s" % (self.args.tag,self.vol, self.args.timestamp))
+                        #print("A Insert SYMLINK create lasttrans.db %s:%s - %s" % (self.args.tag,self.vol, self.args.timestamp))
                         self.args.conn.execute("INSERT INTO JOURNAL (VOL, INTNAME, SNAPNAME, SNAP_TS, TRNS_TS, DELETED) VALUES ('%s', '%s', '%s', '%s', '%s', '%s')"% (self.vol,self.args.tag,self.SnapName,self.args.timestamp,'',0)) ;
                     except:
-                        print("A Update SYMLINK create lasttrans.db %s:%s - %s" % (self.args.tag,self.vol, self.args.timestamp))
+                        #print("A Update SYMLINK create lasttrans.db %s:%s - %s" % (self.args.tag,self.vol, self.args.timestamp))
                  #       self.args.conn.execute("UPDATE LASTRUN set LRUN = '%s', DELETED = 0 where VOL='%s' AND INTV='%s'"% (self.args.timestamp,self.vol,self.args.tag)) ;
                         self.args.conn.execute("UPDATE JOURNAL set VOL = '%s', INTNAME = '%s', SNAPNAME = '%s', SNAP_TS = '%s', TRNS_TS = '%s', DELETED = 0)"% (self.vol,self.args.tag,self.SnapName,self.args.timestamp,'')) ;
                     pass
                     #print('Symlink %s %s %s' % (st,self.snapped,self.transferred))
                 elif  st == 'BKP' and self.transferred:
-                    print("B Insert/Update SYMLINK transferred lasttrans.db %s:%s" % (self.vol+'|'+self.args.tag, self.args.timestamp))
+                    #print("B Insert/Update SYMLINK transferred lasttrans.db %s:%s" % (self.vol+'|'+self.args.tag, self.args.timestamp))
                     try:
                         self.args.conn.execute("UPDATE LASTRUN set LTRANS = '%s', DELETED = 0 where VOL='%s' AND INTV='%s'"% (args.timestamp,self.vol,args.tag)) ;
                     except:
@@ -975,7 +976,7 @@ class SubVolume(SubVolumeInfo):
                 #conn.close()
             elif args.action == 'transfer':
                 pass
-                print("C Insert/Update SYMLINK transfer lasttrans.db %s:%s" % (self.args.tag, self.args.timestamp))
+                #print("C Insert/Update SYMLINK transfer lasttrans.db %s:%s" % (self.args.tag, self.args.timestamp))
                 try:
                     self.args.conn.execute("UPDATE LASTRUN set LTRANS = '%s', DELETED = 0 where VOL='%s' AND INTV='%s'"% (args.timestamp,self.vol,args.tag)) ;
                 except:
@@ -1048,7 +1049,7 @@ class SubVolume(SubVolumeInfo):
                     self.del_vol    = self.OrigName.split('.')[0]
                     self.del_ts     = self.OrigName.split('.')[1]
                     self.del_tag    = self.OrigName.split('.')[2]
-                    print("DELETE LASTRUN %s - %s - %s" % (self.del_vol,self.del_ts,self.del_tag))
+                    #print("DELETE LASTRUN %s - %s - %s" % (self.del_vol,self.del_ts,self.del_tag))
                     try:
                         self.args.conn.execute("UPDATE LASTRUN set DELETED = 1 where VOL='%s' AND INTV='%s' AND LRUN = '%s' "% (self.del_vol,self.args.tag,self.del_ts)) ;
                     except:
@@ -1173,7 +1174,7 @@ def isbtrfs(path):
     if not path == None:
         for p in psutil.disk_partitions():
             if (p.mountpoint == path and p.device != 'systemd-1') and p.fstype == 'btrfs':
-                print(p)
+                #print(p)
                 return True
         else:
             return False
@@ -1307,7 +1308,7 @@ def lists(args):
             for st in ST.keys():
                 print('..--==°°==--..')
                 print('Youngest snapshot in %s' % (st))
-                print('XXX',ST[st])
+                #print('XXX',ST[st])
                 for vol in ST[st].keys():
                     s = dict()
                     missing = list()

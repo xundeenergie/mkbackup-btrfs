@@ -7,6 +7,7 @@ import subprocess
 import socket
 import os
 import errno
+import re
 
 __author__ = "Jakobus Schuerz <jakobus.schuerz@gmail.com>"
 __version__ = "0.01.0"
@@ -42,45 +43,85 @@ class Config():
         self._read()
         
     def _read(self):
+
         csup = dict()
         self.config = ConfigParser()
         self.config.read(self.cfile)
         self.csupdir = self.cfile+'.d'
         if os.path.exists(str(self.csupdir)) and os.path.isdir(str(self.csupdir)):
             for csuplst in os.listdir(self.csupdir):
-                if csuplst.endswith('conf'):
+                if csuplst.endswith('.conf'):
                     csup[csuplst] = ConfigParser()
                     csup[csuplst].read(self.csupdir+'/'+csuplst)
         
-        for i in sorted(csup.keys()):
-            # Set Defaults
-            j = 'DEFAULT'
-            for k in csup[i].defaults():
-                if k == 'ignore':
-                    orig = self.config.get(j,k)+',' if self.config.has_option(j,'ignore') else ''
-                    if csup[i].get(j,k)[0] == '+':
-                        #print('A',j,k,orig+csup[i].get(j,k)[1:])
-                        self.config.set(j,k,orig+csup[i].get(j,k)[1:])
-                    else:
-                        #print('B',j,k,csup[i].get(j,k))
-                        self.config.set(j,k,csup[i].get(j,k))
-                else:
-                    #print('C',j,k,csup[i].get(j,k))
-                    self.config.set(j,k,csup[i].get(j,k))
+#        for i in sorted(csup.keys()):
+#            # Set Defaults
+#            j = 'DEFAULT'
+#            for k in csup[i].defaults():
+#                if k == 'ignore':
+#                    orig = self.config.get(j,k)+',' if self.config.has_option(j,'ignore') else ''
+#                    print(i,k,orig)
+#                    if csup[i].get(j,k)[0] == '+':
+#                        #print('A',j,k,orig+csup[i].get(j,k)[1:])
+#                        self.config.set(j,k,orig+csup[i].get(j,k)[1:])
+#                    else:
+#                        #print('B',j,k,csup[i].get(j,k))
+#                        self.config.set(j,k,csup[i].get(j,k))
+#                else:
+#                    #print('C',j,k,csup[i].get(j,k))
+#                    self.config.set(j,k,csup[i].get(j,k))
 
         for i in sorted(csup.keys()):
             # Set Options
-            for j in csup[i].sections():
-                for k in csup[i].options(j):
-                    if k == 'ignore':
-                        orig = self.config.get(j,k)+',' if self.config.has_option(j,'ignore') else ''
-                        #print('D',orig)
-                        if csup[i].get(j,k)[0] == '+':
-                            self.config.set(j,k,orig+csup[i].get(j,k)[1:])
+            for j in csup[i].defaults():
+                if self.config.has_option('DEFAULT',j):
+                    # superseed option
+                    if j == 'ignore':
+                        if csup[i].get('DEFAULT',j)[0] == '+':
+                            orig = self.config.get('DEFAULT',j)+',' if self.config.has_option('DEFAULT','ignore') else ''
+                            #print("O",orig,orig+csup[i].get('DEFAULT',j)[1:])
+                            self.config.set('DEFAULT',j,orig+csup[i].get('DEFAULT',j)[1:])
                         else:
-                            self.config.set(j,k,csup[i].get(j,k))
+                            self.config.set('DEFAULT',j,csup[i].get('DEFAULT',j))
                     else:
-                        self.config.set(j,k,csup[i].get(j,k))
+                        if csup[i].get('DEFAULT',j)[0] == '+':
+                            self.config.set('DEFAULT',j,csup[i].get('DEFAULT',j)[1:])
+                        else:
+                            self.config.set('DEFAULT',j,csup[i].get('DEFAULT',j))
+                else:
+                    # add option
+                    #print(re.sub('^\+','',csup[i].get('DEFAULT',j)))
+                    self.config.set('DEFAULT',j,re.sub('^\+','',csup[i].get('DEFAULT',j)))
+
+                
+
+            for j in csup[i].sections():
+                if self.config.has_section(j):
+                    # modify section
+                    for k in csup[i].options(j):
+                        if self.config.has_option(j,k):
+                            # superseed option
+                            if k == 'ignore':
+                                if csup[i].get(j,k)[0] == '+':
+                                    orig = self.config.get(j,k)[1:]+',' if self.config.has_option(j,'ignore') else ''
+                                    self.config.set(j,k,orig+csup[i].get(j,k)[1:])
+                                else:
+                                    self.config.set(j,k,csup[i].get(j,k))
+                            else:
+                                #self.config.set(j,k,csup[i].get(j,k))
+                                if csup[i].get(j,k)[0] == '+':
+                                    self.config.set(j,k,csup[i].get(j,k)[1:])
+                                else:
+                                    self.config.set(j,k,csup[i].get(j,k))
+                        else:
+                            # add option
+                            self.config.set(j,k,csup[i].get(j,k))
+                else:
+                    # add section
+                    self.config.add_section(j)
+                    for k in csup[i].options(j):
+                        # add option to new section
+                        self.config.set(j,k,re.sub('^\+','',csup[i].get(j,k)))
 
         psrc = os.getcwd()
         if   '/'+psrc.strip('/') == self.config.get('DEFAULT','SNPMNT')+'/'+self.config.get('DEFAULT','snpstore').strip('/'):
@@ -107,7 +148,7 @@ class Config():
                              'volumes': '$S,__ALWAYSCURRENT__',
                              'interval': 5,
                              'symlink': 'LAST',
-                             'transfer': False }
+                             'transfer': False}
         self.config['hourly'] = {'volumes':  '$S,__ALWAYSCURRENT__','interval': '24','transfer': True}
         self.config['daily'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '7','transfer': True}
         self.config['weekly'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '5','transfer': True}
@@ -312,16 +353,14 @@ class Config():
         return(VOLSTRANS)
 
     def getIgnores(self,intv='misc'):
-        #self._read()
         try:
-            return(self.config.get(intv,'ignore'))
-            print("A")
+            r = self.config.get(intv,'ignore')
         except:
             try:
-                return(self.config.get('DEFAULT','ignore'))
-                print("B")
+                r = self.config.get('DEFAULT','ignore')
             except:
-                return(None)
+                r=None
+        return(None if r == '' or r == None else r)
 
     def __trnName(self,short):
         ret = list()
