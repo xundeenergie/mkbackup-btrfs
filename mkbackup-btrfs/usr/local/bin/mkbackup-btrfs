@@ -990,12 +990,12 @@ class SubVolume(SubVolumeInfo):
             StorePath = self.config.getStorePath(st)
             if not issubvol(StorePath): continue
             linkName = self.basename+'.'+args.config.getSymLink(args.tag)
-            self.DEBUG(' =symlink> <%s>/%s' % (st,StorePath+'/'+linkName),level=0)
+            self.DEBUG('%-12s»<%s>/%s«' % (' =symlink>',st,StorePath+'/'+linkName),level=0)
             self.symlink_force('./'+self.SnapName, StorePath+'/'+linkName)
             if args.config.getSymLink(args.tag) != args.config.getSymLink(): self.symlink_force('./'+self.SnapName, StorePath+'/'+self.basename+'.LAST')
 
     def delete(self):
-        self.DEBUG(' =delete-snapshot=> from »<%s>/%s«' % (self.store, self.SourceName),level=1)
+        self.DEBUG('%-20s from »<%s>/%s«' % (' =delete-snapshot=>',self.store, self.SourceName),level=1)
         if self.args.action == 'somethingelse':
             sname = self.SnapLock
             slock = self.SLockFile
@@ -1261,10 +1261,10 @@ def lists(args):
         elif args.showdb:
             cursor = args.conn.execute("SELECT ID, INTNAME, VOL, SNAPNAME, SNAP_TS, TRNS_TS, DELETED  from JOURNAL")
             print("Journal")
-            tabstr = "%4s:%12s%22s%50s%22s%22s\t%s"
+            tabstr = "%-4s%-12s %-22s  %50s | %-19s - %19s\t%s"
             print( tabstr % ("ID","Interval","Volume", "SNAMPNAME","Last run","Last Trans","Deleted"))
             for row in cursor:
-                print(tabstr % (row[0],row[1],row[2],row[3],row[4],row[5],row[6]))
+                print(tabstr % (str(row[0])+':',row[1],row[2],'»'+row[3]+'«',row[4],row[5],row[6]))
 
         else:
             reintv = re.compile('NEXT|'+'|'.join(args.config.ListIntervals()))
@@ -1747,18 +1747,5 @@ snapshots: %s
             print(listing.DeletedSubvolumes.pop())
         print('---')
 
-#    print(args.db+'/mkbackup-btrfs.db')
-#    cursor = args.conn.execute("SELECT ID, INTV, VOL, LRUN, LTRANS, DELETED  from LASTRUN")
-#    print("Last runs")
-#    for row in cursor:
-#        print("%s: %s\t%s\tLast run:\t%s\tLast Trans:\t%s\tDeleted:\t%s" % (row[0],row[1],row[2],row[3],row[4],row[5]))
-#
-#    cursor = args.conn.execute("SELECT ID, INTNAME, VOL, SNAPNAME, SNAP_TS, TRNS_TS, DELETED  from JOURNAL")
-#    print("Journal")
-#    tabstr = "%4s:%12s%22s%50s%22s%22s\t%s"
-#    print( tabstr % ("ID","Interval","Volume", "SNAMPNAME","Last run","Last Trans","Deleted"))
-#    for row in cursor:
-#        print(tabstr % (row[0],row[1],row[2],row[3],row[4],row[5],row[6]))
-   
     DEBUG("---== (%s) finnished %s %s at %s ==---" % (os.getpid(),args.func.__name__, args.tag, args.timestamp),level=1,verbose=args.verbose)
 #
