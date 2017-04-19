@@ -1119,6 +1119,7 @@ def cleanup(args):
                 #print('DO',args.snapshots)
                 for sn in args.snapshots:
                     ex = re.compile('$|'.join([sn+'.*' + word_in_list for word_in_list in I.keys()])+'$')
+                    print(ex)
                     for i in args.config.ListIntervals():
                         cI[i] = 0
                     try:
@@ -1126,6 +1127,7 @@ def cleanup(args):
                             for tag in I.keys():
                                 if ST[st].svols[i]['path'].partition(tag)[1] != '':
                                     cI[tag] += 1
+                                    print("cI[tag]:", tag, cI[tag], I[tag])
                                     if cI[tag] > int(I[tag]):
                                         DEL.push([st,ST[st].svols[i]['path']])
                     except:
@@ -1250,15 +1252,15 @@ def lists(args):
     if args.info:
         if args.showpathstore:
             for st in args.store: print(args.config.getStorePath(st))
-        elif args.showtags:
+        if args.showtags:
             for i in args.config.ListIntervals(): print(i)
-        elif args.showtransfers:
+        if args.showtransfers:
             if args.config.getTransfer(intv=args.tag):
                 DEBUG('"%s" results in "%s", will transfer actual snapshots from this volume(s):' % (args.tag,args.config.getIsDefault(intv=args.tag)),level=1,verbose=args.verbose)
                 print(' '.join(args.config.getVolumes(intv=args.tag)))
             else:
                 DEBUG('%s will transfer nothing' % (args.tag),level=1,verbose=args.verbose)
-        elif args.showdb:
+        if args.showdb:
             cursor = args.conn.execute("SELECT ID, INTNAME, VOL, SNAPNAME, SNAP_TS, TRNS_TS, DELETED  from JOURNAL")
             print("Journal")
             tabstr = "%-4s%-12s %-22s  %50s | %-19s - %19s\t%s"
@@ -1266,7 +1268,74 @@ def lists(args):
             for row in cursor:
                 print(tabstr % (str(row[0])+':',row[1],row[2],'»'+row[3]+'«',row[4],row[5],row[6]))
 
-        else:
+        if args.showyoungest:
+            ST=dict()
+            for st in args.store:
+                ST[st]=dict()
+                #for vol in args.config.getVolumes():
+                #print("S",args.snapshots)
+                for vol in args.snapshots if len(args.snapshots) > 0 else '*':
+                    #print('VOL',vol)
+                    ST[st][vol]=dict()
+                    for intv in args.config.ListIntervals():
+                        ST[st][vol][intv] = list()
+                    if args.config.getStorePath(st) is not None:
+                        dirlist = dict()
+                        for snps in glob.glob(args.config.getStorePath(st)+'/'+vol+'.*'):
+                            if len(os.path.basename(snps).split('.')) == 3: 
+                                if not os.path.basename(snps).split('.')[1] in dirlist:
+                                    dirlist[os.path.basename(snps).split('.')[1]] = list()
+                                dirlist[os.path.basename(snps).split('.')[1]].append(os.path.basename(snps))
+                        for t in sorted(dirlist.keys()):
+                            #print(t,dirlist[t])
+                            for snp in dirlist[t]:
+                                #print(dirlist[t])
+                                for intv in ST[st][vol].keys():
+                                    R = re.compile(intv +'$') 
+                                    if R.search(snp):
+                                        ST[st][vol][intv].append(os.path.basename(snp))
+                        ST[st][vol]['dirlist'] = dirlist
+                    #for x in ST[st][vol].keys(): print(x,ST[st][vol][x])
+            for st in ST.keys():
+                DEBUG('..--==°°==--..',level=1,verbose=args.verbose)
+                DEBUG('Youngest snapshot in %s' % (st),level=1,verbose=args.verbose)
+                for vol in ST[st].keys():
+                    s = dict()
+                    missing = list()
+                    DEBUG('  Volume %s:' % (vol),level=1,verbose=args.verbose)
+                    for intv in ST[st][vol].keys():
+                        if intv != 'dirlist':
+                            if len(ST[st][vol][intv]) > 0:
+                                i = ST[st][vol][intv].pop()
+                                if args.tagset:
+                                    if args.all:
+                                        s[i.split('.')[1]] = i
+                                    else:
+                                        s['dirlist'] = ST[st][vol]['dirlist'][sorted(dirlist.keys()).pop()]
+                                else:
+                                    if i.split('.')[2] == args.tag: 
+                                        s[i.split('.')[1]] = i
+                            else:
+                                missing.append(intv)
+                        
+                    lo = 0
+                    for i in reversed(sorted(s.keys())):
+                        out = '»<%s>/%s«' % (st,s[i])
+                        lo = len(out) if len(out) > lo else lo
+                        print('    %s' % (out))
+                    DEBUG('    %s' % ('-' * (lo)),level=1,verbose=args.verbose)
+                    lo = 0
+                    out = """missing: %s""" % (', '.join(missing))
+
+                    if args.tag == 'misc': DEBUG("""      %s\n      %s\n""" % (out,'=' * len(out)),level=1,verbose=args.verbose)
+
+        if args.print_config:
+            print("show config")
+            args.config.PrintConfig()
+            
+
+
+        if not (args.showyoungest or args.showtransfers or args.showdb or args.showtags or args.showpathstore or args.print_config):
             reintv = re.compile('NEXT|'+'|'.join(args.config.ListIntervals()))
             cmd=['systemctl','list-timers']
             try:
@@ -1290,41 +1359,7 @@ def lists(args):
                     o = l.replace("timer-","").replace(".timer","").rstrip()
                     x = o[i:].rstrip(),
                     print(o+" backup","\t--> transfer" if args.config.getTransfer(x[0]) else "")
-            ST=dict()
-            for st in args.store:
-                ST[st]=dict()
-                #for vol in args.config.getVolumes():
-                for vol in args.snapshots:
-                    print('VOL',vol)
-                    ST[st][vol]=dict()
-                    for intv in args.config.ListIntervals():
-                        ST[st][vol][intv] = list()
-                    if args.config.getStorePath(st) is not None:
-                        for snp in glob.glob(args.config.getStorePath(st)+'/'+vol+'.*'):
-                            for intv in ST[st][vol].keys():
-                                R = re.compile(intv+'$')
-                                if R.search(snp):
-                                    ST[st][vol][intv].append(os.path.basename(snp))
-            for st in ST.keys():
-                print('..--==°°==--..')
-                print('Youngest snapshot in %s' % (st))
-                #print('XXX',ST[st])
-                for vol in ST[st].keys():
-                    s = dict()
-                    missing = list()
-                    print('\tVolume: %s' % (vol))
-                    for intv in ST[st][vol].keys():
-                        if len(ST[st][vol][intv]) > 0:
-                            i = ST[st][vol][intv].pop()
-                            s[i.split('.')[1]] = i
-                            
-                        else:
-                            missing.append(intv)
-                            #print('\t\t'+"is missing: %s" % (intv))
-                    for i in reversed(sorted(s.keys())):
-                        print('\t\t'+s[i])
-                    print("\t\tmissing: %s" % (', '.join(missing)))
-        print("--finish--")
+            print("--finish--")
     else:
         text = "subvolumes in"
         if args.snap:
@@ -1490,7 +1525,7 @@ parser.add_argument('--version', action='version', version='0.1.0')
 parser.add_argument('-V', '--systemvolumes', action='store_true',
         default=False, help='''take the systemvolumes from config. store is
         always SNP''')
-parser.add_argument('-t', '--tag', default='misc', help='''one of %s''' % (Config().ListIntervals()))
+parser.add_argument('-t', '--tag', default=None, help='''one of %s''' % (Config().ListIntervals()))
 parser.add_argument('-v', '--verbose', action='count', default=0, help='''verbose output''' )
 #parser.add_argument('-i', '--info', action='store_true', default=False, help='''Print infos, action is "list"''')
 parser.add_argument('-i', '--ignore', action='append', help='''Regular expression pattern for ignoring several subvolumes to be not backed up (and subvolumes unter them)
@@ -1538,6 +1573,9 @@ list_parser.add_argument('-P', '--show-StorePath', dest='showpathstore', action=
 list_parser.add_argument('-t', '--show-tags', dest='showtags', action='store_true', default=False, help="""Print all available tags""")
 list_parser.add_argument('-T', '--show-transfers', dest='showtransfers', action='store_true', default=False, help="""Print volumes to transfer by choosen tag""")
 list_parser.add_argument('-d', '--show-database', dest='showdb', action='store_true', default=False, help="""Print whole snapshot-database""")
+list_parser.add_argument('-y', '--show-youngest', action='store_true', dest='showyoungest', default=False, help="list youngest snapshots in store, with '-t tag' only for this tag")
+list_parser.add_argument('--print-config', action='store_true', default=False, help="show the whole configuration or only for the given tag")
+list_parser.add_argument('--all', dest='all', action='store_true', default=False, help="""show full list of all youngest snapshots in all intervals for all volumes (only in combination with -y""")
 list_parser.add_argument('--tree', dest='tree', action='store_true', default=False, help="""Build tree from all snapshots (without subvolumes in it)""")
 list_parser.set_defaults(func=lists)
 list_parser.set_defaults(action='list')
@@ -1622,10 +1660,12 @@ if __name__ == '__main__':
     args.config = Config()
     stores = []
     snapshots = []
+
     if 'store' in args: 
         if isstring(args.store): args.store = args.store.split(' ')
     else:
         args.store = []
+
     if 'snapshots' in args: 
         if isstring(args.snapshots): args.snapshots = args.snapshots.split()
     else:
@@ -1635,6 +1675,8 @@ if __name__ == '__main__':
             stores.extend([i])
         else:
             snapshots.extend([i.rstrip('/')])
+    if len(stores) == 0: stores = ['SRC']
+
     args.store = stores
     args.snapshots = snapshots
 
@@ -1645,6 +1687,12 @@ if __name__ == '__main__':
     args.config.setBKPStore(args.bkpstore)
     args.config.setSNPPath(args.snpmount)
     args.config.setSNPStore(args.snpstore)
+
+    # tag = None is not allowed. Set it to misc, if not set
+    args.tagset = False
+    if args.tag == None: 
+        args.tag = 'misc'
+        args.tagset = True # if no tag was given, and tag is set here, this value is true - it indicates, tag was set automatically to 'misc'
 
 
     if args.systemvolumes:
@@ -1696,19 +1744,22 @@ if __name__ == '__main__':
     if args.verbose > 0:
         args.npb = False 
         
-    # tag = None is not allowed. Set it to misc, if not set
-    if args.tag == None: 
-        args.tag = 'misc'
-
     args.db = '/var/lib/mkbackup-btrfs'
     if not os.path.exists(args.db) and not os.path.exists(args.db+'/mkbackup-btrfs.db'):
         create_db(db=args.db)
 
     args.conn = sqlite3.connect(args.db+'/mkbackup-btrfs.db')
 
+    #DEBUG("Arguments",args,verbose=args.verbose)
+    if args.verbose > 3:
+        DEBUG("Arguments",verbose=args.verbose)
+        for i in sorted(vars(args)):
+            DEBUG(i+': '+str(getattr(args,i,None)),verbose=args.verbose)
+    elif args.verbose > 1:
+        DEBUG("Arguments",args,verbose=args.verbose)
+
 
     # Run action
-    DEBUG('Arguments',args,level=2,verbose=args.verbose)
     args.func(args)
 
     # Check symlinks in stores, if they exist and ok or missing.

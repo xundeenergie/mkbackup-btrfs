@@ -167,7 +167,7 @@ class Config():
                 exit("Failure during creation of config-file")
         return(self.config)
 
-    def ReadConfig(self):
+    def PrintConfig(self):
         #self._read()
         for i in self.config.sections():
             print('Section: ',i)
