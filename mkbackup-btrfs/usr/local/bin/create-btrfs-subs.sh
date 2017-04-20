@@ -1,9 +1,17 @@
 #!/bin/bash
 
-# Create a partition with btrfs
-# Mount it to a free mountpoint (for example /mnt)
-# change directory to this mountpoint (cd /mnt)
-# run this script
+case $1 in
+    -h)
+        cat <<EOF
+ Create a partition with btrfs
+ Mount it to a free mountpoint (for example /mnt)
+ change directory to this mountpoint (cd /mnt)
+ run this script
+EOF
+        ;;
+    *)
+        ;;
+esac
 
 SUBS="boot-grub-x86_64-efi home opt srv subs usr-local var-cache var-lib-mpd var-lib-named var-log var-opt var-spool var-spool-dovecot var-mail var-tmp var-virutal_machines var-www"
 ARCH="amd64"
