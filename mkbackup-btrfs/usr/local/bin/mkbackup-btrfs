@@ -668,7 +668,7 @@ class SubVolume(SubVolumeInfo):
                 for sub in self.list_subvolumes(self.id,names=True):
                     # Test if subvolume is in ignorelist - only debug-output now
                     if re_ign != None and re_ign.search('/'+sub):
-                        print('%-12s»<%s>/%s«:' % (' -IGNORE->',self.store, sub))
+                        self.DEBUG('%-12s»<%s>/%s«:' % (' -IGNORE->',self.store, sub),level=2)
                     else:
                         #print('/'+sub,re_ign,re_ign.search('/'+sub))
                         # Test the Source for local snapshotting
@@ -761,7 +761,7 @@ class SubVolume(SubVolumeInfo):
                 if isbtrfs(self.config.getMountPath(store='BKP')):
                     if os.path.exists(self.BkpPath):
                         if issubvol(self.BkpPath):
-                            print("BKP-Path %s is subvolume" % (self.BkpPath))
+                            self.DEBUG("BKP-Path %s is subvolume" % (self.BkpPath),level=4)
                         else:
                             self.DEBUG(" |no-transfer: %s should be subvolume, is directory on external media" % (self.BkpPath))
                             return
@@ -1116,18 +1116,16 @@ def cleanup(args):
             ST[st] = listing(args,store=st,single=True)
             if len(args.snapshots) > 0:
                 DEBUG(args,'  --cleanup interval-snapshots',level=3)
-                #print('DO',args.snapshots)
                 for sn in args.snapshots:
-                    ex = re.compile('$|'.join([sn+'.*' + word_in_list for word_in_list in I.keys()])+'$')
-                    print(ex)
+                    ex = re.compile('$|'.join([sn+'\..*\.' + word_in_list for word_in_list in I.keys()])+'$')
+                    DEBUG(args,'Regex:',ex,level=5)
                     for i in args.config.ListIntervals():
                         cI[i] = 0
                     try:
                         for i in ST[st].grep_subvolumes(ex,names=False,rev=True):
                             for tag in I.keys():
-                                if ST[st].svols[i]['path'].partition(tag)[1] != '':
+                                if ST[st].svols[i]['path'].partition('.'+tag)[1] != '':
                                     cI[tag] += 1
-                                    print("cI[tag]:", tag, cI[tag], I[tag])
                                     if cI[tag] > int(I[tag]):
                                         DEL.push([st,ST[st].svols[i]['path']])
                     except:
@@ -1330,8 +1328,7 @@ def lists(args):
                     if args.tag == 'misc': DEBUG("""      %s\n      %s\n""" % (out,'=' * len(out)),level=1,verbose=args.verbose)
 
         if args.print_config:
-            print("show config")
-            args.config.PrintConfig()
+            args.config.PrintConfig(tag = None if args.tagset else args.tag)
             
 
 

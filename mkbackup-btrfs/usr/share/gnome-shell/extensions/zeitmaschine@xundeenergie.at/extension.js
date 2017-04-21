@@ -34,7 +34,8 @@ let Drives = new Object();
 //const EnabledIcon = 'my-caffeine-on-symbolic';
 const DisabledIcon = 'system-run-symbolic';
 const EnabledIcon = 'system-run-symbolic';
-const ConfFile = '/etc/mkbackup-btrfs.conf';
+//const ConfFile = '/etc/mkbackup-btrfs.conf';
+const ConfFile = '/tmp/mkbackup-btrfs.conf.tmp';
 
 
 const BackupManager = new Lang.Class({

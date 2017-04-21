@@ -167,13 +167,26 @@ class Config():
                 exit("Failure during creation of config-file")
         return(self.config)
 
-    def PrintConfig(self):
+    def PrintConfig(self,tag):
         #self._read()
-        for i in self.config.sections():
-            print('Section: ',i)
+        if tag == None:
+            seclist = self.config.sections()
+        else:
+            seclist = [tag]
+
+        #print( seclist, self.config.defaults())
+        if tag == None:
+            print('[DEFAULT]')
+            for j in self.config.defaults():
+                print(j+' = ',self.__trnName(self.config.get('DEFAULT',j)))
+            print('')
+
+        for i in self.config.sections() if tag == None else [tag]:
+            print('[%s]' %(i))
             for j in self.config.options(i):
-                print(j+':',self.__trnName(self.config.get(i,j)))
-            print('------------------------------')
+                print(j+' = ',self.__trnName(self.config.get(i,j)))
+            print('')
+
 
     def ListIntervals(self):
         #self._read()
