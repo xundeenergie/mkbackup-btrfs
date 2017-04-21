@@ -1,5 +1,5 @@
 [Unit]
-Description=Create temporary conf-file for shell-extension /tmp/%I.conf.tmp
+Description=Create or update temporary conf-file /tmp/%I.conf.tmp for shell-extension 
 
 [Service]
 ExecStart=/bin/sh -c "(/usr/local/bin/mkbackup list -i --print-config > /tmp/%I.conf.tmp)"
