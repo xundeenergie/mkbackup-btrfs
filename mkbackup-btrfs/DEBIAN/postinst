@@ -83,7 +83,7 @@ done
 
 INTERVALS="hourly daily weekly aptupgrade plugin afterboot manually"
 CINT=$(for i in $INTERVALS;do echo "mkbackup@${i}.service" ; done)
-SERVICES="btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service $CINT"
+SERVICES="btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service mkbackup-conf@mkbackup\\x2dbtrfs.service $CINT"
 
 for s in $SERVICES; do
     #deb-systemd-helper-new-xe unmask $s >/dev/null || true

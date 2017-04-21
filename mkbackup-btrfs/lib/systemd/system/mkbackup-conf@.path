@@ -1,0 +1,8 @@
+[Unit]
+Description=Path-Unit for /etc/%I %i
+[Path]
+PathModified=/etc/%I.conf
+#PathChanged=/etc/%I.conf.d/
+PathModified=/etc/%I.conf.d/
+
+Unit=mkbackup-conf@%i.service

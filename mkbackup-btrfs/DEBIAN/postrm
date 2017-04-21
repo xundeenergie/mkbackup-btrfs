@@ -16,7 +16,7 @@ fi
 SERVICES="mkbackup.target backup.automount var-cache-btrfs_pool_SYSTEM.automount"
 INTERVALS="hourly daily weekly aptupgrade plugin afterboot manually"
 CINT="$(for i in $INTERVALS;do echo "mkbackup@${i}.service" ; done)"
-INSTSERVICES="btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service"
+INSTSERVICES="btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service mkbackup-conf@mkbackup\\x2dbtrfs.service"
 
 
 case "$1" in
