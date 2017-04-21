@@ -89,6 +89,7 @@ for s in $SERVICES; do
     #deb-systemd-helper-new-xe unmask $s >/dev/null || true
     deb-systemd-helper-new unmask $s || true
     # was-enabled defaults to true, so new installations run enable.
+    echo "$s"
     if deb-systemd-helper-new --quiet was-enabled $s; then
             # Enables the unit on first installation, creates new
             # symlinks on upgrades if the unit file has changed.

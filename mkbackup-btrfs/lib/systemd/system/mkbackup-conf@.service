@@ -3,3 +3,6 @@ Description=Create or update temporary conf-file /tmp/%I.conf.tmp for shell-exte
 
 [Service]
 ExecStart=/bin/sh -c "(/usr/local/bin/mkbackup list -i --print-config > /tmp/%I.conf.tmp)"
+
+[Service]
+WantedBy=multi-user.target
