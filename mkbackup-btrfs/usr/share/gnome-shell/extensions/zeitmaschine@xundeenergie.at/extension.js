@@ -400,14 +400,15 @@ const BackupManager = new Lang.Class({
         // volumes to the list
         volumes.push('home-jakob-Videos-extern.mount')
         volumes.push('home-media.mount')
-        /*for (let d in this._drives) {
-            log('N',d);
-        };*/
+        for (let d in this._drives) {
+            log('N',d,d['volumes']);
+        };
 
         this.aout = GLib.spawn_command_line_sync(
             this._getCommand(this.services.join(' '), 'is-active', 'system'))[1].toString().split('\n');
-        //log(this.aout);
+        //log(this.aout.indexOf('active'));
 
+        let apos = this.aout.indexOf('active')
         active = this.aout.indexOf('active') >= 0
 
         let vout = GLib.spawn_command_line_sync(
@@ -416,7 +417,11 @@ const BackupManager = new Lang.Class({
 
         this.bkpsubmenu.icon.style = (active ? "color: #ff0000;" : "color: revert;");
         MainIcon.style = (mounted ? "color: #ff0000;" : "color: revert;");
-        MainLabel.set_text(mounted ? _("mounted") : "");
+        let mlabel = (mounted ? _("mounted") : "");
+        let alabel = (active ? this.services[apos] : "");
+        MainLabel.set_text(mlabel + ' ' + alabel);
+        //MainLabel.set_text(mounted ? _("mounted") : "");
+        //MainLabel.set_text(active ? this.services[apos] : "");
 
 		if (this.menu.isOpen) {
             //Menu is open
