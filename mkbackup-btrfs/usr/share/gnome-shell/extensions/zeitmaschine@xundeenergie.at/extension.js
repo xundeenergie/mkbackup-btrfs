@@ -173,6 +173,7 @@ const BackupManager = new Lang.Class({
         this._drives[d_name]['device'] = drive.get_identifier('unix-device'); 
         //this._drives[d_name]['uuid']   = drive.get_identifier('uuid'); 
         this._drives[d_name]['volumes'] = new Object()
+        log("ABCDE",this._drives[d_name]['device']);
         /*if (drive.has_volumes()) {
             log('DHV',drive.get_volumes());
             let VList = drive.get_volumes();
@@ -248,6 +249,7 @@ const BackupManager = new Lang.Class({
         log(volume.get_identifier('class'))
         log(volume.get_identifier('label'))
         let dr = volume.get_drive()
+        this._drives[dr.get_name()] = dr
         log(dr.get_name())
         log(dr.enumerate_identifiers())
         log(dr.get_identifier('unix-device'))
@@ -391,6 +393,7 @@ const BackupManager = new Lang.Class({
     _refresh_panel : function() {
 
         //log('YY',this._drives['ST1000LM024 HN-M101MBB']['volumes'])
+        //log('YY',this._drives['ST1000LM024 HN-M101MBB'])
         let active = false;
         let volumes = []
         let mounted = false;
@@ -400,9 +403,10 @@ const BackupManager = new Lang.Class({
         // volumes to the list
         volumes.push('home-jakob-Videos-extern.mount')
         volumes.push('home-media.mount')
-        for (let d in this._drives) {
-            log('N',d,d['volumes']);
-        };
+        //for (let d in this._drives['ST1000LM024 HN-M101MBB']) {
+        /*for (let d in this._drives) {
+            log("D",d,this._drives[d].get_name());
+        };*/
 
         this.aout = GLib.spawn_command_line_sync(
             this._getCommand(this.services.join(' '), 'is-active', 'system'))[1].toString().split('\n');
