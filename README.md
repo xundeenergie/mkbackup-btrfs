@@ -2,6 +2,38 @@
 Make snapshots recursively from btrfs-subvolumes
 This scripts are written in python3 and replace https://github.com/xundeenergie/mkbtrbackup
 
+
+## Automatic installation with script
+
+Start a debian-live session. Download a netboot.iso or any other stretch-live.iso 
+Take care, that you've installed btrfs-progs and kernel in the highest possible version.
+Download and install the package mkbackup-btrfs.deb (always a symlink to the latest package) from https://github.com/xundeenergie/mkbackup-btrfs
+Or just download and make it executeable 
+    wget https://raw.githubusercontent.com/xundeenergie/mkbackup-btrfs/master/mkbackup-btrfs/usr/local/bin/create-btrfs-subs.sh
+    chmod a+x create-btrfs-subs-sh
+
+Then create a new as big as possible partition and format it with btrfs.
+
+If you want to use UEFI, your partition-table must be GPT. For UEFI you need an extra partition for ESP (Efi System Partition). Just lool on other places how to format a Disk for the usage with (U)EFI.
+
+If you've created a big btrfs-partition, mount it in your live-system:
+    mount /dev/sdXY /mnt -osubvolume=/,compress
+
+X is your drive, Y is the number oft the btrfs-partition on drive X.
+
+then change to /mnt
+    cd /mnt
+
+and run the script 
+    sudo /path/to/download/create-btrfs-subs.sh
+
+/path/to/download is where you've downloaded the script before.
+
+You will end up in a chroot of your new installed ground-system. It is not bootable now.
+Install a kernel, tzdata, initramfs, grub or refind, install other packages you need (firmware, network-manager, desktops...)
+
+
+## Manually creation of the subvolume-structure, no installation!
 You have to prepare your installation with some subvolumes.
 
 First create a directory

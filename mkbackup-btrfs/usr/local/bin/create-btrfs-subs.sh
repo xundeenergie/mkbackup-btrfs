@@ -68,20 +68,40 @@ done
 
 cp "${MAIN}/etc/fstab" "${MAIN}/etc/fstab.orig"
 
-$DEBOOTSTRAP --arch "${ARCH}" "${DIST}" "${MAIN}" http://ftp.at.debian.org/debian
+cat <<EOF
+Now your BTRFS-Subvolumes are created and mounted.
+You can now install your system with debootstrap, or run the installer 
 
-$MOUNT -o bind /dev "${MAIN}/dev"
-$MOUNT -o bind /dev/pts "${MAIN}/dev/pts"
-$MOUNT -t sysfs /sys "${MAIN}/sys"
-$MOUNT -t proc /proc "${MAIN}/proc"
-cp /proc/mounts "${MAIN}/etc/mtab"
-cp /etc/resolv.conf "${MAIN}/etc/resolv.conf"
+Install with debootstrap? [Y/n]
+EOF
 
-chroot "${MAIN}"
-echo "You are now in the chroot, groundsystem is now installed. Now install other packages."
-echo "try apt install linux-image task-desktop task-german-desktop console-setup tzdata"
-echo "add new users, and add them to several groups"
-echo "add grub2 and initramfs"
+read i
+case i in
+    Y) 
+        $DEBOOTSTRAP --arch "${ARCH}" "${DIST}" "${MAIN}" http://ftp.at.debian.org/debian
+
+        $MOUNT -o bind /dev "${MAIN}/dev"
+        $MOUNT -o bind /dev/pts "${MAIN}/dev/pts"
+        $MOUNT -t sysfs /sys "${MAIN}/sys"
+        $MOUNT -t proc /proc "${MAIN}/proc"
+        cp /proc/mounts "${MAIN}/etc/mtab"
+        cp /etc/resolv.conf "${MAIN}/etc/resolv.conf"
+
+        chroot "${MAIN}"
+        cat <<EOF 
+        You are now in the chroot, groundsystem is now installed. Now install other packages.
+        add new users, and add them to several groups
+        add grub2 or refind and initramfs
+        try apt install linux-image task-desktop task-german-desktop console-setup tzdata
+EOF
+        ;;
+    *)
+        echo "Install with installer now. Exit skript"
+        ;;
+esac
+
+
+
 
 exit
 

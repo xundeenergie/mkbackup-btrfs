@@ -4,6 +4,7 @@ Description=Upate /tmp/%I.conf.tmp if /etc/%I* changes
 [Path]
 PathModified=/etc/%I.conf
 PathModified=/etc/%I.conf.d/
+PathChanged=/tmp/%I.conf.tmp
 Unit=mkbackup-conf@%i.service
 
 [Install]
