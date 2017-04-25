@@ -8,6 +8,7 @@ case $1 in
  change directory to this mountpoint (cd /mnt)
  run this script
 EOF
+        exit 0
         ;;
     *)
         ;;
@@ -70,14 +71,17 @@ cp "${MAIN}/etc/fstab" "${MAIN}/etc/fstab.orig"
 
 cat <<EOF
 Now your BTRFS-Subvolumes are created and mounted.
-You can now install your system with debootstrap, or run the installer 
+You can now install your system with debootstrap 
 
 Install with debootstrap? [Y/n]
 EOF
 
 read i
 case i in
-    Y) 
+    N|n)
+        echo "Exit skript"
+        ;;
+    Y|y) 
         $DEBOOTSTRAP --arch "${ARCH}" "${DIST}" "${MAIN}" http://ftp.at.debian.org/debian
 
         $MOUNT -o bind /dev "${MAIN}/dev"
@@ -95,15 +99,12 @@ case i in
         try apt install linux-image task-desktop task-german-desktop console-setup tzdata
 EOF
         ;;
-    *)
-        echo "Install with installer now. Exit skript"
-        ;;
 esac
 
 
 
 
-exit
+exit 0
 
 #UUID=03d34c21-a150-4e91-8470-a6346d04287a	/			btrfs	defaults,compress=lzo,nospace_cache,inode_cache,relatime,ssd,discard							0	0
 #UUID=03d34c21-a150-4e91-8470-a6346d04287a	/boot/grub/x86_64/efi	btrfs	defaults,compress=lzo,nospace_cache,inode_cache,relatime,ssd,discard,subvol=__ALWAYSCURRENT__/boot-grub-x86_64-efi	0	0
