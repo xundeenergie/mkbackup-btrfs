@@ -950,43 +950,44 @@ class SubVolume(SubVolumeInfo):
 
         for st in list(self.args.sourcepath.keys())[0], list(self.args.destpath.keys())[0]:
             #print('C',st,self.snapped,'T',self.transferred,args.action)
-            if args.action == 'create':
-                #conn = sqlite3.connect(self.args.db+'/mkbackup-btrfs.db')
-                if  (st == 'SRC' or st == 'SNP' ) and self.snapped:
-                    try:
-                        #print("A Insert SYMLINK create lasttrans.db %s:%s - %s" % (self.args.tag,self.vol, self.args.timestamp))
-                        self.args.conn.execute("INSERT INTO JOURNAL (VOL, INTNAME, SNAPNAME, SNAP_TS, TRNS_TS, DELETED) VALUES ('%s', '%s', '%s', '%s', '%s', '%s')"% (self.vol,self.args.tag,self.SnapName,self.args.timestamp,'',0)) ;
-                    except:
-                        #print("A Update SYMLINK create lasttrans.db %s:%s - %s" % (self.args.tag,self.vol, self.args.timestamp))
-                 #       self.args.conn.execute("UPDATE LASTRUN set LRUN = '%s', DELETED = 0 where VOL='%s' AND INTV='%s'"% (self.args.timestamp,self.vol,self.args.tag)) ;
-                        self.args.conn.execute("UPDATE JOURNAL set VOL = '%s', INTNAME = '%s', SNAPNAME = '%s', SNAP_TS = '%s', TRNS_TS = '%s', DELETED = 0)"% (self.vol,self.args.tag,self.SnapName,self.args.timestamp,'')) ;
-                    pass
-                    #print('Symlink %s %s %s' % (st,self.snapped,self.transferred))
-                elif  st == 'BKP' and self.transferred:
-                    #print("B Insert/Update SYMLINK transferred lasttrans.db %s:%s" % (self.vol+'|'+self.args.tag, self.args.timestamp))
-                    try:
-                        self.args.conn.execute("UPDATE LASTRUN set LTRANS = '%s', DELETED = 0 where VOL='%s' AND INTV='%s'"% (args.timestamp,self.vol,args.tag)) ;
-                    except:
-                        self.args.conn.execute("INSERT INTO LASTRUN (VOL, INTV, LTRANS, DELETED) VALUES ('%s', '%s', '%s', 0)"% (self.vol,args.tag,args.timestamp)) ;
-                    pass
-                    #print('SymlinK %s %s %s' % (st,self.snapped,self.transferred))
-                else:
-                    return
-                self.args.conn.commit()
-                #conn.close()
-            elif args.action == 'transfer':
-                pass
-                #print("C Insert/Update SYMLINK transfer lasttrans.db %s:%s" % (self.args.tag, self.args.timestamp))
-                try:
-                    self.args.conn.execute("UPDATE LASTRUN set LTRANS = '%s', DELETED = 0 where VOL='%s' AND INTV='%s'"% (args.timestamp,self.vol,args.tag)) ;
-                except:
-                    self.args.conn.execute("INSERT INTO LASTRUN (VOL, INTV, LTRANS, DELETED) VALUES ('%s', '%s', '%s', 0)"% (self.vol+'|'+args.tag,args.timestamp)) ;
-                self.args.conn.commit()
-            elif args.action == 'delete':
-                self.DEBUG('Test if symlink points to the youngest for tag, if not - resymlink',level=1)
-                pass
-            else:
-                return
+# Experimenteller Code für eine externe sqlite-DB. Funktioniert noch nicht zufriedenstellend!
+#            if args.action == 'create':
+#                #conn = sqlite3.connect(self.args.db+'/mkbackup-btrfs.db')
+#                if  (st == 'SRC' or st == 'SNP' ) and self.snapped:
+#                    try:
+#                        #print("A Insert SYMLINK create lasttrans.db %s:%s - %s" % (self.args.tag,self.vol, self.args.timestamp))
+#                        self.args.conn.execute("INSERT INTO JOURNAL (VOL, INTNAME, SNAPNAME, SNAP_TS, TRNS_TS, DELETED) VALUES ('%s', '%s', '%s', '%s', '%s', '%s')"% (self.vol,self.args.tag,self.SnapName,self.args.timestamp,'',0)) ;
+#                    except:
+#                        #print("A Update SYMLINK create lasttrans.db %s:%s - %s" % (self.args.tag,self.vol, self.args.timestamp))
+#                 #       self.args.conn.execute("UPDATE LASTRUN set LRUN = '%s', DELETED = 0 where VOL='%s' AND INTV='%s'"% (self.args.timestamp,self.vol,self.args.tag)) ;
+#                        self.args.conn.execute("UPDATE JOURNAL set VOL = '%s', INTNAME = '%s', SNAPNAME = '%s', SNAP_TS = '%s', TRNS_TS = '%s', DELETED = 0)"% (self.vol,self.args.tag,self.SnapName,self.args.timestamp,'')) ;
+#                    pass
+#                    #print('Symlink %s %s %s' % (st,self.snapped,self.transferred))
+#                elif  st == 'BKP' and self.transferred:
+#                    #print("B Insert/Update SYMLINK transferred lasttrans.db %s:%s" % (self.vol+'|'+self.args.tag, self.args.timestamp))
+#                    try:
+#                        self.args.conn.execute("UPDATE LASTRUN set LTRANS = '%s', DELETED = 0 where VOL='%s' AND INTV='%s'"% (args.timestamp,self.vol,args.tag)) ;
+#                    except:
+#                        self.args.conn.execute("INSERT INTO LASTRUN (VOL, INTV, LTRANS, DELETED) VALUES ('%s', '%s', '%s', 0)"% (self.vol,args.tag,args.timestamp)) ;
+#                    pass
+#                    #print('SymlinK %s %s %s' % (st,self.snapped,self.transferred))
+#                else:
+#                    return
+#                self.args.conn.commit()
+#                #conn.close()
+#            elif args.action == 'transfer':
+#                pass
+#                #print("C Insert/Update SYMLINK transfer lasttrans.db %s:%s" % (self.args.tag, self.args.timestamp))
+#                try:
+#                    self.args.conn.execute("UPDATE LASTRUN set LTRANS = '%s', DELETED = 0 where VOL='%s' AND INTV='%s'"% (args.timestamp,self.vol,args.tag)) ;
+#                except:
+#                    self.args.conn.execute("INSERT INTO LASTRUN (VOL, INTV, LTRANS, DELETED) VALUES ('%s', '%s', '%s', 0)"% (self.vol+'|'+args.tag,args.timestamp)) ;
+#                self.args.conn.commit()
+#            elif args.action == 'delete':
+#                self.DEBUG('Test if symlink points to the youngest for tag, if not - resymlink',level=1)
+#                pass
+#            else:
+#                return
             StorePath = self.config.getStorePath(st)
             if not issubvol(StorePath): continue
             linkName = self.basename+'.'+args.config.getSymLink(args.tag)
@@ -1050,10 +1051,11 @@ class SubVolume(SubVolumeInfo):
                     self.del_ts     = self.OrigName.split('.')[1]
                     self.del_tag    = self.OrigName.split('.')[2]
                     #print("DELETE LASTRUN %s - %s - %s" % (self.del_vol,self.del_ts,self.del_tag))
-                    try:
-                        self.args.conn.execute("UPDATE LASTRUN set DELETED = 1 where VOL='%s' AND INTV='%s' AND LRUN = '%s' "% (self.del_vol,self.args.tag,self.del_ts)) ;
-                    except:
-                        self.args.conn.execute("INSERT INTO LASTRUN (VOL, INTV, LRUN, DELETED) VALUES ('%s', '%s', '%s', 1)"% (self.del_vol,self.args.tag,self.args.timestamp)) ;
+# Experimenteller Code für eine externe Datenbank - funktioniert noch nicht
+#                    try:
+#                        self.args.conn.execute("UPDATE LASTRUN set DELETED = 1 where VOL='%s' AND INTV='%s' AND LRUN = '%s' "% (self.del_vol,self.args.tag,self.del_ts)) ;
+#                    except:
+#                        self.args.conn.execute("INSERT INTO LASTRUN (VOL, INTV, LRUN, DELETED) VALUES ('%s', '%s', '%s', 1)"% (self.del_vol,self.args.tag,self.args.timestamp)) ;
                 except:
                     raise DeleteError
 

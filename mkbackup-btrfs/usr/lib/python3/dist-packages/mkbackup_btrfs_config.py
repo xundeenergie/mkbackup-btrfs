@@ -62,12 +62,16 @@ class Config():
                     if self.config.has_section(j) or j == 'DEFAULT':
                         if k == 'ignore':
                             # only attend pattern on option 'ignore'
-                            orig = self.config.get(j,k)+',' if self.config.has_option(j,k) else ''
-                            self.config.set(j,k,orig + re.sub('^\+','',csup[i].get(j,k)))
+                            orig = self.config.get(j,k) + ',' if self.config.has_option(j,k) else ''
+                        elif k == 'description':
+                            # only attend pattern on option 'description'
+                            orig = self.config.get(j,k) if self.config.has_option(j,k) else ''
                         else:
                             # if option is not ignore, do the same as without
                             # +, but remove + as first character
-                            self.config.set(j,k,re.sub('^\+*','',csup[i].get(j,k)))
+                            orig = ''
+                        self.config.set(j,k,orig + re.sub('^\+','',csup[i].get(j,k)))
+                        #self.config.set(j,k,re.sub('^\+*','',csup[i].get(j,k)))
                     else:
                         # add section
                         self.config.add_section(j)
@@ -82,12 +86,15 @@ class Config():
                     if self.config.has_section(j) or j == 'DEFAULT':
                         if k == 'ignore':
                             # only attend pattern on option 'ignore'
-                            orig = self.config.get(j,k)+',' if self.config.has_option(j,k) else ''
-                            self.config.set(j,k,orig + re.sub('^\+','',csup[i].get(j,k)))
+                            orig = self.config.get(j,k) + ',' if self.config.has_option(j,k) else ''
+                        elif k == 'description':
+                            # only attend pattern on option 'description'
+                            orig = self.config.get(j,k) if self.config.has_option(j,k) else ''
                         else:
                             # if option is not ignore, do the same as without
                             # +, but remove + as first character
-                            self.config.set(j,k,re.sub('^\+*','',csup[i].get(j,k)))
+                            orig = ''
+                        self.config.set(j,k,orig + re.sub('^\+','',csup[i].get(j,k)))
                     else:
                         # add section
                         self.config.add_section(j)
@@ -114,15 +121,17 @@ class Config():
             self.config.set('DEFAULT','srcstore', '')
 
     def CreateConfig(self):
-        self.config['DEFAULT'] = {'SNPMNT': '/var/cache/btrfs_pool_SYSTEM',
-                             'BKPMNT': '/var/cache/backup',
-                             'snpstore': '',
-                             'bkpstore': '$h',
-                             'volumes': '$S,__ALWAYSCURRENT__',
-                             'interval': 5,
-                             'symlink': 'LAST',
-                             'transfer': False}
-        self.config['hourly'] = {'volumes':  '$S,__ALWAYSCURRENT__','interval': '24','transfer': True}
+        self.config['DEFAULT'] = {
+                'Description': "Erstellt ein Backup",
+                'SNPMNT': '/var/cache/btrfs_pool_SYSTEM',
+                 'BKPMNT': '/var/cache/backup',
+                 'snpstore': '',
+                 'bkpstore': '$h',
+                 'volumes': '$S,__ALWAYSCURRENT__',
+                 'interval': 5,
+                 'symlink': 'LAST',
+                 'transfer': False}
+        self.config['hourly'] = {'Description': "+jede Stunde", 'volumes':  '$S,__ALWAYSCURRENT__','interval': '24','transfer': True}
         self.config['daily'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '7','transfer': True}
         self.config['weekly'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '5','transfer': True}
         self.config['monthly'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '12','transfer': True}

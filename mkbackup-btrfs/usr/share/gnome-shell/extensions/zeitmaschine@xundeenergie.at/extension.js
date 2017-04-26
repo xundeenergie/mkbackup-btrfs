@@ -27,6 +27,7 @@ const refreshTime = 3.0;
 let MainLabel;
 let icon;
 let MainIcon;
+let ExtIcon;
 let extMediaName = 'external backup-drive';
 let Drives = new Object();
 
@@ -69,12 +70,16 @@ const BackupManager = new Lang.Class({
 		let hbox = new St.BoxLayout({ style_class: 'panel-status-menu-box' });
 		MainIcon = new St.Icon({icon_name: 'drive-harddisk-usb-symbolic', 
                                 style_class: 'system-status-icon'});
+		ExtIcon = new St.Icon({icon_name: 'drive-harddisk-usb-symbolic', 
+                                style_class: 'system-status-icon'});
+        ExtIcon.hide();
 
 		MainLabel = new St.Label({ text: '---',
 		});
 
 		hbox.add_child(MainLabel);
 		hbox.add_child(MainIcon);
+		hbox.add_child(ExtIcon);
 		hbox.add_child(PopupMenu.arrowIcon(St.Side.BOTTOM));
 
 		this.actor.add_actor(hbox);
@@ -115,6 +120,10 @@ const BackupManager = new Lang.Class({
         this.bkpsubmenu = new PopupMenu.PopupSubMenuMenuItem(_("Backup-Intervalle"), true);
         this.bkpsubmenu.icon.icon_name = 'system-run-symbolic';
         this.menu.addMenuItem(this.bkpsubmenu);
+
+        //this.descrsubmenu = new PopupMenu.PopupSubMenuMenuItem(_("Info"), true);
+        //this.descrsubmenu.icon.icon_name = 'system-run-symbolic';
+        //this.bkpsubmenu.addMenuItem(this.descrsubmenu);
 
 		if(this._entries.length > 0)
 		this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
@@ -348,7 +357,7 @@ const BackupManager = new Lang.Class({
         //extMediaName = 'external backup-drive';
         log('SDDRIVE',drive.get_name(),drive.get_volumes(),drive.has_media(),drive.is_removable(),drive.has_volumes(),drive.enumerate_identifiers());
         if (drive.is_removable() && drive.has_volumes()) {
-            //extMediaName = drive.get_name();
+            extMediaName = drive.get_name();
             log('SDDREMOV')
 
             drive.get_volumes().forEach(Lang.bind(this, function(volume) {
@@ -421,6 +430,10 @@ const BackupManager = new Lang.Class({
 
         this.bkpsubmenu.icon.style = (active ? "color: #ff0000;" : "color: revert;");
         MainIcon.style = (mounted ? "color: #ff0000;" : "color: revert;");
+        ExtIcon.style = (mounted ? "color: #ff0000;" : "color: revert;");
+        (mounted ? ExtIcon.show() : ExtIcon.hide());
+        
+        //ExtIcon.actor = (mounted ? "visibile = true;" : "visible = false;");
         let mlabel = (mounted ? _("mounted") : "");
         let alabel = (active ? this.services[apos] : "");
         MainLabel.set_text(mlabel + ' ' + alabel);
@@ -464,6 +477,8 @@ const BackupManager = new Lang.Class({
             this._getCommand(this.services.join(' '), 'is-enabled', 'system'))[1].toString().split('\n');
         //log(eout);
 
+        this.aout = GLib.spawn_command_line_sync(
+            this._getCommand(this.services.join(' '), 'is-active', 'system'))[1].toString().split('\n');
 
 		this._entries.forEach(Lang.bind(this, function(service,index,arr) {
             if (! arr[index].enabled == (eout[index] == 'enabled')) 
@@ -478,7 +493,7 @@ const BackupManager = new Lang.Class({
 		this._entries.forEach(Lang.bind(this, function(service,index,arr) {
 			let serviceItem
 			me.forEach(Lang.bind(this, function(item) {
-				if ( item.label.text == service['name'] ) {
+				if ( item.label.text == service['descr']+' ('+service['name'] + ')' ) {
 					arr[index].found = true;
 					serviceItem = item;
 					me.splice(me.indexOf(item),1);
@@ -487,16 +502,14 @@ const BackupManager = new Lang.Class({
 
             if ( arr[index].changed ) {
                 if (arr[index].found) {
-                    //log('update',service['name']);
                     if ( service.staticserv ) {
                         serviceItem.setToggleState(service.active);
                     } else  {
                         serviceItem.setToggleState(service.enabled);
                     }
                 } else {
-                    //log('new',service['name']);
                     if ( service.staticserv ) {
-                        serviceItem = new PopupTargetItem(service['name'], service.active);
+                        serviceItem = new PopupTargetItem(service['descr']+' ('+service['name'] + ')', service.active);
                         this.bkpsubmenu.menu.addMenuItem(serviceItem);
                         
                         serviceItem.connect('toggled', Lang.bind(this, function() {
@@ -504,7 +517,7 @@ const BackupManager = new Lang.Class({
                                 this._getCommand(service['service'], (this._check_service(service.service, 'active') ? 'stop' : 'start'), service["type"]));
                         }));
                     } else {
-                        serviceItem = new PopupServiceItem(service['name'], service.enabled);
+                        serviceItem = new PopupServiceItem(service['descr']+' ('+service['name'] + ')', service.enabled);
                         this.bkpsubmenu.menu.addMenuItem(serviceItem);
 
                         serviceItem.connect('toggled', Lang.bind(this, function() {
@@ -525,6 +538,9 @@ const BackupManager = new Lang.Class({
                 };
                 if (serviceItem.transferButton) {
                     serviceItem.transferButton.style = (service.tr ? "text-decoration: revert;" : "text-decoration: line-through;");
+                };
+                if (serviceItem.descriptionLabel) {
+                    serviceItem.descriptionLabel.label = service.descr;
                 };
 
 
@@ -584,6 +600,12 @@ const BackupManager = new Lang.Class({
                     obj.tr = (kf.get_value(interval,"transfer").toLowerCase() === "true");
                 } catch(err) {
                     obj.tr = (kf.get_value("DEFAULT","transfer").toLowerCase() === "true");
+                }
+
+                try {
+                    obj.descr = (kf.get_value(interval,"description"));
+                } catch(err) {
+                    obj.descr = (kf.get_value("DEFAULT","description"));
                 }
             this._entries.push(obj)}));
         } 
