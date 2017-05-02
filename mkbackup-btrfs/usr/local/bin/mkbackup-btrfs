@@ -298,7 +298,7 @@ class listing:
         result = []
         for sub in sorted(self.svols.keys(),key=int):
             if self.svols[sub]['puuid'] == uuid:
-                self.DEBUG('PARENT',self.svols[sub]['path'],level=5)
+                self.DEBUG('PARENTX',names,sub,self.svols[sub]['path'] if names else sub,"Y",level=5)
                 result.append(self.svols[sub]['path']) if names else result.append(sub)
         return(self._ret(result,reverse=rev))
 
@@ -1278,51 +1278,80 @@ def lists(args):
                     #print('VOL',vol)
                     ST[st][vol]=dict()
                     for intv in args.config.ListIntervals():
-                        ST[st][vol][intv] = list()
+                        ST[st][vol][intv] = dict()
                     if args.config.getStorePath(st) is not None:
                         dirlist = dict()
                         for snps in glob.glob(args.config.getStorePath(st)+'/'+vol+'.*'):
+                            #print("snps",snps)
                             if len(os.path.basename(snps).split('.')) == 3: 
                                 if not os.path.basename(snps).split('.')[1] in dirlist:
                                     dirlist[os.path.basename(snps).split('.')[1]] = list()
                                 dirlist[os.path.basename(snps).split('.')[1]].append(os.path.basename(snps))
                         for t in sorted(dirlist.keys()):
-                            #print(t,dirlist[t])
                             for snp in dirlist[t]:
-                                #print(dirlist[t])
+                                #print("T",dirlist[t],snp)
                                 for intv in ST[st][vol].keys():
                                     R = re.compile(intv +'$') 
+                                    #print("I",intv)
                                     if R.search(snp):
-                                        ST[st][vol][intv].append(os.path.basename(snp))
+                                        #print("snp",st,vol,intv,snp)
+                                        #ST[st][vol][intv].append(os.path.basename(snp))
+                                        #print(intv,snp,os.path.basename(snps).split('.')[1])
+                                        if not os.path.basename(snp).split('.')[1] in ST[st][vol][intv]:
+                                            ST[st][vol][intv][os.path.basename(snp).split('.')[1]] = list()
+                                        ST[st][vol][intv][os.path.basename(snp).split('.')[1]].append(os.path.basename(snp))
                         ST[st][vol]['dirlist'] = dirlist
                     #for x in ST[st][vol].keys(): print(x,ST[st][vol][x])
             for st in ST.keys():
+                fp = ''
+                if args.shortpath == True: fp='/'
+                if args.mountpath == True: fp=args.config.getStoreName(st)+'/'
+                if args.fullpath  == True: fp=args.config.getStorePath(st)+'/'
                 DEBUG('..--==°°==--..',level=1,verbose=args.verbose)
                 DEBUG('Youngest snapshot in %s' % (st),level=1,verbose=args.verbose)
+                #print("ST",ST[st])
                 for vol in ST[st].keys():
                     s = dict()
                     missing = list()
                     DEBUG('  Volume %s:' % (vol),level=1,verbose=args.verbose)
-                    for intv in ST[st][vol].keys():
+                    for intv in sorted(ST[st][vol].keys()):
+                        #print(ST[st][vol][intv])
                         if intv != 'dirlist':
                             if len(ST[st][vol][intv]) > 0:
-                                i = ST[st][vol][intv].pop()
+                                #for x in sorted(ST[st][vol][intv].keys()): print("Key",x,ST[st][vol][intv],ST[st][vol][intv][x])
+                                #i = ST[st][vol][intv].pop()
+                                #print("X",ST[st][vol][intv][max(ST[st][vol][intv].keys())])
+                                k = max(ST[st][vol][intv].keys())
+                                i = ST[st][vol][intv][k]
+                                #print("i",intv,i,k)
                                 if args.tagset:
                                     if args.all:
+                                        #print("A")
                                         s[i.split('.')[1]] = i
                                     else:
+                                        #print("B")
                                         s['dirlist'] = ST[st][vol]['dirlist'][sorted(dirlist.keys()).pop()]
                                 else:
-                                    if i.split('.')[2] == args.tag: 
-                                        s[i.split('.')[1]] = i
+                                    #print("C",i)
+                                    #if i.split('.')[2] == args.tag: 
+                                        #print("D",i)
+                                        #s[i.split('.')[1]] = i
+                                    if intv == args.tag:
+                                        s[k] = i
                             else:
                                 missing.append(intv)
                         
                     lo = 0
                     for i in reversed(sorted(s.keys())):
-                        out = '»<%s>/%s«' % (st,s[i])
-                        lo = len(out) if len(out) > lo else lo
-                        print('    %s' % (out))
+                        #for j in s[i] if i == 'dirlist' else [s[i]]:
+                        for j in s[i]:
+                            #out = '»<%s>/  %s%s«' % (st,fp,j)
+                            out = '%s%s«' % (fp,j)
+                            lo = len(out) if len(out) > lo else lo
+                            if args.verbose == 0:
+                                DEBUG('%s' % (out),level=0,verbose=args.verbose)
+                            else:
+                                DEBUG('    %s' % (out),level=1,verbose=args.verbose)
                     DEBUG('    %s' % ('-' * (lo)),level=1,verbose=args.verbose)
                     lo = 0
                     out = """missing: %s""" % (', '.join(missing))
@@ -1385,7 +1414,7 @@ def lists(args):
                         DEBUG("[II]  <%s> is %s" %(st,args.config.getStorePath()),level=1,verbose=args.verbose)
                         DEBUG("[II]  list %s <%s>/%s" %(text,st,SRC[snap].SourceName),level=1,verbose=args.verbose)
                         fp=''
-                        if args.sisters or args.older or args.younger or args.parents:
+                        if args.sisters or args.older or args.younger or args.parents or args.snap:
                             if args.shortpath == True: fp='/'
                             if args.mountpath == True: fp=SRC[snap].StoreName+'/'
                             if args.fullpath  == True: fp=SRC[snap].StorePath+'/'
@@ -1395,8 +1424,9 @@ def lists(args):
                             if args.fullpath  == True: fp=SRC[snap].StorePath+'/'+SRC[snap].SourceName+'/'
 
                         if args.snap:
-                            
-                            for i in SRC[snap].list_snapshots(SRC[snap].uuid,rev=args.reverse): print(fp+SRC[snap].SourceName+i)
+                            # List children of snapshot
+                            #for i in SRC[snap].list_snapshots(SRC[snap].uuid,rev=args.reverse): print(fp+SRC[snap].SourceName+i)
+                            for i in SRC[snap].list_snapshots(SRC[snap].uuid,rev=args.reverse): print(fp+i)
                         elif args.sisters or args.older or args.younger:
                             # List sisters of snapshot (same parent)
                             for i in SRC[snap].list_sisters(SRC[snap].id,rev=args.reverse): print(fp+i)
