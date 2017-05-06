@@ -49,3 +49,6 @@ buildonlydeb: $(FILES)
 	fakeroot git commit -m $(COMMIT) && git push origin master || exit 0
 	touch .publish-git
 	
+
+pull-git:
+	git pull origin || exit 0
