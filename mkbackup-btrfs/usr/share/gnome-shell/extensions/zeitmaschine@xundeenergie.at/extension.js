@@ -605,7 +605,11 @@ const BackupManager = new Lang.Class({
                 try {
                     obj.descr = (kf.get_value(interval,"description"));
                 } catch(err) {
+                    try {
                     obj.descr = (kf.get_value("DEFAULT","description"));
+                    } catch(err) {
+                        obj.descr = "";
+                    }
                 }
             this._entries.push(obj)}));
         } 
