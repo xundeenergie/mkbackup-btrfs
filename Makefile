@@ -25,7 +25,7 @@ all: .builddeb
 	sed -e "s/^Version:.*/`gawk -f ../increment.awk $(DIR)/DEBIAN/control`/" $(DIR)/DEBIAN/control > $(DIR)/DEBIAN/control.tmp
 	mv $(DIR)/DEBIAN/control.tmp $(DIR)/DEBIAN/control
 	fakeroot dpkg-deb --build $(DIR) "$(DIR)_$(VERSION)_$(ARCH).deb"
-	ln -sf "$(DIR)_$(VERSION)_$(ARCH).deb" "$(DIR).deb"
+	ln -sf "$(DIR)_$(VERSION)_$(ARCH).deb" "$(DIR)_current_$(ARCH).deb"
 	aptly repo add xundeenergie "$(DIR)_$(VERSION)_$(ARCH).deb"
 	touch .builddeb
 
