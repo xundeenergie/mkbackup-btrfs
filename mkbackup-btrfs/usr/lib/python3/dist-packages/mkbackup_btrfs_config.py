@@ -104,10 +104,10 @@ class Config():
 
 
         psrc = os.getcwd()
-        if   '/'+psrc.strip('/') == self.config.get('DEFAULT','SNPMNT')+'/'+self.config.get('DEFAULT','snpstore').strip('/'):
+        if   '/'+psrc.strip('/') == self.config.get('DEFAULT','SNPMNT'):
             self.config.set('DEFAULT','SRC', self.config.get('DEFAULT','SNPMNT'))
             self.config.set('DEFAULT','srcstore', self.config.get('DEFAULT','snpstore'))
-        if   '/'+psrc.strip('/') == self.config.get('DEFAULT','SNPMNT'):
+        elif   '/'+psrc.strip('/') == self.config.get('DEFAULT','SNPMNT')+'/'+self.config.get('DEFAULT','snpstore').strip('/'):
             self.config.set('DEFAULT','SRC', self.config.get('DEFAULT','SNPMNT'))
             self.config.set('DEFAULT','srcstore', self.config.get('DEFAULT','snpstore'))
         elif '/'+psrc.strip('/') == self.config.get('DEFAULT','BKPMNT')+'/'+self.config.get('DEFAULT','bkpstore').strip('/'):
@@ -131,7 +131,7 @@ class Config():
                  'interval': 5,
                  'symlink': 'LAST',
                  'transfer': False}
-        self.config['hourly'] = {'Description': "+jede Stunde", 'volumes':  '$S,__ALWAYSCURRENT__','interval': '24','transfer': True}
+        self.config['hourly'] = {'volumes':  '$S,__ALWAYSCURRENT__','interval': '24','transfer': True}
         self.config['daily'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '7','transfer': True}
         self.config['weekly'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '5','transfer': True}
         self.config['monthly'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '12','transfer': True}
@@ -150,7 +150,6 @@ class Config():
         return(self.config)
 
     def PrintConfig(self,tag):
-        #self._read()
         if tag == None:
             seclist = self.config.sections()
         else:
@@ -171,7 +170,6 @@ class Config():
 
 
     def ListIntervals(self):
-        #self._read()
         LST = []
         for i in self.config.sections():
             LST.append(i) 
@@ -194,14 +192,22 @@ class Config():
         return(list(set(LST)))
 
 
-    def getStorePath(self,store='SRC'):
-        #self._read()
+    def getStorePath(self,store='SRC',intv='DEFAULT'):
         if store == 'SRC':
-            path = '/'+self.config.get('DEFAULT','SRC').strip('/')+'/'+self.config.get('DEFAULT','srcstore').strip('/')
+            try:
+                path = '/'+self.config.get(intv,'SRC').strip('/')+'/'+self.config.get(intv,'srcstore').strip('/')
+            except:
+                path = '/'+self.config.get('DEFAULT','SRC').strip('/')+'/'+self.config.get('DEFAULT','srcstore').strip('/')
         if store == 'SNP':
-            path = '/'+self.config.get('DEFAULT','SNPMNT').strip('/')+'/'+self.__trnName(self.config.get('DEFAULT','snpstore').strip('/'))
+            try:
+                path = '/'+self.config.get(intv,'SNPMNT').strip('/')+'/'+self.__trnName(self.config.get(intv,'snpstore').strip('/'))
+            except:
+                path = '/'+self.config.get('DEFAULT','SNPMNT').strip('/')+'/'+self.__trnName(self.config.get('DEFAULT','snpstore').strip('/'))
         if store == 'BKP':
-            path = '/'+self.config.get('DEFAULT','BKPMNT').strip('/')+'/'+self.__trnName(self.config.get('DEFAULT','bkpstore').strip('/'))
+            try:
+                path = '/'+self.config.get(intv,'BKPMNT').strip('/')+'/'+self.__trnName(self.config.get(intv,'bkpstore').strip('/'))
+            except:
+                path = '/'+self.config.get('DEFAULT','BKPMNT').strip('/')+'/'+self.__trnName(self.config.get('DEFAULT','bkpstore').strip('/'))
 
         # listing in / raises error, when next return is deleted. 
         return('/'+path.strip('/'))
@@ -211,14 +217,22 @@ class Config():
         else:
             return(None)
 
-    def getMountPath(self,store='SRC'):
-        #self._read()
+    def getMountPath(self,store='SRC',intv='DEFAULT'):
         if store == 'SRC':
-            path = '/'+self.config.get('DEFAULT','SRC').strip('/')
+            try:
+                path = '/'+self.config.get(intv,'SRC').strip('/')
+            except:
+                path = '/'+self.config.get('DEFAULT','SRC').strip('/')
         elif store == 'SNP':
-            path = '/'+self.config.get('DEFAULT','SNPMNT').strip('/')
+            try:
+                path = '/'+self.config.get(intv,'SNPMNT').strip('/')
+            except:
+                path = '/'+self.config.get('DEFAULT','SNPMNT').strip('/')
         elif store == 'BKP':
-            path = '/'+self.config.get('DEFAULT','BKPMNT').strip('/')
+            try:
+                path = '/'+self.config.get(intv,'BKPMNT').strip('/')
+            except:
+                path = '/'+self.config.get('DEFAULT','BKPMNT').strip('/')
 
         # listing in / raises error, when next return is deleted. 
         return('/'+path.strip('/'))
@@ -228,9 +242,9 @@ class Config():
         else:
             return(None)
 
-    def getDevice(self,store='SRC'):
+    def getDevice(self,store='SRC',intv='DEFAULT'):
         #self._read()
-        mp = self.getMountPath(store=store)
+        mp = self.getMountPath(store=store,intv=intv)
         #cmd = """awk -F " " '$1 !~ /systemd-1/ && $2 == "%s" && $3 == "btrfs" {printf $1}' /proc/mounts""" % (mp)
         cmd = """awk -F " " '$2 == "%s" && $3 == "autofs" {printf $1}' /proc/mounts""" % (mp)
         amount =  subprocess.check_output(cmd, shell=True).decode()
@@ -255,9 +269,9 @@ class Config():
 
         #return device if device != '' else None
 
-    def getUUID(self,store='SRC'):
+    def getUUID(self,store='SRC',intv='DEFAULT'):
         #self._read()
-        device = self.getDevice(store=store)
+        device = self.getDevice(store=store,intv=intv)
         if device == None: return None
         cmd = "/sbin/blkid %s -o value -s 'UUID'" % (device)
         uuid =  subprocess.check_output(cmd, shell=True).decode().partition('\n')[0]
@@ -280,14 +294,23 @@ class Config():
         #self._read()
         self.config['DEFAULT']['snpstore'] = store
 
-    def getStoreName(self,store='SRC'):
+    def getStoreName(self,store='SRC',intv='DEFAULT'):
         #self._read()
         if store == 'SRC':
-            path = self.config.get('DEFAULT','srcstore').strip('/')
+            try:
+                path = self.config.get(intv,'srcstore').strip('/')
+            except:
+                path = self.config.get('DEFAULT','srcstore').strip('/')
         elif store == 'SNP':
-            path = self.__trnName(self.config.get('DEFAULT','snpstore').strip('/'))
+            try:
+                path = self.__trnName(self.config.get(intv,'snpstore').strip('/'))
+            except:
+                path = self.__trnName(self.config.get('DEFAULT','snpstore').strip('/'))
         elif store == 'BKP':
-            path = self.__trnName(self.config.get('DEFAULT','bkpstore').strip('/'))
+            try:
+                path = self.__trnName(self.config.get(intv,'bkpstore').strip('/'))
+            except:
+                path = self.__trnName(self.config.get('DEFAULT','bkpstore').strip('/'))
         if '/'+path.strip('/') != "/":
             return(path.strip('/'))
         else:

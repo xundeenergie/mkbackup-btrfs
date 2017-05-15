@@ -205,10 +205,10 @@ class listing:
         self.single    = single
         self.verbose   = args.verbose
         self.StoreList = store # List is from which store
-        self.MountPath = args.config.getMountPath(self.store) # path from / to the mountpoint of store
-        self.StoreName = args.config.getStoreName(self.store) # path of store below the mountpoint
-        self.StorePath = args.config.getStorePath(self.store) # whole path from / to directory where the snapshot lives
-        self.BkpPath   = args.config.getStorePath('BKP') # whole path from / to directory where the snapshot lives
+        self.MountPath = args.config.getMountPath(self.store,self.args.tag) # path from / to the mountpoint of store
+        self.StoreName = args.config.getStoreName(self.store,self.args.tag) # path of store below the mountpoint
+        self.StorePath = args.config.getStorePath(self.store,self.args.tag) # whole path from / to directory where the snapshot lives
+        self.BkpPath   = args.config.getStorePath('BKP',self.args.tag) # whole path from / to directory where the snapshot lives
         self.svols     = dict()
         self.args      = args
         self.scanfs()
@@ -254,9 +254,9 @@ class listing:
 
     def build_tree(self,snap=None,st="/"):
         if TREE:
-            wood = Node(self.config.getStorePath(st)+' ('+st+')')
+            wood = Node(self.config.getStorePath(st,args.tag)+' ('+st+')')
             stroot="wood"
-            isbkp = self.config.getStorePath(st) == self.config.getStorePath('BKP')
+            isbkp = self.config.getStorePath(st,args.tag) == self.config.getStorePath('BKP',args.tag)
             for sub in sorted(self.svols.keys(),key=int):
                 if self.svols[sub]['path'] == snap: stroot = self.svols[sub]['uuid']
                 try:
@@ -469,7 +469,7 @@ class SubVolume(SubVolumeInfo):
         self.subvolsshort = []
         self.subvolumes   = []
         self.stderr       = args.stderr
-        self.DEBUG('[II]  <%s> is %s: ' % (self.store, self.config.getStorePath(self.store)),level=2)
+        self.DEBUG('[II]  <%s> is %s: ' % (self.store, self.config.getStorePath(self.store,self.args.tag)),level=2)
 
     def _createlockfile(self,lf,ln):
         if os.path.isfile(self.store+'/'+lf):
@@ -511,7 +511,7 @@ class SubVolume(SubVolumeInfo):
                 raise RuntimeError('ERROR - Systemvolume not allowed to rename (To): %s' % (To),1)
 
         st = self.store if store == None else store
-        StorePath = self.config.getStorePath(st)
+        StorePath = self.config.getStorePath(st,self.args.tag)
         if not issubvol(StorePath): 
             self.DEBUG("Failed to rename »<%s>%s«, is no btrfs-subvolume, or not existing" % (st,From),level=3)
             return
@@ -745,7 +745,7 @@ class SubVolume(SubVolumeInfo):
                 self.DEBUG(" |no-transfer: Filesystem not mounted: %s" % (self.config.getDevice(store=self.store)))
                 return
             if None == uuidB:
-                self.DEBUG(" |no-transfer: Filesystem not mounted: %s" % (self.config.getMountPath(store='BKP')))
+                self.DEBUG(" |no-transfer: Filesystem not mounted: %s" % (self.config.getMountPath(store='BKP',intv=args.tag)))
                 return
 
 
@@ -758,7 +758,7 @@ class SubVolume(SubVolumeInfo):
                 # first check if BKP-mount is btrfs, then check if BKP-Store exists and is a subvolume.
                 # If BKP-mount is btrfs, and BKPStore does not exist, create it as subvolume
                 # If BKPStore exists and is a directory, change it to subvolume
-                if isbtrfs(self.config.getMountPath(store='BKP')):
+                if isbtrfs(self.config.getMountPath(store='BKP',intv=args.tag)):
                     if os.path.exists(self.BkpPath):
                         if issubvol(self.BkpPath):
                             self.DEBUG("BKP-Path %s is subvolume" % (self.BkpPath),level=4)
@@ -845,7 +845,7 @@ class SubVolume(SubVolumeInfo):
             self.DEBUG(' ==transfer=> »<%s>/%s«' % (self.store,sname),level=1)
             if self.args.npb: pt = progress_timer(description= ' ==transfer=> »<%s>/%s«: ' % (self.store,sname), n_iter=len(transfers.keys())*2)
             for t in sorted(transfers.keys()):
-                dest = args.config.getStorePath('BKP')+'/'+t
+                dest = args.config.getStorePath('BKP',args.tag)+'/'+t
                 destdir = os.path.dirname(dest.rstrip('/'))+'/'
                 if issubvol(dest) == False:
                     if os.path.exists(dest):
@@ -880,7 +880,7 @@ class SubVolume(SubVolumeInfo):
 
             listing.TransferedSubvolumes.push(re.sub('\.part$','',sname))
             for t in reversed(sorted(transfers.keys())):
-                dest = args.config.getStorePath('BKP')+'/'+t
+                dest = args.config.getStorePath('BKP',args.tag)+'/'+t
                 destdir = os.path.dirname(dest.rstrip('/'))+'/'
                 self.DEBUG("  =set-ro>  %s" % (dest),level=1)
                 try:
@@ -988,7 +988,7 @@ class SubVolume(SubVolumeInfo):
 #                pass
 #            else:
 #                return
-            StorePath = self.config.getStorePath(st)
+            StorePath = self.config.getStorePath(st,self.args.tag)
             if not issubvol(StorePath): continue
             linkName = self.basename+'.'+args.config.getSymLink(args.tag)
             self.DEBUG('%-12s»<%s>/%s«' % (' =symlink>',st,StorePath+'/'+linkName),level=0)
@@ -1078,7 +1078,7 @@ class SubVolume(SubVolumeInfo):
 
 def main(args):
     for st in args.store:
-        print('S',args.config.getStorePath(st))
+        print('S',args.config.getStorePath(st,args.tag))
         for s in args.snapshots:
             print(st,s)
 
@@ -1106,7 +1106,7 @@ def cleanup(args):
         I[i]  = args.config.getInterval(i)
     #for st in args.store:
     for st in ['SRC','SNP','BKP']:
-        StorePath = args.config.getStorePath(st)
+        StorePath = args.config.getStorePath(st,args.tag)
         if not issubvol(StorePath):
             DEBUG(args,' =cleanup: store doesnt exist: %s' % (StorePath),level=3)
             continue
@@ -1114,7 +1114,7 @@ def cleanup(args):
             if args.npb: pt.update()
         else:
             DEBUG(args,' -Cleanup store <%s>:%s' % (st,StorePath),level=3)
-            StorePath = args.config.getStorePath(st)+'/'
+            StorePath = args.config.getStorePath(st,args.tag)+'/'
             ST[st] = listing(args,store=st,single=True)
             if len(args.snapshots) > 0:
                 DEBUG(args,'  --cleanup interval-snapshots',level=3)
@@ -1154,7 +1154,7 @@ def cleanup(args):
             if args.npb: pt.update()
 
             DEBUG(args,'  --cleanup unused lockfiles',level=3)
-            for lf in os.listdir(args.config.getStorePath(st)):
+            for lf in os.listdir(args.config.getStorePath(st,args.tag)):
                 if explock.search(lf):
                     if check_lockfile(args,lf):
                         pass
@@ -1251,7 +1251,7 @@ def setprop(args):
 def lists(args):
     if args.info:
         if args.showpathstore:
-            for st in args.store: print(args.config.getStorePath(st))
+            for st in args.store: print(args.config.getStorePath(st,args.tag))
         if args.showtags:
             for i in args.config.ListIntervals(): print(i)
         if args.showtransfers:
@@ -1279,9 +1279,9 @@ def lists(args):
                     ST[st][vol]=dict()
                     for intv in args.config.ListIntervals():
                         ST[st][vol][intv] = dict()
-                    if args.config.getStorePath(st) is not None:
+                    if args.config.getStorePath(st,args.tag) is not None:
                         dirlist = dict()
-                        for snps in glob.glob(args.config.getStorePath(st)+'/'+vol+'.*'):
+                        for snps in glob.glob(args.config.getStorePath(st,args.tag)+'/'+vol+'.*'):
                             #print("snps",snps)
                             if len(os.path.basename(snps).split('.')) == 3: 
                                 if not os.path.basename(snps).split('.')[1] in dirlist:
@@ -1305,8 +1305,8 @@ def lists(args):
             for st in ST.keys():
                 fp = ''
                 if args.shortpath == True: fp='/'
-                if args.mountpath == True: fp=args.config.getStoreName(st)+'/'
-                if args.fullpath  == True: fp=args.config.getStorePath(st)+'/'
+                if args.mountpath == True: fp=args.config.getStoreName(st,args.tag)+'/'
+                if args.fullpath  == True: fp=args.config.getStorePath(st,args.tag)+'/'
                 DEBUG('..--==°°==--..',level=1,verbose=args.verbose)
                 DEBUG('Youngest snapshot in %s' % (st),level=1,verbose=args.verbose)
                 #print("ST",ST[st])
@@ -1517,7 +1517,7 @@ def restore(args):
                     else:
                         dst = os.environ['HOME']+src.replace(bkpsubdir,'')
                 else:
-                    if mountp in [args.config.getMountPath('BKP'), args.config.getMountPath('SNP')]:
+                    if mountp in [args.config.getMountPath('BKP',args.tag), args.config.getMountPath('SNP',args.tag)]:
                         dst = src.replace(bkpsubdir,'')
                         #print(dst)
                     else:
@@ -1733,18 +1733,18 @@ if __name__ == '__main__':
     if args.action == 'create' or args.action == 'transfer':
         if 'BKP' in args.store: args.store.pop(args.store.index('BKP'))
         if 'SRC' in args.store or 'SNP' not in args.store:
-            args.sourcepath['SRC'] = args.config.getStorePath('SRC')
+            args.sourcepath['SRC'] = args.config.getStorePath('SRC',args.tag)
         else:
-            args.sourcepath['SNP'] = args.config.getStorePath('SNP')
-        args.destpath['BKP'] = args.config.getStorePath('BKP')
+            args.sourcepath['SNP'] = args.config.getStorePath('SNP',args.tag)
+        args.destpath['BKP'] = args.config.getStorePath('BKP',args.tag)
     else:
         if len(args.store) == 0:
-            args.sourcepath['SRC'] = args.config.getStorePath('SRC')
-            args.destpath['BKP'] = args.config.getStorePath('BKP')
+            args.sourcepath['SRC'] = args.config.getStorePath('SRC',args.tag)
+            args.destpath['BKP'] = args.config.getStorePath('BKP',args.tag)
         else:
             for st in args.store:
-                args.sourcepath[st] = args.config.getStorePath(st)
-                args.destpath[st] = args.config.getStorePath(st)
+                args.sourcepath[st] = args.config.getStorePath(st,args.tag)
+                args.destpath[st] = args.config.getStorePath(st,args.tag)
 
     DEBUG('SRC',args.sourcepath,level=5,verbose=args.verbose)
     DEBUG('DST',args.destpath,level=5,verbose=args.verbose)
