@@ -1,9 +1,9 @@
 [Unit]
 SourcePath=/etc/fstab
 Documentation=man:fstab(5) man:systemd-fstab-generator(8)
-Requires=var-cache-backup.automount
-After=var-cache-backup.automount
-#PartOf=var-cache-backup.automount
+#Requires=var-cache-backup.automount
+#After=var-cache-backup.automount
+PartOf=var-cache-backup.automount
 #Wants=backup.mount backup.automount
 #Before=backup.mount
 
@@ -13,4 +13,4 @@ After=var-cache-backup.automount
 Where=/var/cache/backup
 Type=btrfs
 TimeoutSec=10s
-Options=defaults,user,noatime,nofail,compress=lzo,space_cache,noinode_cache,relatime,subvol=/
+Options=noauto,user,noatime,nofail,compress=lzo,space_cache,noinode_cache,relatime,subvol=/

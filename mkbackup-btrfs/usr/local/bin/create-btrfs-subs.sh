@@ -69,19 +69,19 @@ done
 
 cp "${MAIN}/etc/fstab" "${MAIN}/etc/fstab.orig"
 
-cat <<EOF
-Now your BTRFS-Subvolumes are created and mounted.
-You can now install your system with debootstrap 
-
-Install with debootstrap? [Y/n]
-EOF
-
-read i
-case i in
-    N|n)
-        echo "Exit skript"
-        ;;
-    Y|y) 
+#cat <<EOF
+#Now your BTRFS-Subvolumes are created and mounted.
+#You can now install your system with debootstrap 
+#
+#Install with debootstrap? [Y/n]
+#EOF
+#
+#read i
+#case i in
+#    N|n)
+#        echo "Exit skript"
+#        ;;
+#    Y|y) 
         $DEBOOTSTRAP --arch "${ARCH}" "${DIST}" "${MAIN}" http://ftp.at.debian.org/debian
 
         $MOUNT -o bind /dev "${MAIN}/dev"
@@ -98,8 +98,8 @@ case i in
         add grub2 or refind and initramfs
         try apt install linux-image task-desktop task-german-desktop console-setup tzdata
 EOF
-        ;;
-esac
+#        ;;
+#esac
 
 
 

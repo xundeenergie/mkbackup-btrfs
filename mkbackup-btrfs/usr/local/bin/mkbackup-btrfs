@@ -130,6 +130,9 @@ def check_lockfile(args,lf):
         if len(pid) > 0 and os.path.isfile('/proc/'+pid+'/cmdline'):
             #self.DEBUG(pid+' is running: '+lf)
             DEBUG('lockfile %s in use with process %s' % (lf,pid),level=3,verbose=args.verbose)
+#            import fileinput
+#            for line in fileinput.input('/proc/'+pid+'/cmdline'):
+#                print(line)
             return(True)
         else:
             DEBUG('lockfile %s unused' % (lf),level=3,verbose=args.verbose)
@@ -440,7 +443,7 @@ class SubVolume(SubVolumeInfo):
         self.config       = args.config #Config()
         self.path         = ''
         self.dir          = ''
-        self.basename     = name.split('.')[0]
+        self.basename     = os.path.basename(name.split('.')[0])
         if args.action == 'transfer':
             self.trans_ts     = name.split('.')[1]
             self.trans_tag    = name.split('.')[2]
@@ -924,9 +927,10 @@ class SubVolume(SubVolumeInfo):
                                                 shell=False)
                 process_recv = subprocess.Popen(second, stdin=process_send.stdout, stderr=subprocess.DEVNULL,
                                               stdout=subprocess.PIPE, shell=False)
-                # Allow process_curl to receive a SIGPIPE if process_wc exits.
+                # Allow process_curl to receive a SIGPIPE if process_send exits.
                 process_send.stdout.close()
                 out, err = process_recv.communicate()
+                #self.DEBUG("out --- err",out," --- ",err,level=3)
             except:
                 raise TransferError('ERROR - sending to external backup-media failed')
                 pass
@@ -940,6 +944,7 @@ class SubVolume(SubVolumeInfo):
             os.symlink(target, link_name)
         except OSError as e:
             if e.errno == errno.EEXIST:
+                    print("LINK NAME",link_name)
                     os.remove(link_name)
                     os.symlink(target, link_name)
             else:

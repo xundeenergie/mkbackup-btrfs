@@ -7,4 +7,4 @@ What=MksnapshotFS.py
 Where=/backup
 Type=fuse
 TimeoutSec=10s
-Options=ro,nofail
+Options=noauto,ro,nofail
