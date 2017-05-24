@@ -214,6 +214,10 @@ class listing:
         self.BkpPath   = args.config.getStorePath('BKP',self.args.tag) # whole path from / to directory where the snapshot lives
         self.svols     = dict()
         self.args      = args
+        self.BKPLogin  = args.config.getSSHLogin(store='BKP',tag=self.args.tag)
+        self.SNPLogin  = args.config.getSSHLogin(store='SNP',tag=self.args.tag)
+        self.SRCLogin  = args.config.getSSHLogin(store='SRC',tag=self.args.tag)
+        print("LOGINS",self.SRCLogin,self.SNPLogin,self.BKPLogin)
         self.scanfs()
 
     def scanfs(self):
@@ -748,7 +752,7 @@ class SubVolume(SubVolumeInfo):
                 self.DEBUG(" |no-transfer: Filesystem not mounted: %s" % (self.config.getDevice(store=self.store)))
                 return
             if None == uuidB:
-                self.DEBUG(" |no-transfer: Filesystem not mounted: %s" % (self.config.getMountPath(store='BKP',intv=args.tag)))
+                self.DEBUG(" |no-transfer: Filesystem not mounted: %s" % (self.config.getMountPath(store='BKP',tag=args.tag)))
                 return
 
 
@@ -761,7 +765,7 @@ class SubVolume(SubVolumeInfo):
                 # first check if BKP-mount is btrfs, then check if BKP-Store exists and is a subvolume.
                 # If BKP-mount is btrfs, and BKPStore does not exist, create it as subvolume
                 # If BKPStore exists and is a directory, change it to subvolume
-                if isbtrfs(self.config.getMountPath(store='BKP',intv=args.tag)):
+                if isbtrfs(self.config.getMountPath(store='BKP',tag=args.tag)):
                     if os.path.exists(self.BkpPath):
                         if issubvol(self.BkpPath):
                             self.DEBUG("BKP-Path %s is subvolume" % (self.BkpPath),level=4)
