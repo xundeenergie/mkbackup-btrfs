@@ -2,7 +2,8 @@
 Description=Create or update temporary conf-file /tmp/%I.conf.tmp for shell-extension 
 
 [Service]
-ExecStart=/bin/sh -c "(/usr/local/bin/mkbackup list -i --print-config > /tmp/%I.conf.tmp)"
+#ExecStart=/bin/sh -c "(/usr/local/bin/mkbackup list -i --print-config > /tmp/%I.conf.tmp)"
+ExecStart=/usr/local/bin/mkbackup list -i --print-config -o /tmp/%I.conf.tmp
 
 [Install]
 WantedBy=multi-user.target

@@ -21,21 +21,46 @@ PY34 = sys.version_info[0:2] >= (3, 4)
 
 if PY3:
     from configparser import ConfigParser
+    from configparser import RawConfigParser, NoOptionError, NoSectionError
 else:
     from ConfigParser import ConfigParser
+    from ConfigParser import RawConfigParser, NoOptionError, NoSectionError
 
 def s2bool(s):
     return s.lower() in ['true','yes','y','1'] if s else False
 
+class MyConfigParser(RawConfigParser):
+    def get(self, section, option):
+        try:
+            return ConfigParser.get(self, section, option)
+        except:
+            return ConfigParser.get(self, 'DEFAULT', option)
+
+class Myos():
+    def __init__(self):
+        pass
+        #print("INIT myos")
+
+    def stat(self,path):
+        #print("stat myos")
+        #return False
+        return os.stat(path)
+
+    def path_exists(self,path):
+        #print("myos.path",os.path.exists(path))
+        return os.path.exists(path)
+
 class Config():
     def __init__(self,cfile='/etc/mkbackup-btrfs.conf'):
         self.cfile = cfile
-        self.config = ConfigParser()
+        #self.config = ConfigParser()
+        self.config = MyConfigParser()
         #self.hostname = subprocess.check_output("/bin/hostname",shell=True).decode('utf8').split('\n')[0]
         self.hostname=socket.gethostname()
         self.syssubvol=subprocess.check_output(['/usr/bin/grub-mkrelpath','/'], shell=False).decode('utf8').split("\n")[0].strip("/")
 
-        if os.path.exists(self.cfile): 
+        #if os.path.exists(self.cfile): 
+        if Myos().path_exists(self.cfile): 
             pass #print('OK')
         else:
             print('Default-Config created at %s' % (self.cfile))
@@ -57,7 +82,7 @@ class Config():
     def _read(self):
 
         csup = dict() #for each dropin-file a csup = config-superseed-dict-entry
-        self.config = ConfigParser()
+        #self.config = ConfigParser()
         self.config.read(self.cfile)
         self.csupdir = self.cfile+'.d'
         if os.path.exists(str(self.csupdir)) and os.path.isdir(str(self.csupdir)):
@@ -115,6 +140,8 @@ class Config():
                             self.config.set(j,k,re.sub('^\+','',csup[i].get(j,k)))
 
 
+        # If directory, where mkbackup-btrfs is started from, is one of SNP or
+        # BKP, set SRC to the configured path and store
         psrc = os.getcwd()
         if   '/'+psrc.strip('/') == self.getMountPath('SNP')[1]:
             #print("A",self.getMountPath('SNP'))
@@ -172,21 +199,21 @@ class Config():
                 exit("Failure during creation of config-file")
         return(self.config)
 
-    def PrintConfig(self,tag,of=None):
+    def PrintConfig(self,tag=None,of=None):
         if tag == None:
             seclist = self.config.sections()
         else:
             seclist = [tag]
 
         out = list()
-        #print( seclist, self.config.defaults())
         if tag == None:
             out.append('[DEFAULT]')
             for j in self.config.defaults():
                 out.append("%s = %s" % (j,self.__trnName(self.config.get('DEFAULT',j))))
             out.append('')
 
-        for i in self.config.sections() if tag == None else [tag]:
+        #for i in self.config.sections() if tag == None else [tag]:
+        for i in seclist:
             out.append('[%s]' %(i))
             for j in self.config.options(i):
                 out.append("%s = %s" % (j,self.__trnName(self.config.get(i,j))))
@@ -226,27 +253,30 @@ class Config():
         return(list(set(LST)))
 
 
-    def getMountPath(self,store='SRC',tag='DEFAULT',shlogin=False):
+    def getMountPath(self, store='SRC', tag='DEFAULT', shlogin=False, original=True):
         if store == 'SRC':
-            try:
+#            try:
                 path = self.config.get(tag,'SRC')
-            except:
-                path = self.config.get('DEFAULT','SRC')
+#            except:
+#                path = self.config.get('DEFAULT','SRC')
         elif store == 'SNP':
-            try:
+#            try:
                 path = self.config.get(tag,'SNPMNT')
-            except:
-                path = self.config.get('DEFAULT','SNPMNT')
+#            except:
+#                path = self.config.get('DEFAULT','SNPMNT')
         elif store == 'BKP':
-            try:
-                path = self.config.get(tag,'BKPMNT')
-            except:
-                path = self.config.get('DEFAULT','BKPMNT')
+#            try:
+               path = self.config.get(tag,'BKPMNT')
+#            except:
+#               path = self.config.get('DEFAULT','BKPMNT')
+        else:
+            print("EE - getMountPath: store %s is not allowed (%s) set path to SRC" % (store,tag))
+            path = self.config.get('DEFAULT','SRC')
 
         _ssh = path.split(':')
         if len(_ssh) == 1:
             path = _ssh[0]
-            SSH = ''
+            SSH = None
         elif len(_ssh) == 2:
             userhost,path = _ssh
             port = '22'
@@ -254,10 +284,16 @@ class Config():
         elif len(_ssh) == 3:
             userhost,port,path = _ssh
             SSH = [userhost,port]
+
         if shlogin:
-            return(' '.join(SSH))
+            return(SSH)
         else:
-            return('/'+path.strip('/'))
+            if original:
+                sshout = ''
+                if SSH != None: sshout=':'.join(SSH)+':'
+                return(sshout+'/'+path.strip('/'))
+            else:
+                return('/'+path.strip('/'))
         #return(' '.join(SSH) if shlogin else '/'+path.strip('/'))
         # avoid deleting of / - but it's buggy, so return above is inserted
         if '/'+path.strip('/') != "/":
@@ -266,10 +302,14 @@ class Config():
             return(None)
 
     def getSSHLogin(self,store='SRC',tag='DEFAULT'):
-        return(self.getMountPath(store=store,tag=tag,shlogin=True))
+        if self.getMountPath(store=store,tag=tag,shlogin=True) is None:
+            return(None)
+        else:
+            uh,p = self.getMountPath(store=store,tag=tag,shlogin=True)
+            return('ssh -p %s %s ' % (p,uh))
+
 
     def getStoreName(self,store='SRC',tag='DEFAULT'):
-        #self._read()
         if store == 'SRC':
             try:
                 path = self.config.get(tag,'srcstore').strip('/')
@@ -290,51 +330,31 @@ class Config():
         else:
             return('')
 
-    def getStorePath(self,store='SRC',tag='DEFAULT'):
-        return(self.getMountPath(store=store,tag=tag) + '/' + self.getStoreName(store=store,tag=tag))
-
-        if store == 'SRC':
-            try:
-                path = '/'+self.config.get(tag,'SRC').strip('/')+'/'+self.config.get(tag,'srcstore').strip('/')
-            except:
-                path = '/'+self.config.get('DEFAULT','SRC').strip('/')+'/'+self.config.get('DEFAULT','srcstore').strip('/')
-        if store == 'SNP':
-            try:
-                path = '/'+self.config.get(tag,'SNPMNT').strip('/')+'/'+self.__trnName(self.config.get(tag,'snpstore').strip('/'))
-            except:
-                path = '/'+self.config.get('DEFAULT','SNPMNT').strip('/')+'/'+self.__trnName(self.config.get('DEFAULT','snpstore').strip('/'))
-        if store == 'BKP':
-            try:
-                path = '/'+self.config.get(tag,'BKPMNT').strip('/')+'/'+self.__trnName(self.config.get(tag,'bkpstore').strip('/'))
-            except:
-                path = '/'+self.config.get('DEFAULT','BKPMNT').strip('/')+'/'+self.__trnName(self.config.get('DEFAULT','bkpstore').strip('/'))
-
-        # listing in / raises error, when next return is deleted. 
-        return('/'+path.strip('/'))
-        # avoid deleting of / - but it's buggy, so return above is inserted
-        if '/'+path.strip('/') != "/":
-            return('/'+path.strip('/'))
-        else:
-            return(None)
+    def getStorePath(self,store='SRC',tag='DEFAULT',original=False):
+        sn = '/'+self.getStoreName(store=store,tag=tag) if len(self.getStoreName(store=store,tag=tag)) > 0 else ''
+        return(self.getMountPath(store=store,tag=tag,original=original) + sn)
 
     def getDevice(self,store='SRC',tag='DEFAULT'):
-        #self._read()
-        ssh, mp = self.getMountPath(store=store,tag=tag)
-        #cmd = """awk -F " " '$1 !~ /systemd-1/ && $2 == "%s" && $3 == "btrfs" {printf $1}' /proc/mounts""" % (mp)
-        cmd = """awk -F " " '$2 == "%s" && $3 == "autofs" {printf $1}' /proc/mounts""" % (mp)
+        mp = self.getMountPath(store=store,tag=tag,original=False)
+        login = '' if self.getSSHLogin(store,tag) is None else self.getSSHLogin(store,tag)
+        cmd = """awk -F " " '$1 == /systemd-1/ && $2 == "%s" && $3 == "autofs" {printf $1}' /proc/mounts""" % (mp) \
+                if login == '' \
+                else r""" %s"awk -F \" \" '\$1 == /systemd-1/ && \$2 == \"%s\" && \$3 == \"autofs\" {printf \$1}' /proc/mounts" """ % (login,mp)
+        # amount = automountpoint
         amount =  subprocess.check_output(cmd, shell=True).decode()
         if amount == '':
             pass
         elif amount == 'systemd-1':
             try:
-                os.stat(self.getStorePath(store=store))
+                Myos().stat(self.getStorePath(store=store,tag=tag))
             except:
-                os.stat(os.path.dirname(self.getStorePath(store=store)))
+                Myos().stat(os.path.dirname(self.getStorePath(store=store,tag=tag)))
         else:
             print("don't know")
             return None
 
-        cmd = """awk -F " " '$2 == "%s" && $3 == "btrfs" {printf $1}' /proc/mounts""" % (mp)
+        #cmd = """%sawk -F " " '$2 == "%s" && $3 == "btrfs" {printf $1}' /proc/mounts""" % (login,mp)
+        cmd = """awk -F " " '$2 == "%s" && $3 == "btrfs" {printf $1}' /proc/mounts""" % (mp) if login == '' else r""" %s"awk -F \" \" '\$2 == \"%s\" && \$3 == \"btrfs\" {printf \$1}' /proc/mounts" """ % (login,mp)
         device =  subprocess.check_output(cmd, shell=True).decode()
         if device == '':
             return None
@@ -345,11 +365,12 @@ class Config():
         #return device if device != '' else None
 
     def getUUID(self,store='SRC',tag='DEFAULT'):
-        #self._read()
         device = self.getDevice(store=store,tag=tag)
+        login = '' if self.getSSHLogin(store,tag) is None else self.getSSHLogin(store,tag)
         if device == None: return None
-        cmd = "/sbin/blkid %s -o value -s 'UUID'" % (device)
+        cmd = "%s/sbin/blkid %s -o value -s 'UUID'" % (login,device)
         uuid =  subprocess.check_output(cmd, shell=True).decode().partition('\n')[0]
+        #print("UUID",uuid)
         return uuid if uuid != '' else None
 
     
