@@ -8,6 +8,7 @@ import socket
 import os
 import errno
 import re
+import paramiko
 
 __author__ = "Jakobus Schuerz <jakobus.schuerz@gmail.com>"
 __version__ = "0.01.0"
@@ -29,20 +30,34 @@ else:
 def s2bool(s):
     return s.lower() in ['true','yes','y','1'] if s else False
 
-class MyConfigParser(RawConfigParser):
-    def get(self, section, option):
+# quote awk-argument in ssh-command
+def quote_argument(argument):
+    return '"%s"' % (
+        argument
+        .replace('\\', '\\\\')
+        .replace('"', '\\"')
+        .replace('$', '\\$')
+        .replace('`', '\\`')
+    )
+
+class MyConfigParser(ConfigParser):
+    comment = """replace get in Configparser to give the default-option, if a
+                section doesn't exist, and option exists in default"""
+    def get(self, section, option, **kw):
         try:
-            return ConfigParser.get(self, section, option)
+            return ConfigParser.get(self, section, option, raw=True)
         except:
-            return ConfigParser.get(self, 'DEFAULT', option)
+            return ConfigParser.get(self, 'DEFAULT', option, raw=True)
 
 class Myos():
-    def __init__(self):
+    def __init__(self,uh=None,p=22):
+        self.remote = False if uh == None else True
+        print("Remote",self.remote,uh,p)
         pass
         #print("INIT myos")
 
     def stat(self,path):
-        #print("stat myos")
+        print("stat myos")
         #return False
         return os.stat(path)
 
@@ -58,6 +73,8 @@ class Config():
         #self.hostname = subprocess.check_output("/bin/hostname",shell=True).decode('utf8').split('\n')[0]
         self.hostname=socket.gethostname()
         self.syssubvol=subprocess.check_output(['/usr/bin/grub-mkrelpath','/'], shell=False).decode('utf8').split("\n")[0].strip("/")
+        self.ssh = dict()
+        self.ssh_cons = dict()
 
         #if os.path.exists(self.cfile): 
         if Myos().path_exists(self.cfile): 
@@ -66,18 +83,29 @@ class Config():
             print('Default-Config created at %s' % (self.cfile))
             self.CreateConfig()
         self._read()
+        for i in self.ListIntervals() +['DEFAULT']:
+            self.ssh[i] = dict()
+            for s in ['SNP', 'BKP']:
+                #print('X',self.getSSHLogin(s,i))
+                self.ssh[i][s] = dict()
+                if self.getSSHLogin(s,i) != None:
+                    c,x,p,uh = self.getSSHLogin(s,i).strip().split(' ')
+                    u,h = uh.split('@')
+                    if not uh in self.ssh_cons:
+                        #print("STORES",uh,s,i)
+                        self.ssh_cons[uh] = paramiko.SSHClient()
+                        self.ssh_cons[uh].set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                        self.ssh_cons[uh].connect(h, username=u)
 
-#        for i in ['DEFAULT']:
-#            print('XX[%s]' %(i))
-#            for j in self.config.defaults():
-#                print("XX"+j+' = ',self.__trnName(self.config.get(i,j)))
-#            print('')
-#        
-#        for i in self.config.sections():
-#            print('XX[%s]' %(i))
-#            for j in self.config.options(i):
-#                print("XX"+j+' = ',self.__trnName(self.config.get(i,j)))
-#            print('')
+                    self.ssh[i][s]['ssh'] = uh
+#                    self.ssh[i][s]['ssh'] = self.ssh_cons[uh]
+#                    self.ssh[i][s]['ssh'].set_missing_host_key_policy(paramiko.AutoAddPolicy())
+#                    self.ssh[i][s]['hostname'] = h
+#                    self.ssh[i][s]['username'] = u
+#                    self.ssh[i][s]['ssh'].connect(h, username=u)
+#                    self.ssh[i][s]['ssh'].close()
+                else:
+                    self.ssh[i][s]['ssh'] = None
         
     def _read(self):
 
@@ -255,20 +283,11 @@ class Config():
 
     def getMountPath(self, store='SRC', tag='DEFAULT', shlogin=False, original=True):
         if store == 'SRC':
-#            try:
                 path = self.config.get(tag,'SRC')
-#            except:
-#                path = self.config.get('DEFAULT','SRC')
         elif store == 'SNP':
-#            try:
                 path = self.config.get(tag,'SNPMNT')
-#            except:
-#                path = self.config.get('DEFAULT','SNPMNT')
         elif store == 'BKP':
-#            try:
                path = self.config.get(tag,'BKPMNT')
-#            except:
-#               path = self.config.get('DEFAULT','BKPMNT')
         else:
             print("EE - getMountPath: store %s is not allowed (%s) set path to SRC" % (store,tag))
             path = self.config.get('DEFAULT','SRC')
@@ -294,7 +313,7 @@ class Config():
                 return(sshout+'/'+path.strip('/'))
             else:
                 return('/'+path.strip('/'))
-        #return(' '.join(SSH) if shlogin else '/'+path.strip('/'))
+
         # avoid deleting of / - but it's buggy, so return above is inserted
         if '/'+path.strip('/') != "/":
             return('/'+path.strip('/'))
@@ -334,14 +353,29 @@ class Config():
         sn = '/'+self.getStoreName(store=store,tag=tag) if len(self.getStoreName(store=store,tag=tag)) > 0 else ''
         return(self.getMountPath(store=store,tag=tag,original=original) + sn)
 
+    def remotecommand(self,tag='DEFAULT',store='SRC',cmd=''):
+        if self.ssh[tag][store]['ssh'] == None:
+            return(subprocess.check_output(cmd, shell=True).decode())
+        else:
+            out = ''
+            stdin, stdout, stderr = self.ssh_cons[self.ssh[tag][store]['ssh']].exec_command(cmd)
+            for line in stdout:
+                out += line.strip('\n')
+            return(out)
+
+
     def getDevice(self,store='SRC',tag='DEFAULT'):
         mp = self.getMountPath(store=store,tag=tag,original=False)
         login = '' if self.getSSHLogin(store,tag) is None else self.getSSHLogin(store,tag)
-        cmd = """awk -F " " '$1 == /systemd-1/ && $2 == "%s" && $3 == "autofs" {printf $1}' /proc/mounts""" % (mp) \
-                if login == '' \
-                else r""" %s"awk -F \" \" '\$1 == /systemd-1/ && \$2 == \"%s\" && \$3 == \"autofs\" {printf \$1}' /proc/mounts" """ % (login,mp)
+        cmd = """awk -F " " '$1 == /systemd-1/ && $2 == "%s" && $3 == "autofs" {printf $1}' /proc/mounts""" % (mp)
+        #print("CMD",tag,store,self.ssh['DEFAULT'].keys(),cmd)
+        #cmd = cmd if login == '' else "%s %s" % (login,quote_argument(cmd))
+
         # amount = automountpoint
-        amount =  subprocess.check_output(cmd, shell=True).decode()
+#        amount =  subprocess.check_output(cmd, shell=True).decode()
+        amount = self.remotecommand(tag,store,cmd)
+                
+        print("AMOUNT",amount)
         if amount == '':
             pass
         elif amount == 'systemd-1':
@@ -350,19 +384,15 @@ class Config():
             except:
                 Myos().stat(os.path.dirname(self.getStorePath(store=store,tag=tag)))
         else:
-            print("don't know")
+            print("don't know type of automount: %s" %(amount))
             return None
 
-        #cmd = """%sawk -F " " '$2 == "%s" && $3 == "btrfs" {printf $1}' /proc/mounts""" % (login,mp)
-        cmd = """awk -F " " '$2 == "%s" && $3 == "btrfs" {printf $1}' /proc/mounts""" % (mp) if login == '' else r""" %s"awk -F \" \" '\$2 == \"%s\" && \$3 == \"btrfs\" {printf \$1}' /proc/mounts" """ % (login,mp)
+        cmd = """awk -F " " '$2 == "%s" && $3 == "btrfs" {printf $1}' /proc/mounts""" % (mp)
+        cmd = cmd if login == '' else "%s %s" % (login,quote_argument(cmd))
+        print("CMD",cmd)
         device =  subprocess.check_output(cmd, shell=True).decode()
-        if device == '':
-            return None
-        else:
-            return device
-
-
-        #return device if device != '' else None
+        print("DEVICE",device)
+        return None if device == '' else device
 
     def getUUID(self,store='SRC',tag='DEFAULT'):
         device = self.getDevice(store=store,tag=tag)
@@ -419,11 +449,11 @@ class Config():
         except:
             return('default')
 
-    def getVolumes(self,intv='default'):
+    def getVolumes(self,tag='default'):
         #self._read()
         VOLSTRANS = []
         try:
-            VOLS = self.config.get(intv,'volumes')
+            VOLS = self.config.get(tag,'volumes')
         except:
             VOLS = self.config.get('DEFAULT','volumes')
         for vol in VOLS.split(','):

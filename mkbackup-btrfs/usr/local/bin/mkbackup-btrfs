@@ -214,9 +214,9 @@ class listing:
         self.BkpPath   = args.config.getStorePath('BKP',self.args.tag) # whole path from / to directory where the snapshot lives
         self.svols     = dict()
         self.args      = args
-        self.BKPLogin  = args.config.getSSHLogin(store='BKP',tag=self.args.tag)
-        self.SNPLogin  = args.config.getSSHLogin(store='SNP',tag=self.args.tag)
-        self.SRCLogin  = args.config.getSSHLogin(store='SRC',tag=self.args.tag)
+#        self.BKPLogin  = args.config.getSSHLogin(store='BKP',tag=self.args.tag)
+#        self.SNPLogin  = args.config.getSSHLogin(store='SNP',tag=self.args.tag)
+#        self.SRCLogin  = args.config.getSSHLogin(store='SRC',tag=self.args.tag)
         #print("LOGINS",self.SRCLogin,self.SNPLogin,self.BKPLogin)
         self.scanfs()
 
@@ -652,6 +652,8 @@ class SubVolume(SubVolumeInfo):
                 self.DEBUG('  =%-9s»<%s>/%s«' % (propn+'>',self.store,sname+'/'+sub),level=1)
                 try:
                     cmd = login+['btrfs','property','set','-ts',self.StorePath+'/'+sname+'/'+sub,'ro',prop]
+                    #cmd = ['btrfs','property','set','-ts',self.StorePath+'/'+sname+'/'+sub,'ro',prop]
+                    #self.config.remotecommand(self.tag,self.store,cmd)
                     sp_call(self.args,cmd)
                 except:
                     print('setprop error')
@@ -752,7 +754,7 @@ class SubVolume(SubVolumeInfo):
             uuidS = self.config.getUUID(store=self.store)
             uuidB = self.config.getUUID(store='BKP')
             if None == uuidS:
-                self.DEBUG(" |no-transfer: Filesystem for »%s« not mounted: »%s«" % (self.store,self.config.getDevice(store=self.store)))
+                self.DEBUG(" |no-transfer: Filesystem for »%s« not mounted: »%s«" % (self.store,self.config.getDevice(store=self.store,tag=args.tag)))
                 return
             if None == uuidB:
                 self.DEBUG(" |no-transfer: Filesystem for »%s« not mounted: »%s«" % ('BKP',self.config.getMountPath(store='BKP',tag=args.tag)))
@@ -1296,7 +1298,7 @@ def lists(args):
         if args.showtransfers:
             if args.config.getTransfer(intv=args.tag):
                 DEBUG('"%s" results in "%s", will transfer actual snapshots from this volume(s):' % (args.tag,args.config.getIsDefault(intv=args.tag)),level=1,verbose=args.verbose)
-                print(' '.join(args.config.getVolumes(intv=args.tag)))
+                print(' '.join(args.config.getVolumes(tag=args.tag)))
             else:
                 DEBUG('%s will transfer nothing' % (args.tag),level=1,verbose=args.verbose)
         if args.showdb:
@@ -1767,7 +1769,7 @@ if __name__ == '__main__':
 
 
     if args.systemvolumes:
-        args.snapshots=args.config.getVolumes(intv=args.tag)
+        args.snapshots=args.config.getVolumes(tag=args.tag)
         if len(args.store) == 0: args.store=['SNP']
 
     # set store and path to store depending on action
@@ -1849,6 +1851,13 @@ if __name__ == '__main__':
                         os.remove(link)
                 else:
                     DEBUG("Symlink missing: %s/%s.%s" % (st,vol,sln),level=4,verbose=args.verbose)
+    for t in args.config.ssh_cons.keys():
+        print("Close Connection to %s" % (t))
+        args.config.ssh_cons[t].close()
+#        for s in args.config.ssh[t].keys():
+#            if not args.config.ssh[t][s]['ssh'] == None:
+#                print("CLOSE",t,s)
+#                args.config.ssh[t][s]['ssh'].close() 
 
     # print summary over all actions 
     if not args.action == 'list' and not args.action == 'restore':
