@@ -375,7 +375,7 @@ class Config():
 #        amount =  subprocess.check_output(cmd, shell=True).decode()
         amount = self.remotecommand(tag,store,cmd)
                 
-        print("AMOUNT",amount)
+        #print("AMOUNT",amount)
         if amount == '':
             pass
         elif amount == 'systemd-1':
@@ -389,9 +389,9 @@ class Config():
 
         cmd = """awk -F " " '$2 == "%s" && $3 == "btrfs" {printf $1}' /proc/mounts""" % (mp)
         cmd = cmd if login == '' else "%s %s" % (login,quote_argument(cmd))
-        print("CMD",cmd)
+        #print("CMD",cmd)
         device =  subprocess.check_output(cmd, shell=True).decode()
-        print("DEVICE",device)
+        #print("DEVICE",device)
         return None if device == '' else device
 
     def getUUID(self,store='SRC',tag='DEFAULT'):
