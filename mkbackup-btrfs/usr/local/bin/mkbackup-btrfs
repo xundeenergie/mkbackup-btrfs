@@ -943,13 +943,14 @@ class SubVolume(SubVolumeInfo):
             return
 
     def symlink_force(self,target, link_name):
+
         try:
             os.symlink(target, link_name)
         except OSError as e:
             if e.errno == errno.EEXIST:
                     os.remove(link_name)
                     os.symlink(target, link_name)
-                    self.DEBUG("TARGET | LINKNAME:",target,'|',link_name,level=3)
+                    self.DEBUG("[II] TARGET => LINKNAME: %s => %s" % (target.strip(),link_name.strip()),level=3)
             else:
                 raise e
     

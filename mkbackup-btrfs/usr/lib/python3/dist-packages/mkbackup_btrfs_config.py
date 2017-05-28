@@ -92,18 +92,11 @@ class Config():
                     c,x,p,uh = self.getSSHLogin(s,i).strip().split(' ')
                     u,h = uh.split('@')
                     if not uh in self.ssh_cons:
-                        #print("STORES",uh,s,i)
                         self.ssh_cons[uh] = paramiko.SSHClient()
                         self.ssh_cons[uh].set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                        self.ssh_cons[uh].connect(h, username=u)
+                        self.ssh_cons[uh].connect(h, p, u)
 
                     self.ssh[i][s]['ssh'] = uh
-#                    self.ssh[i][s]['ssh'] = self.ssh_cons[uh]
-#                    self.ssh[i][s]['ssh'].set_missing_host_key_policy(paramiko.AutoAddPolicy())
-#                    self.ssh[i][s]['hostname'] = h
-#                    self.ssh[i][s]['username'] = u
-#                    self.ssh[i][s]['ssh'].connect(h, username=u)
-#                    self.ssh[i][s]['ssh'].close()
                 else:
                     self.ssh[i][s]['ssh'] = None
         
@@ -366,7 +359,7 @@ class Config():
 
     def getDevice(self,store='SRC',tag='DEFAULT'):
         mp = self.getMountPath(store=store,tag=tag,original=False)
-        login = '' if self.getSSHLogin(store,tag) is None else self.getSSHLogin(store,tag)
+        #login = '' if self.getSSHLogin(store,tag) is None else self.getSSHLogin(store,tag)
         cmd = """awk -F " " '$1 == "systemd-1" && $2 == "%s" && $3 == "autofs" {printf $1}' /proc/mounts""" % (mp)
         #print("CMD",tag,store,self.ssh['DEFAULT'].keys(),cmd)
         #cmd = cmd if login == '' else "%s %s" % (login,quote_argument(cmd))
@@ -388,7 +381,7 @@ class Config():
             return None
 
         cmd = """awk -F " " '$2 == "%s" && $3 == "btrfs" {printf $1}' /proc/mounts""" % (mp)
-        cmd = cmd if login == '' else "%s %s" % (login,quote_argument(cmd))
+        #cmd = cmd if login == '' else "%s %s" % (login,quote_argument(cmd))
         #print("CMD",cmd)
         device =  subprocess.check_output(cmd, shell=True).decode()
         #print("DEVICE",device)
@@ -396,10 +389,12 @@ class Config():
 
     def getUUID(self,store='SRC',tag='DEFAULT'):
         device = self.getDevice(store=store,tag=tag)
-        login = '' if self.getSSHLogin(store,tag) is None else self.getSSHLogin(store,tag)
+        #login = '' if self.getSSHLogin(store,tag) is None else self.getSSHLogin(store,tag)
         if device == None: return None
-        cmd = "%s/sbin/blkid %s -o value -s 'UUID'" % (login,device)
-        uuid =  subprocess.check_output(cmd, shell=True).decode().partition('\n')[0]
+        #cmd = "%s/sbin/blkid %s -o value -s 'UUID'" % (login,device)
+        cmd = "/sbin/blkid %s -o value -s 'UUID'" % (device)
+        uuid = self.remotecommand(tag,store,cmd).partition('\n')[0]
+        #uuid =  subprocess.check_output(cmd, shell=True).decode().partition('\n')[0]
         #print("UUID",uuid)
         return uuid if uuid != '' else None
 
