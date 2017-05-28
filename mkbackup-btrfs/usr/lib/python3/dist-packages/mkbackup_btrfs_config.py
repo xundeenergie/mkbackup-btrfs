@@ -367,7 +367,7 @@ class Config():
     def getDevice(self,store='SRC',tag='DEFAULT'):
         mp = self.getMountPath(store=store,tag=tag,original=False)
         login = '' if self.getSSHLogin(store,tag) is None else self.getSSHLogin(store,tag)
-        cmd = """awk -F " " '$1 == /systemd-1/ && $2 == "%s" && $3 == "autofs" {printf $1}' /proc/mounts""" % (mp)
+        cmd = """awk -F " " '$1 == "systemd-1" && $2 == "%s" && $3 == "autofs" {printf $1}' /proc/mounts""" % (mp)
         #print("CMD",tag,store,self.ssh['DEFAULT'].keys(),cmd)
         #cmd = cmd if login == '' else "%s %s" % (login,quote_argument(cmd))
 
