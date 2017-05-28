@@ -122,21 +122,15 @@ def isstring(s):
 def check_lockfile(args,lf):
     # Returns True, when lockfile is in use, and False if lockfile is unused
     # Returns None, when lockfile is not existing
-    #print(lf)
     if os.path.isfile(lf):
         file = open(lf, 'r')
         pid = file.readline()
         file.close()
         if len(pid) > 0 and os.path.isfile('/proc/'+pid+'/cmdline'):
-            #self.DEBUG(pid+' is running: '+lf)
             DEBUG('lockfile %s in use with process %s' % (lf,pid),level=3,verbose=args.verbose)
-#            import fileinput
-#            for line in fileinput.input('/proc/'+pid+'/cmdline'):
-#                print(line)
             return(True)
         else:
             DEBUG('lockfile %s unused' % (lf),level=3,verbose=args.verbose)
-            #self.DEBUG(' --> remove unused lockfile: '+lf,level=3)
             return(False)
     else:
         DEBUG('lockfile %s not existing' % (lf),level=3,verbose=args.verbose)
