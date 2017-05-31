@@ -1,7 +1,8 @@
 #!/bin/bash
 #mawk '$5 ~ "^/$" {gsub ("/","",$4);print $4}' /proc/self/mountinfo
 
-SV1=$(basename "$(grub-mkrelpath /)")
+#SV1=$(basename "$(grub-mkrelpath /)")
+SV1="XXX"
 
 [ -x /bin/cat ] || exit 1
 SV2=$(grep -sq "=subvol=" /proc/cmdline && /bin/cat /proc/cmdline |sed 's/^.*=subvol=\([^ ]*\) .*$/\1/')
@@ -10,5 +11,5 @@ SV2=$(grep -sq "=subvol=" /proc/cmdline && /bin/cat /proc/cmdline |sed 's/^.*=su
 if [ "$SV1" == "$SV2" ];then
 	echo "$SV1"
 else
-	echo "$SV1"
+	echo "$SV2"
 fi

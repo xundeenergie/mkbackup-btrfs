@@ -40,6 +40,47 @@ def quote_argument(argument):
         .replace('`', '\\`')
     )
 
+class MountInfo():
+    def __init__(self,mountinfo='/proc/self/mountinfo'):
+        self.mi = dict()
+        mif = open(mountinfo)
+        for line in mif:
+            a,b,c,relpath,mntp,d,e,f,fstype,dev,opts = line.split()
+            mntp = mntp.replace('\\040',' ')
+            self.mi[mntp] = dict()
+            self.mi[mntp]['relpath'] = relpath
+            self.mi[mntp]['fstype'] = fstype
+            self.mi[mntp]['dev'] = dev
+            self.mi[mntp]['opts'] = opts
+        mif.close()
+            
+    def __check(self,mountpoint,attribute):
+        mp = '/'+mountpoint.strip('/')
+        rec = False
+        rep = ''
+        if os.path.exists(mp):
+            try:
+                rp = self.mi[mp][attribute]
+                rep = mp
+            except:
+                rec = True
+                a,rep,rp = self.__check(os.path.dirname(mp),attribute)
+            return [rec,rep,rp]
+        else:
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), mp) 
+
+    def relpath(self,mountpoint):
+        rec,rep,mp = self.__check(mountpoint,'relpath')
+        print(mountpoint,rec,rep,mp)
+        if rec: return mp.replace(rep,'') + mountpoint
+        return mp
+
+    def fstype(self,mountpoint):
+        return self.__check(mountpoint,'fstype')[2]
+
+    def device(self,mountpoint):
+        return self.__check(mountpoint,'dev')[2]
+
 class MyConfigParser(ConfigParser):
     comment = """replace get in Configparser to give the default-option, if a
                 section doesn't exist, and option exists in default"""
@@ -72,7 +113,9 @@ class Config():
         self.config = MyConfigParser()
         #self.hostname = subprocess.check_output("/bin/hostname",shell=True).decode('utf8').split('\n')[0]
         self.hostname=socket.gethostname()
-        self.syssubvol=subprocess.check_output(['/usr/bin/grub-mkrelpath','/'], shell=False).decode('utf8').split("\n")[0].strip("/")
+        self.mountinfo = MountInfo()
+        self.syssubvol = self.mountinfo.relpath('/')
+        #self.syssubvol=subprocess.check_output(['/usr/bin/grub-mkrelpath','/'], shell=False).decode('utf8').split("\n")[0].strip("/")
         self.ssh = dict()
         self.ssh_cons = dict()
 
