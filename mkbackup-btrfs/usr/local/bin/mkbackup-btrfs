@@ -21,7 +21,7 @@ except:
     TREE=False
 
 #from mksnapshotconfig import Config
-from mkbackup_btrfs_config import Config
+from mkbackup_btrfs_config import Config, MountInfo, connect, Myos
 
 #define progress timer class
 class progress_timer:
@@ -54,29 +54,29 @@ class progress_timer:
 # 0 - continue programm
 # 1 - raise error
 
-class create_db:
-    def __init__(self, ts=0, db='/var/lib/mkbackup-btrfs'):
-        if not os.path.exists(db):
-            os.makedirs(db)
-        print("DB",db)
-        
-        conn = sqlite3.connect(db+'/mkbackup-btrfs.db')
-        conn.execute('''CREATE TABLE LASTRUN
-            (ID INTEGER PRIMARY KEY NOT NULL,
-            VOL     TEST,
-            INTV    TEXT,
-            LRUN      TEXT,
-            LTRANS  TEXT,
-            DELETED INTEGER);''')
-        conn.execute('''CREATE TABLE JOURNAL
-            (ID INTEGER PRIMARY KEY NOT NULL,
-            VOL TEXT,
-            INTNAME TEXT,
-            SNAPNAME TEXT,
-            SNAP_TS TEXT,
-            TRNS_TS TEXT,
-            DELETED INTEGER);''')
-        conn.close()
+#class create_db:
+#    def __init__(self, ts=0, db='/var/lib/mkbackup-btrfs'):
+#        if not os.path.exists(db):
+#            os.makedirs(db)
+#        print("DB",db)
+#        
+#        conn = sqlite3.connect(db+'/mkbackup-btrfs.db')
+#        conn.execute('''CREATE TABLE LASTRUN
+#            (ID INTEGER PRIMARY KEY NOT NULL,
+#            VOL     TEST,
+#            INTV    TEXT,
+#            LRUN      TEXT,
+#            LTRANS  TEXT,
+#            DELETED INTEGER);''')
+#        conn.execute('''CREATE TABLE JOURNAL
+#            (ID INTEGER PRIMARY KEY NOT NULL,
+#            VOL TEXT,
+#            INTNAME TEXT,
+#            SNAPNAME TEXT,
+#            SNAP_TS TEXT,
+#            TRNS_TS TEXT,
+#            DELETED INTEGER);''')
+#        conn.close()
     
 if hasattr(os, 'sync'):
     sync = os.sync
@@ -94,23 +94,23 @@ def DEBUG(*msg,level=0,verbose=0):
         for i in msg: print(i)
         return
 
-def sp_call(args,cmdl,level=4):
-    stdout = subprocess.DEVNULL
-    stderr = subprocess.DEVNULL
-    stdout = args.stdout
-    stderr = args.stderr
-    
-    DEBUG('[II][cmdl]  '+' '.join(cmdl),level=level,verbose=args.verbose)
-    try:
-        r = subprocess.call(cmdl, stdout=stdout, stderr=stderr)
-    except subprocess.CalledProcessError as e:
-        DEBUG(e,level=level,verbose=args.verbose)
-        pass # handle errors in the called executable
-    except OSError as e:
-        DEBUG(e,level=level,verbose=args.verbose)
-        raise SystemExit
-        pass 
-    return(r)
+#def sp_call(args,cmdl,level=4):
+#    stdout = subprocess.DEVNULL
+#    stderr = subprocess.DEVNULL
+#    stdout = args.stdout
+#    stderr = args.stderr
+#    
+#    DEBUG('[II][cmdl]  '+' '.join(cmdl),level=level,verbose=args.verbose)
+#    try:
+#        r = subprocess.call(cmdl, stdout=stdout, stderr=stderr)
+#    except subprocess.CalledProcessError as e:
+#        DEBUG(e,level=level,verbose=args.verbose)
+#        pass # handle errors in the called executable
+#    except OSError as e:
+#        DEBUG(e,level=level,verbose=args.verbose)
+#        raise SystemExit
+#        pass 
+#    return(r)
     
 def isstring(s):
     # if we use Python 3
@@ -122,19 +122,23 @@ def isstring(s):
 def check_lockfile(args,lf):
     # Returns True, when lockfile is in use, and False if lockfile is unused
     # Returns None, when lockfile is not existing
-    if os.path.isfile(lf):
-        file = open(lf, 'r')
-        pid = file.readline()
-        file.close()
-        if len(pid) > 0 and os.path.isfile('/proc/'+pid+'/cmdline'):
-            DEBUG('lockfile %s in use with process %s' % (lf,pid),level=3,verbose=args.verbose)
-            return(True)
+    for st in args.store:
+        print("A",args.tag,st)
+        if Myos().path_isfile(lf,args.config.ssh[args.tag][st]):
+            print("B")
+            file = open(lf, 'r')
+            pid = file.readline()
+            file.close()
+            if len(pid) > 0 and Myos().path_isfile('/proc/'+pid+'/cmdline',args.config.ssh[args.tag][st]):
+                DEBUG('lockfile %s in use with process %s' % (lf,pid),level=3,verbose=args.verbose)
+                return(True)
+            else:
+                DEBUG('lockfile %s unused' % (lf),level=3,verbose=args.verbose)
+                return(False)
         else:
-            DEBUG('lockfile %s unused' % (lf),level=3,verbose=args.verbose)
-            return(False)
-    else:
-        DEBUG('lockfile %s not existing' % (lf),level=3,verbose=args.verbose)
-        return(None)
+            print("C")
+            DEBUG('lockfile %s not existing' % (lf),level=3,verbose=args.verbose)
+            return(None)
 
 class Stack:
     def __init__(self):
@@ -221,19 +225,26 @@ class listing:
         else:
             cmd=['btrfs','subvolume','list','-R','-u','-q','-c',self.StorePath]
 
-        try:
-            res = subprocess.Popen(cmd,stdout=subprocess.PIPE, stderr=self.args.stderr)
-            output,error = res.communicate()
-            if res.returncode > 0:
-                #print('scanfs error',self.StorePath,output,error,res.returncode)
-                raise ScanFsError(self.StorePath)
-        except subprocess.CalledProcessError as e:
-            raise ScanFsError(self.StorePath)
-        except:
-            raise
+        #print('XXX',self.args.tag,self.store,self.args.config.ssh[self.args.tag][self.store])
+        output = self.args.config.remotecommand(tag=self.args.tag, store=self.store, cmd=' '.join(cmd))
+#        for line in output.splitlines():
+#            print('L',line)
+#
+#        try:
+#            res = subprocess.Popen(cmd,stdout=subprocess.PIPE, stderr=self.args.stderr)
+#            output,error = res.communicate()
+#            if res.returncode > 0:
+#                #print('scanfs error',self.StorePath,output,error,res.returncode)
+#                raise ScanFsError(self.StorePath)
+#        except subprocess.CalledProcessError as e:
+#            raise ScanFsError(self.StorePath)
+#        except:
+#            raise
         #if output[0] == 0:
         for line in output.splitlines():
-            argmts = str(line, encoding='utf8').split(' ')
+            #argmts = str(line, encoding='utf8').split(' ')
+            argmts = line.split(' ')
+#            print("ARGS",argmts[16:])
             #ID 2412 gen 8547 cgen 8547 top level 2393 parent_uuid 7991115b-8a6b-6d4d-b664-03db01e902d0 received_uuid - uuid 368490e7-5aca-0d4d-9b7a-becff0487ebd path aldebaran/__ALWAYSCURRENT__.2016-10-15_22:40:25.hourly.part/var-spool-dovecot
             self.svols[argmts[1]] = dict() 
             self.svols[argmts[1]]['id'] = argmts[1]
@@ -352,6 +363,11 @@ class listing:
         return(self._ret(result,reverse=rev))
 
     
+    def _isbtrfs(self,path,store='SRC',tag='DEFAULT'):
+        mi = MountInfo(conn=self.args.config.ssh[tag][store])
+        self.DEBUG("Filesysem for »%s« is %s" % (path,mi.fstype(path)),level=2)
+        return True if mi.fstype(path) == 'btrfs' else False
+
     def main(self):
         self.scanfs()
 
@@ -400,16 +416,21 @@ class SubVolumeInfo(listing):
         cmd = ['btrfs','subvolume','show',self.StorePath+'/'+SourceName]
         sv = False
         snaps=[]
-        try:
-            res = subprocess.Popen(cmd,stdout=subprocess.PIPE, stderr=self.args.stderr)
-            output,error = res.communicate()
-            if res.returncode > 0:
-                raise NoSubvolumeError
-        except:
-            raise
+#        try:
+#            res = subprocess.Popen(cmd,stdout=subprocess.PIPE, stderr=self.args.stderr)
+#            output,error = res.communicate()
+#            if res.returncode > 0:
+#                raise NoSubvolumeError
+#        except:
+#            raise
+
+        output = self.args.config.remotecommand(tag=self.args.tag, store=self.store, cmd=' '.join(cmd))
 
         for line in output.splitlines():
-            argmnts = [arg.strip() for arg in str(line, encoding='utf8').split(': ')]
+            #print("L:",line)
+            #argmnts = [arg.strip() for arg in str(line, encoding='utf8').split(': ')]
+            argmnts = [arg.strip() for arg in line.replace('\t',' ').split(': ')]
+            #print("ARG",argmnts)
             if len(argmnts) > 1:
                 setattr(self, self.tr_att(argmnts[0]), argmnts[1])
             elif sv:
@@ -439,6 +460,7 @@ class SubVolume(SubVolumeInfo):
         self.verbose      = args.verbose
         self.tag          = args.tag
         self.config       = args.config #Config()
+        #self.mi           = args.mi #MountInfo()
         self.path         = ''
         self.dir          = ''
         self.basename     = os.path.basename(name.split('.')[0])
@@ -473,7 +495,7 @@ class SubVolume(SubVolumeInfo):
         self.DEBUG('[II]  <%s> is %s: ' % (self.store, self.config.getStorePath(self.store,self.args.tag)),level=2)
 
     def _createlockfile(self,lf,ln):
-        if os.path.isfile(self.store+'/'+lf):
+        if Myos().path_isfile(self.store+'/'+lf,conn=self.args.config.ssh[self.tag][self.store]):
             self.DEBUG('Nothing to lock',level=2)
         else:
             self.DEBUG("%-12s»<%s>/%s«" % (' =lock>',self.store,ln),level=0)
@@ -493,7 +515,7 @@ class SubVolume(SubVolumeInfo):
                 self.DEBUG('ERROR - lockfile in use: <%s - %s>/%s' % (self.store,self.StorePath,path+lf),level=2)
                 return
         try:
-            os.remove(path+lf)
+            Myos().remove(path+lf,args.config.ssh[self.args.tag][self.store])
         except OSError as e:
             if e.errno == errno.EEXIST or errno.ENOENT:
                 pass 
@@ -512,8 +534,9 @@ class SubVolume(SubVolumeInfo):
                 raise RuntimeError('ERROR - Systemvolume not allowed to rename (To): %s' % (To),1)
 
         st = self.store if store == None else store
+
         StorePath = self.config.getStorePath(st,self.args.tag)
-        if not issubvol(self.args,StorePath,store): 
+        if not issubvol(self.args,StorePath,store,self.args.tag): 
             self.DEBUG("Failed to rename »<%s>%s«, is no btrfs-subvolume, or not existing" % (st,From),level=3)
             return
 
@@ -521,7 +544,7 @@ class SubVolume(SubVolumeInfo):
         pass
 
         self.DEBUG(" =unlock>  <%s>/%s" % (st,To),level=1)
-        if os.path.exists(StorePath+'/'+To):
+        if Myos().path_exists(StorePath+'/'+To,self.args.config.ssh[self.tag][st]):
             self.DEBUG(' =%-10s»%s« exists. Nothing to rename' % (Action+':',To),level=3)
             return
         else:
@@ -530,12 +553,12 @@ class SubVolume(SubVolumeInfo):
                     self.DEBUG(" =%-11s nothing to rename" % (Action+':'),level=3)
                     return
             else:
-                if issubvol(self.args,StorePath+'/'+From,store):
+                if issubvol(self.args,StorePath+'/'+From,store,self.args.tag):
                     self.DEBUG(' =%s-rename> »<%s>/%s« --> %s' % (Action,st,From,To), level=1)  
                 else: 
                     return
         try:
-            os.rename(StorePath+'/'+From,StorePath+'/'+To)
+            Myos().rename(StorePath+'/'+From,StorePath+'/'+To,self.args.config.ssh[self.tag][self.store])
         except FileNotFoundError:
             self.DEBUG('Nothing to rename',level=3)
         except OSError as e:
@@ -642,13 +665,14 @@ class SubVolume(SubVolumeInfo):
         prop = 'true' if ro else 'false'
         self.DEBUG(' =set-%-6s»<%s>/%s«' % (propn+'>',self.store,sname),level=1)
         for sub in self.list_subvolumes(self.id,names=True,rev=True if ro else False):
-            if issubvol(self.args,self.StorePath+'/'+sname+'/'+sub,self.store):
+            if issubvol(self.args,self.StorePath+'/'+sname+'/'+sub,self.store,self.args.tag):
                 self.DEBUG('  =%-9s»<%s>/%s«' % (propn+'>',self.store,sname+'/'+sub),level=1)
                 try:
                     cmd = login+['btrfs','property','set','-ts',self.StorePath+'/'+sname+'/'+sub,'ro',prop]
                     #cmd = ['btrfs','property','set','-ts',self.StorePath+'/'+sname+'/'+sub,'ro',prop]
                     #self.config.remotecommand(self.tag,self.store,cmd)
-                    sp_call(self.args,cmd)
+                    #sp_call(self.args,cmd)
+                    self.args.config.remotecommand(tag=self.args.tag, store=self.store, cmd=' '.join(cmd))
                 except:
                     print('setprop error')
                     
@@ -669,7 +693,7 @@ class SubVolume(SubVolumeInfo):
         #print('IGNORES',re_ign)
         if self.args.npb: pt = progress_timer(description= ' =create-snapshot=> from »<%s>/%s«: ' % (self.store, self.SourceName), n_iter=len(self.list_subvolumes(self.id,names=True)))
         #if self.exist:
-        if issubvol(self.args,self.StorePath+'/'+self.SourceName,self.store):
+        if issubvol(self.args,self.StorePath+'/'+self.SourceName,self.store,self.args.tag):
             try:
                 for sub in self.list_subvolumes(self.id,names=True):
                     # Test if subvolume is in ignorelist - only debug-output now
@@ -678,27 +702,30 @@ class SubVolume(SubVolumeInfo):
                     else:
                         #print('/'+sub,re_ign,re_ign.search('/'+sub))
                         # Test the Source for local snapshotting
-                        if issubvol(self.args,self.StorePath+'/'+self.SourceName+'/'+sub,self.store):
+                        if issubvol(self.args,self.StorePath+'/'+self.SourceName+'/'+sub,self.store,self.args.tag):
                             dest = self.SnapLock+'/'+sub
                             #TODO: Test on ignores
                             cmd = ['btrfs','subvolume','snapshot',self.StorePath+'/'+self.SourceName+'/'+sub,self.StorePath+'/'+dest]
 
                             # Test the destination for local snapshotting
-                            if issubvol(self.args,self.StorePath+'/'+dest,self.store):
+                            if issubvol(self.args,self.StorePath+'/'+dest,self.store,self.args.tag):
                                 # Test if top level snapshot is existing and a snapshot
                                 raise RuntimeError('FAILURE - Destination exists: %s' % (self.StorePath+'/'+dest), 0)
-                            elif issubvol(self.args,self.StorePath+'/'+dest,self.store) == False:
+                            elif issubvol(self.args,self.StorePath+'/'+dest,self.store,self.args.tag) == False:
                                 # If destination exists and is a directory and not a snapshot, delete dir and create snapshot (for subvolumes of snapshot)
                                 self.DEBUG('%-12s»<%s>/%s«' % (' =create>',self.store,dest),level=1)
-                                sp_call(self.args,['rm','-r','-f',self.StorePath+'/'+dest])
-                                sp_call(self.args,cmd)                           
+#                                sp_call(self.args,['rm','-r','-f',self.StorePath+'/'+dest])
+#                                sp_call(self.args,cmd)                           
+                                output = self.args.config.remotecommand(tag=self.args.tag, store=self.store, cmd=' '.join(['rm','-r','-f',self.StorePath+'/'+dest]))
+                                output = self.args.config.remotecommand(tag=self.args.tag, store=self.store, cmd=' '.join(cmd))
                             else:
                                 # If destination doesnt exist, create the snapshot
                                 self.DEBUG('%-12s»<%s>/%s«' % (' =create>',self.store,dest),level=1)
-                                sp_call(self.args,cmd)                           
+#                                sp_call(self.args,cmd)                           
+                                self.args.config.remotecommand(tag=self.args.tag, store=self.store, cmd=' '.join(cmd))
                             sync()
 
-                        elif issubvol(self.args,self.OrigName+'/'+sub,self.store) == False:
+                        elif issubvol(self.args,self.OrigName+'/'+sub,self.store,self.args.tag) == False:
                             raise RuntimeError('FAILURE - Source is directory, not a subvolume. No creation possible: %s' % (sub), 0)
                         else:
                             self.DEBUG( " Source-subvolume not existing: %s" % (self.OrigName+'/'+sub),level=3)
@@ -754,7 +781,6 @@ class SubVolume(SubVolumeInfo):
                 self.DEBUG(" |no-transfer: Filesystem for »%s« not mounted: »%s«" % ('BKP',self.config.getMountPath(store='BKP',tag=args.tag)))
                 return
 
-
             if uuidS == uuidB: 
                 # Same Filesystem on SRC/SNP and BKP. No transfer
                 self.DEBUG(' |no-transfer: external backupmedia obviously not mounted')
@@ -764,9 +790,10 @@ class SubVolume(SubVolumeInfo):
                 # first check if BKP-mount is btrfs, then check if BKP-Store exists and is a subvolume.
                 # If BKP-mount is btrfs, and BKPStore does not exist, create it as subvolume
                 # If BKPStore exists and is a directory, change it to subvolume
-                if isbtrfs(self.config.getMountPath(store='BKP',tag=args.tag)):
+                #if isbtrfs(self.config.getMountPath(store='BKP',tag=args.tag)):
+                if self._isbtrfs(self.config.getMountPath(store='BKP',tag=args.tag,original=False),'BKP',args.tag):
                     if os.path.exists(self.BkpPath):
-                        if issubvol(self.args,self.BkpPath,'BKP'):
+                        if issubvol(self.args,self.BkpPath,'BKP',self.args.tag):
                             self.DEBUG("BKP-Path %s is subvolume" % (self.BkpPath),level=4)
                         else:
                             self.DEBUG(" |no-transfer: %s should be subvolume, is directory on external media" % (self.BkpPath))
@@ -799,15 +826,14 @@ class SubVolume(SubVolumeInfo):
                         print('%s not exists -> create subvolume' % (self.BkpPath))
                         self.DEBUG('isdir ==> delete ==> transfer',self.BkpPath,level=3)
                         cmd = ['btrfs','subvolume','create',self.BkpPath]
-                        sp_call(self.args,cmd)
+#                        sp_call(self.args,cmd)
+                        self.args.config.remotecommand(tag=self.args.tag, store=self.store, cmd=' '.join(cmd))
                 else:
                     self.DEBUG(' |no-transfer: no subvolume for backup on external media')
                     return
 
-
             BKP = listing(self.args,store='BKP')
             transfers = dict()
-            #ctransfers = dict()
             regexpart = re.compile('\.part$|\.part/')
 
             if self.args.action == 'transfer':
@@ -853,11 +879,12 @@ class SubVolume(SubVolumeInfo):
             for t in sorted(transfers.keys()):
                 dest = args.config.getStorePath('BKP',args.tag)+'/'+t
                 destdir = os.path.dirname(dest.rstrip('/'))+'/'
-                if issubvol(self.args,dest,self.store) == False:
+                if issubvol(self.args,dest,self.store,self.args.tag) == False:
                     if os.path.exists(dest):
                         self.DEBUG('isdir ==> delete ==> transfer',dest,level=3)
                         cmd = ['rm','-r','-f',dest]
-                        sp_call(self.args,cmd)
+                        #sp_call(self.args,cmd)
+                        self.args.config.remotecommand(tag=self.args.tag, store=self.store, cmd=' '.join(cmd))
                     else:
                         pass
                         self.DEBUG('notexist ==> transfer', dest,level=3)
@@ -878,7 +905,8 @@ class SubVolume(SubVolumeInfo):
                 if self.args.npb: pt.update()
                 try:
                     cmd = ['btrfs','property','set','-ts',dest,'ro','false']
-                    sp_call(self.args,cmd,level=2)
+                    #sp_call(self.args,cmd,level=2)
+                    X = self.args.config.remotecommand(tag=self.args.tag, store=self.store, cmd=' '.join(cmd))
                 except:
                     raise TransferError
 #            if self.transferred:
@@ -891,7 +919,8 @@ class SubVolume(SubVolumeInfo):
                 self.DEBUG("  =set-ro>  %s" % (dest),level=1)
                 try:
                     cmd = ['btrfs','property','set','-ts',dest,'ro','true']
-                    sp_call(self.args,cmd,level=2)
+                    #sp_call(self.args,cmd,level=2)
+                    self.args.config.remotecommand(tag=self.args.tag, store=self.store, cmd=' '.join(cmd))
                     if self.args.npb: pt.update()
                 except:
                     raise TransferError
@@ -923,7 +952,27 @@ class SubVolume(SubVolumeInfo):
             #first = ['btrfs','send','-p',self.StorePath+'/'+parent,self.StorePath+'/'+source]
         first = ['btrfs','send'] + tclones + tparent + [self.StorePath+'/'+source]
         second = ['btrfs','receive',dest]
+
+        ssh = self.args.config.ssh[self.tag]
+        if ssh[self.store] != None:
+            send=ssh[self.store]['user']+'@'+ssh[self.store]['host']
+            first = ['ssh','-p',str(ssh[self.store]['port']),send]+first
+        else:
+            send='local'
+
+        if ssh['BKP'] != None:
+            recv=ssh['BKP']['user']+'@'+ssh['BKP']['host']
+            second = ['ssh','-p',str(ssh['BKP']['port']),recv]+second
+        else:
+            recv='local'
+
+
+        #output = args.config.remotecommand(tag=args.tag, store=store, cmd=cmd)
+        
         if not self.args.transferinfo:
+#            print("S->R",first,second)
+#            stdin_send,stdout_send,stderr_send = cmdsh(self.tag,self.store,first)
+#            stdin_recv,stdout_recv,stderr_recv = cmdsh(self.tag,'BKP',second)
             try:
                 self.DEBUG(' '.join(first)+' | '+' '.join(second),level=3)
                 process_send = subprocess.Popen(first, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
@@ -998,7 +1047,7 @@ class SubVolume(SubVolumeInfo):
 #            else:
 #                return
             StorePath = self.config.getStorePath(st,self.args.tag)
-            if not issubvol(self.args,StorePath,self.store): continue
+            if not issubvol(self.args,StorePath,self.store,self.args.tag): continue
             linkName = self.basename+'.'+args.config.getSymLink(args.tag)
             self.DEBUG('%-12s»<%s>/%s«' % (' =symlink>',st,linkName),level=0)
             self.symlink_force('./'+self.SnapName, StorePath+'/'+linkName)
@@ -1029,15 +1078,16 @@ class SubVolume(SubVolumeInfo):
         if self.args.npb: pt = progress_timer(description= ' =delete-snapshot=> from »<%s>/%s«: ' % (self.store, self.SourceName), n_iter=len(self.list_subvolumes(self.id,names=True)))
         delsubs = []
         #print('<%s> is %s: ' % (self.store, self.config.getStorePath(self.store)))
-        if issubvol(self.args,self.StorePath+'/'+sname,self.store):
+        if issubvol(self.args,self.StorePath+'/'+sname,self.store,self.args.tag):
             for sub in self.list_subvolumes(sid,names=True,rev=True,incl_self=True):
-                issub = issubvol(self.args,self.StorePath+'/'+sname+'/'+sub,self.store)
+                issub = issubvol(self.args,self.StorePath+'/'+sname+'/'+sub,self.store,self.args.tag)
                 if issub == None:
                     self.DEBUG('del - not existing: '+self.StorePath+'/'+sname+'/'+sub,level=3)
                     pass
                 else:
                     if issub:
-                        if not os.path.isfile(self.StorePath+'/'+slock):
+                        #if not os.path.isfile(self.StorePath+'/'+slock):
+                        if not Myos().path_isfile(self.StorePath+'/'+slock,self.args.config.ssh[self.tag][self.store]):
                             self.DEBUG(' -prepare-to-delete> <%s>/%s' % (self.store,sname+'/'+sub),level=1)
                             delsubs.append(self.StorePath+'/'+sname+'/'+sub)
                         else:
@@ -1054,7 +1104,8 @@ class SubVolume(SubVolumeInfo):
                 cmd.extend(delsubs)
                 self.DEBUG(' -delete-subvolumes>',level=1)
                 try:
-                    sp_call(self.args,cmd)
+                    #sp_call(self.args,cmd)
+                    self.args.config.remotecommand(tag=self.args.tag, store=self.store, cmd=' '.join(cmd))
                     self.DEBUG(' -subvolumes-deleted>',level=1)
                     #linkName = self.basename+'.'+args.config.getSymLink(args.tag)
                     listing.DeletedSubvolumes.push((self.store,re.sub('\.part$','',sname)))
@@ -1118,7 +1169,7 @@ def cleanup(args):
     #for st in args.store:
     for st in ['SRC','SNP','BKP']:
         StorePath = args.config.getStorePath(st,args.tag)
-        if not issubvol(args,StorePath,st):
+        if not issubvol(args,StorePath,st,args.tag):
             DEBUG(args,' =cleanup: store doesnt exist: %s' % (StorePath),level=3)
             continue
             if args.npb: pt.update()
@@ -1180,43 +1231,50 @@ def cleanup(args):
     return
 
 def issubvol(args,path,store='SRC',tag=None):
-    login = [] if args.config.getSSHLogin(store,tag) is None else args.config.getSSHLogin(store,tag).split(' ')
+#    login = [] if args.config.getSSHLogin(store,tag) is None else args.config.getSSHLogin(store,tag).split(' ')
     #print("issubvol-store",store,login)
     if not path == None:
-        if len(login) > 0:
+#        if len(login) > 0:
             #print("Remote-Filesystem - Error issubvol")
-            cmd = login + ['stat','-c%i',path]
+            #cmd = login + ['stat','-c%i',path]
+            cmd = 'stat -c%s %s' % ('%i',path)
             try:
-                res = subprocess.Popen(cmd,stdout=subprocess.PIPE, stderr=args.stderr)
-                output,error = res.communicate()
-                #print(path,res.returncode,output)
-                if res.returncode > 0:
-                    #print('scanfs error',self.StorePath,output,error,res.returncode)
-                    #raise ScanFsError(self.StorePath)
-                    output = b'0'
-                    pass 
-            except subprocess.CalledProcessError as e:
-                #raise ScanFsError(self.StorePath)
-                raise
+                output = args.config.remotecommand(tag=args.tag, store=store, cmd=cmd)
+#                res = subprocess.Popen(cmd,stdout=subprocess.PIPE, stderr=args.stderr)
+#                output,error = res.communicate()
+#                #print(path,res.returncode,output)
+#                if res.returncode > 0:
+#                    #print('scanfs error',self.StorePath,output,error,res.returncode)
+#                    #raise ScanFsError(self.StorePath)
+#                    output = b'0'
+#                    pass 
+#            except subprocess.CalledProcessError as e:
+#                #raise ScanFsError(self.StorePath)
+#                raise
             except:
-                raise
-            return True if int(output.decode()) == 256 else False
-        else:
-            return True if os.path.isdir(path) and os.stat(path).st_ino == 256 else False
+                output = '0'
+            #print("output",output)
+            return True if int(output) == 256 else False
+#        else:
+#            return True if os.path.isdir(path) and os.stat(path).st_ino == 256 else False
 
-def isbtrfs(path):
-    if not path == None:
-        #print(len(path.split(':')))
-        if len(path.split(':')) > 1:
-            print("«%s» is remote filesystem. Not checking" % (path))
-            return False
-        else:
-            for p in psutil.disk_partitions():
-                if (p.mountpoint == path and p.device != 'systemd-1') and p.fstype == 'btrfs':
-                    #print(p)
-                    return True
-            else:
-                return False
+
+#def isbtrfs(path):
+#    if path == None:
+#        return False
+#    else:
+#        #mi = MountInfo()
+#        #print(len(path.split(':')))
+#        if len(path.split(':')) > 1:
+#            print("«%s» is remote filesystem. Not checking" % (path))
+#            return False
+#        else:
+#            for p in psutil.disk_partitions():
+#                if (p.mountpoint == path and p.device != 'systemd-1') and p.fstype == 'btrfs':
+#                    #print(p)
+#                    return True
+#            else:
+#                return False
                 
 def create(args):
     SRC=dict()
@@ -1288,7 +1346,7 @@ def setprop(args):
 def lists(args):
     if args.info:
         if args.showpathstore:
-            for st in args.store: print(args.config.getStorePath(st,args.tag))
+            for st in args.store: print(args.config.getStorePath(st,args.tag,original=True))
         if args.showtags:
             for i in args.config.ListIntervals(): print(i)
         if args.showtransfers:
@@ -1297,13 +1355,13 @@ def lists(args):
                 print(' '.join(args.config.getVolumes(tag=args.tag)))
             else:
                 DEBUG('%s will transfer nothing' % (args.tag),level=1,verbose=args.verbose)
-        if args.showdb:
-            cursor = args.conn.execute("SELECT ID, INTNAME, VOL, SNAPNAME, SNAP_TS, TRNS_TS, DELETED  from JOURNAL")
-            print("Journal")
-            tabstr = "%-4s%-12s %-22s  %50s | %-19s - %19s\t%s"
-            print( tabstr % ("ID","Interval","Volume", "SNAMPNAME","Last run","Last Trans","Deleted"))
-            for row in cursor:
-                print(tabstr % (str(row[0])+':',row[1],row[2],'»'+row[3]+'«',row[4],row[5],row[6]))
+#        if args.showdb:
+#            cursor = args.conn.execute("SELECT ID, INTNAME, VOL, SNAPNAME, SNAP_TS, TRNS_TS, DELETED  from JOURNAL")
+#            print("Journal")
+#            tabstr = "%-4s%-12s %-22s  %50s | %-19s - %19s\t%s"
+#            print( tabstr % ("ID","Interval","Volume", "SNAMPNAME","Last run","Last Trans","Deleted"))
+#            for row in cursor:
+#                print(tabstr % (str(row[0])+':',row[1],row[2],'»'+row[3]+'«',row[4],row[5],row[6]))
 
         if args.print_config:
             args.config.PrintConfig(tag = None if args.tagset else args.tag, of=args.of)
@@ -1525,7 +1583,7 @@ def restore(args):
 
     for f in args.file:
         #print('restore',os.getcwd(),f,os.path.realpath(f))
-        src = os.path.realpath(f)
+        src = Myos().path_realpath(f,args.config.ssh[args.tag]['SRC'])
         bkpsubdir = '/'
         mountp = src
         while mountp > '/':
@@ -1586,6 +1644,7 @@ def restore(args):
 # PARSER
 
 config=Config()
+#mi = MountInfo()
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--version', action='version', version='0.1.0')
@@ -1727,6 +1786,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     #args.config = Config()
     args.config = config
+    #args.mi = mi
     stores = []
     snapshots = []
 
@@ -1813,11 +1873,11 @@ if __name__ == '__main__':
     if args.verbose > 0:
         args.npb = False 
         
-    args.db = '/var/lib/mkbackup-btrfs'
-    if not os.path.exists(args.db) and not os.path.exists(args.db+'/mkbackup-btrfs.db'):
-        create_db(db=args.db)
+#    args.db = '/var/lib/mkbackup-btrfs'
+#    if not os.path.exists(args.db) and not os.path.exists(args.db+'/mkbackup-btrfs.db'):
+#        create_db(db=args.db)
 
-    args.conn = sqlite3.connect(args.db+'/mkbackup-btrfs.db')
+#    args.conn = sqlite3.connect(args.db+'/mkbackup-btrfs.db')
 
     #DEBUG("Arguments",args,verbose=args.verbose)
     if args.verbose > 3:
@@ -1839,16 +1899,16 @@ if __name__ == '__main__':
             #for sln in Config().ListSymlinkNames():
             for sln in args.config.ListSymlinkNames():
                 link = p+'/'+vol+'.'+sln
-                if os.path.exists(link):
-                    if os.path.islink(link):
+                if Myos().path_exists(link,args.config.ssh[args.tag][st]):
+                    if Myos().path_islink(link,args.config.ssh[args.tag][st]):
                         DEBUG("Symlink ok: %s/%s.%s" % (st,vol,sln),level=4,verbose=args.verbose)
                     else:
                         DEBUG("Symlink broken: %s/%s.%s --> remove it" % (st,vol,sln),level=4,verbose=args.verbose)
-                        os.remove(link)
+                        Myos().remove(link,args.config.ssh[args.tag][st])
                 else:
                     DEBUG("Symlink missing: %s/%s.%s" % (st,vol,sln),level=4,verbose=args.verbose)
     for t in args.config.ssh_cons.keys():
-        print("Close Connection to %s" % (t))
+        DEBUG("Close Connection to %s" % (t),level=3,verbose=args.verbose)
         args.config.ssh_cons[t].close()
 #        for s in args.config.ssh[t].keys():
 #            if not args.config.ssh[t][s]['ssh'] == None:

@@ -40,22 +40,57 @@ def quote_argument(argument):
         .replace('`', '\\`')
     )
 
+def connect(conn=None):
+    if conn == None:
+        pass
+    else:
+        if not conn['active']:
+            try:
+                #if conn['conn'].is_active(): print("Session alive")
+                #conn['conn'].close()
+                conn['conn'].connect(conn['host'],conn['port'],conn['user'])
+                conn['active'] = True
+                print("open connection for %s@%s" % (conn['user'], conn['host']))
+            except (paramiko.BadHostKeyException, paramiko.AuthenticationException, paramiko.SSHException, socket.error) as e:
+                print("C",e)
+                raise e 
+#        try:
+#            #if conn['conn'].is_active(): print("Session alive")
+#            conn['conn'].close()
+#            conn['conn'].connect(conn['host'],conn['port'],conn['user'])
+#            print("open connection for %s@%s" % (conn['user'], conn['host']))
+#        except (paramiko.BadHostKeyException, paramiko.AuthenticationException, paramiko.SSHException, socket.error) as e:
+#            print("C",e)
+#            raise e 
+        
+
 class MountInfo():
-    def __init__(self,mountinfo='/proc/self/mountinfo'):
+    def __init__(self,mountinfo='/proc/self/mountinfo',conn=None):
         self.mi = dict()
-        mif = open(mountinfo)
-        for line in mif:
-            a,b,c,relpath,mntp,d,e,f,fstype,dev,opts = line.split()
-            mntp = mntp.replace('\\040',' ')
-            self.mi[mntp] = dict()
-            self.mi[mntp]['relpath'] = relpath
-            self.mi[mntp]['fstype'] = fstype
-            self.mi[mntp]['dev'] = dev
-            self.mi[mntp]['opts'] = opts
-        mif.close()
+        if conn == None:
+            mif = open(mountinfo)
+        else:
+            connect(conn)
+            #conn['conn'].connect(conn['host'],conn['port'],conn['user'])
+            sftp_client = conn['conn'].open_sftp()
+            mif = sftp_client.open(mountinfo)
+
+        try:
+            for line in mif:
+                a,b,c,relpath,mntp,d,e,f,fstype,dev,opts = line.split()
+                mntp = mntp.replace('\\040',' ')
+                self.mi[mntp] = dict()
+                self.mi[mntp]['relpath'] = relpath
+                self.mi[mntp]['fstype'] = fstype
+                self.mi[mntp]['dev'] = dev
+                self.mi[mntp]['opts'] = opts
+        finally:
+            mif.close()
             
     def __check(self,mountpoint,attribute):
-        mp = '/'+mountpoint.strip('/')
+        if not mountpoint[0] == '/': 
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), mountpoint) 
+        mp = mountpoint.rstrip('/')if len(mountpoint) > 1 else mountpoint
         rec = False
         rep = ''
         if os.path.exists(mp):
@@ -71,7 +106,7 @@ class MountInfo():
 
     def relpath(self,mountpoint):
         rec,rep,mp = self.__check(mountpoint,'relpath')
-        print(mountpoint,rec,rep,mp)
+        #print(mountpoint,rec,rep,mp)
         if rec: return mp.replace(rep,'') + mountpoint
         return mp
 
@@ -91,20 +126,87 @@ class MyConfigParser(ConfigParser):
             return ConfigParser.get(self, 'DEFAULT', option, raw=True)
 
 class Myos():
-    def __init__(self,uh=None,p=22):
-        self.remote = False if uh == None else True
-        print("Remote",self.remote,uh,p)
+    def __init__(self):
+        #self.remote = False if conn == None else True
+        #print("Remote",self.remote,uh,p)
         pass
         #print("INIT myos")
 
-    def stat(self,path):
-        print("stat myos")
-        #return False
-        return os.stat(path)
+    def __run__(self,command,conn=None):
+        if not conn == None:
+            print("run remote %s" % (command))
+            out=''
+            stdin, stdout, stderr = conn['conn'].exec_command(command)
+            for line in stdout:
+                out += line
+            return(out)
 
-    def path_exists(self,path):
+    def stat(self,path,conn=None):
+        if not conn == None:
+            command='/usr/bin/stat'
+            return(self.__run__(command,conn))
+        else:
+            return os.stat(path)
+
+
+    def path_isdir(self,path,conn=None):
         #print("myos.path",os.path.exists(path))
-        return os.path.exists(path)
+        if not conn == None:
+            command='/bin/test -d %s' % (path)
+            return(self.__run__(command,conn))
+        else:
+            print("is local dir %s" % (path))
+            return os.path.isdir(path)
+
+    def path_isfile(self,path,conn=None):
+        if not conn == None:
+            command='/bin/test -f %s' % (path)
+            return(self.__run__(command,conn))
+        else:
+            print("is local file %s" % (path))
+            return os.path.isfile(path)
+
+    def path_realpath(self,path,conn=None):
+        #print("myos.path",os.path.exists(path))
+        if not conn == None:
+            command='/usr/bin/realpath %s' % (path)
+            return(self.__run__(command,conn))
+        else:
+            print("local realpath for %s" % (path))
+            return os.path.realpath(path)
+
+    def path_exists(self,path,conn=None):
+        #print("myos.path",os.path.exists(path))
+        if not conn == None:
+            command='/bin/test -e %s' % (path)
+            return(self.__run__(command,conn))
+        else:
+            print("exists-local %s" % (path))
+            return os.path.exists(path)
+
+    def remove(self,path,conn=None):
+        if not conn == None:
+            command='/bin/rm %s' % (path)
+            return(self.__run__(command,conn))
+        else:
+            print("remove-local %s" % (path))
+            return os.remove(path)
+
+    def rename(self,From,To,conn=None):
+        if not conn == None:
+            command='/bin/mv %s %s' % (From,To)
+            return(self.__run__(command,conn))
+        else:
+            print("rename-local %s %s" % (From,To))
+            return os.rename(From,To)
+
+    def path_islink(self,path,conn=None):
+        if not conn == None:
+            command='/bin/test -h %s' % (path)
+            return(self.__run__(command,conn))
+        else:
+            return os.path.islink(path)
+
 
 class Config():
     def __init__(self,cfile='/etc/mkbackup-btrfs.conf'):
@@ -126,9 +228,10 @@ class Config():
             print('Default-Config created at %s' % (self.cfile))
             self.CreateConfig()
         self._read()
+
         for i in self.ListIntervals() +['DEFAULT']:
             self.ssh[i] = dict()
-            for s in ['SNP', 'BKP']:
+            for s in ['SRC', 'SNP', 'BKP']:
                 #print('X',self.getSSHLogin(s,i))
                 self.ssh[i][s] = dict()
                 if self.getSSHLogin(s,i) != None:
@@ -137,11 +240,18 @@ class Config():
                     if not uh in self.ssh_cons:
                         self.ssh_cons[uh] = paramiko.SSHClient()
                         self.ssh_cons[uh].set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                        self.ssh_cons[uh].connect(h, p, u)
+                        #self.ssh_cons[uh].connect(h, int(p), u)
 
-                    self.ssh[i][s]['ssh'] = uh
+                    #self.ssh[i][s]['conn'] = uh
+                    self.ssh[i][s]['conn'] = self.ssh_cons[uh]
+                    self.ssh[i][s]['host'] = h
+                    self.ssh[i][s]['port'] = int(p)
+                    self.ssh[i][s]['user'] = u
+                    self.ssh[i][s]['creds'] = (h, int(p), u)
+                    self.ssh[i][s]['active'] = False
+
                 else:
-                    self.ssh[i][s]['ssh'] = None
+                    self.ssh[i][s] = None
         
     def _read(self):
 
@@ -389,15 +499,30 @@ class Config():
         sn = '/'+self.getStoreName(store=store,tag=tag) if len(self.getStoreName(store=store,tag=tag)) > 0 else ''
         return(self.getMountPath(store=store,tag=tag,original=original) + sn)
 
+    def cmdsh(self,tag='DEFAULT',store='SRC',cmd=''):
+        if self.ssh[tag][store] == None:
+            return('',subprocess.check_output(cmd, shell=True).decode(),'')
+        else:
+            out = ''
+            conn = self.ssh[tag][store]
+            connect(conn)
+            return conn['conn'].exec_command(cmd)
+
     def remotecommand(self,tag='DEFAULT',store='SRC',cmd=''):
-        if self.ssh[tag][store]['ssh'] == None:
+        if self.ssh[tag][store] == None:
             return(subprocess.check_output(cmd, shell=True).decode())
         else:
             out = ''
-            stdin, stdout, stderr = self.ssh_cons[self.ssh[tag][store]['ssh']].exec_command(cmd)
-            for line in stdout:
-                out += line.strip('\n')
-            return(out)
+            conn = self.ssh[tag][store]
+            connect(conn)
+            stdin, stdout, stderr = conn['conn'].exec_command(cmd)
+            out = stdout.readlines()
+            err = stderr.readlines()
+            #print("OUTPUT",cmd,out,err)
+            return(''.join(out) if len(err) == 0 else False)
+#            for line in stdout:
+#                out += line
+#            return(out)
 
 
     def getDevice(self,store='SRC',tag='DEFAULT'):
@@ -410,15 +535,17 @@ class Config():
         # amount = automountpoint
 #        amount =  subprocess.check_output(cmd, shell=True).decode()
         amount = self.remotecommand(tag,store,cmd)
+        conn = self.ssh[tag][store]
+        connect(conn)
                 
         #print("AMOUNT",amount)
         if amount == '':
             pass
         elif amount == 'systemd-1':
             try:
-                Myos().stat(self.getStorePath(store=store,tag=tag))
+                Myos().stat(self.getStorePath(store=store,tag=tag),conn=conn)
             except:
-                Myos().stat(os.path.dirname(self.getStorePath(store=store,tag=tag)))
+                Myos().stat(os.path.dirname(self.getStorePath(store=store,tag=tag)),conn=conn)
         else:
             print("don't know type of automount: %s" %(amount))
             return None
@@ -426,19 +553,18 @@ class Config():
         cmd = """awk -F " " '$2 == "%s" && $3 == "btrfs" {printf $1}' /proc/mounts""" % (mp)
         #cmd = cmd if login == '' else "%s %s" % (login,quote_argument(cmd))
         #print("CMD",cmd)
-        device =  subprocess.check_output(cmd, shell=True).decode()
+        #device =  subprocess.check_output(cmd, shell=True).decode()
+        device = self.remotecommand(tag,store,cmd).partition('\n')[0]
         #print("DEVICE",device)
         return None if device == '' else device
 
     def getUUID(self,store='SRC',tag='DEFAULT'):
         device = self.getDevice(store=store,tag=tag)
-        #login = '' if self.getSSHLogin(store,tag) is None else self.getSSHLogin(store,tag)
         if device == None: return None
-        #cmd = "%s/sbin/blkid %s -o value -s 'UUID'" % (login,device)
         cmd = "/sbin/blkid %s -o value -s 'UUID'" % (device)
         uuid = self.remotecommand(tag,store,cmd).partition('\n')[0]
         #uuid =  subprocess.check_output(cmd, shell=True).decode().partition('\n')[0]
-        #print("UUID",uuid)
+        #print("UUID",store,tag,uuid)
         return uuid if uuid != '' else None
 
     
