@@ -123,9 +123,9 @@ def check_lockfile(args,lf):
     # Returns True, when lockfile is in use, and False if lockfile is unused
     # Returns None, when lockfile is not existing
     for st in args.store:
-        print("A",args.tag,st)
+        #print("A",args.tag,st)
         if Myos().path_isfile(lf,args.config.ssh[args.tag][st]):
-            print("B")
+            #print("B")
             file = open(lf, 'r')
             pid = file.readline()
             file.close()
@@ -136,7 +136,7 @@ def check_lockfile(args,lf):
                 DEBUG('lockfile %s unused' % (lf),level=3,verbose=args.verbose)
                 return(False)
         else:
-            print("C")
+            #print("C")
             DEBUG('lockfile %s not existing' % (lf),level=3,verbose=args.verbose)
             return(None)
 
@@ -1887,19 +1887,25 @@ if __name__ == '__main__':
     elif args.verbose > 1:
         DEBUG("Arguments",args,verbose=args.verbose)
 
-
-    # Run action
+    #################################################################
+    ##                       Run action                            ##
+    #################################################################
     args.func(args)
 
     # Check symlinks in stores, if they exist and ok or missing.
     #for vol in Config().getVolumes():
     for vol in args.config.getVolumes():
+        #print("VOL",vol)
         for st in (args.sourcepath.keys()):
             p = args.sourcepath[st]
+            #print("P",p,st)
             #for sln in Config().ListSymlinkNames():
             for sln in args.config.ListSymlinkNames():
                 link = p+'/'+vol+'.'+sln
+                #print("LINK",p,vol,sln,link)
+                #print("X",args.tag,st,args.config.ssh[args.tag][st])
                 if Myos().path_exists(link,args.config.ssh[args.tag][st]):
+                    #print("XX",args.tag,st)
                     if Myos().path_islink(link,args.config.ssh[args.tag][st]):
                         DEBUG("Symlink ok: %s/%s.%s" % (st,vol,sln),level=4,verbose=args.verbose)
                     else:

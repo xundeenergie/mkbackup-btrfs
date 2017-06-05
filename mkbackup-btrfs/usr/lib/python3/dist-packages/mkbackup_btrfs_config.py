@@ -133,8 +133,10 @@ class Myos():
         #print("INIT myos")
 
     def __run__(self,command,conn=None):
+        #print(command,conn)
         if not conn == None:
-            print("run remote %s" % (command))
+#            print("run remote %s" % (command))
+            connect(conn)
             out=''
             stdin, stdout, stderr = conn['conn'].exec_command(command)
             for line in stdout:
@@ -155,7 +157,7 @@ class Myos():
             command='/bin/test -d %s' % (path)
             return(self.__run__(command,conn))
         else:
-            print("is local dir %s" % (path))
+#            print("is local dir %s" % (path))
             return os.path.isdir(path)
 
     def path_isfile(self,path,conn=None):
@@ -163,7 +165,7 @@ class Myos():
             command='/bin/test -f %s' % (path)
             return(self.__run__(command,conn))
         else:
-            print("is local file %s" % (path))
+#            print("is local file %s" % (path))
             return os.path.isfile(path)
 
     def path_realpath(self,path,conn=None):
@@ -172,7 +174,7 @@ class Myos():
             command='/usr/bin/realpath %s' % (path)
             return(self.__run__(command,conn))
         else:
-            print("local realpath for %s" % (path))
+#            print("local realpath for %s" % (path))
             return os.path.realpath(path)
 
     def path_exists(self,path,conn=None):
@@ -181,7 +183,7 @@ class Myos():
             command='/bin/test -e %s' % (path)
             return(self.__run__(command,conn))
         else:
-            print("exists-local %s" % (path))
+#            print("exists-local %s" % (path))
             return os.path.exists(path)
 
     def remove(self,path,conn=None):
@@ -189,7 +191,7 @@ class Myos():
             command='/bin/rm %s' % (path)
             return(self.__run__(command,conn))
         else:
-            print("remove-local %s" % (path))
+#            print("remove-local %s" % (path))
             return os.remove(path)
 
     def rename(self,From,To,conn=None):
@@ -197,7 +199,7 @@ class Myos():
             command='/bin/mv %s %s' % (From,To)
             return(self.__run__(command,conn))
         else:
-            print("rename-local %s %s" % (From,To))
+#            print("rename-local %s %s" % (From,To))
             return os.rename(From,To)
 
     def path_islink(self,path,conn=None):
@@ -216,7 +218,7 @@ class Config():
         #self.hostname = subprocess.check_output("/bin/hostname",shell=True).decode('utf8').split('\n')[0]
         self.hostname=socket.gethostname()
         self.mountinfo = MountInfo()
-        self.syssubvol = self.mountinfo.relpath('/')
+        self.syssubvol = self.mountinfo.relpath('/')[1:]
         #self.syssubvol=subprocess.check_output(['/usr/bin/grub-mkrelpath','/'], shell=False).decode('utf8').split("\n")[0].strip("/")
         self.ssh = dict()
         self.ssh_cons = dict()
