@@ -1,0 +1,11 @@
+#!/usr/bin/python3
+
+import sys
+from mkbackup_btrfs_config import MountInfo
+
+def relpath(mp): 
+    print(MountInfo().relpath(mp))
+
+if __name__ == "__main__":
+    for i in sys.argv[1:]:
+        relpath(i)
