@@ -547,7 +547,7 @@ class Config():
             connect(conn)
             return conn['conn'].exec_command(cmd)
 
-    def remotecommand(self,tag='DEFAULT',store='SRC',cmd='',stderr=subprocess.DEVNULL):
+    def remotecommand(self,tag='DEFAULT',store='SRC',cmd='',stderr=None):
         if self.ssh[tag][store] == None:
             #print("noconn")
             try:

@@ -412,7 +412,6 @@ class SubVolume(SubVolumeInfo):
 
     def __init__(self,args,name,store='SRC',single=False):
         super().__init__(args,store=store,name=name,single=single)
-        print("N",name)
         self.snapped      = False
         self.transferred  = False
         self.exist        = True
@@ -731,7 +730,7 @@ class SubVolume(SubVolumeInfo):
             #print(self.config.getDevice(store='BKP'))
             uuidS = self.config.getUUID(store=self.store,tag=self.args.tag)
             uuidB = self.config.getUUID(store='BKP',tag=self.args.tag)
-            print("UUID-compare",uuidS,uuidB)
+            self.DEBUG("UUID-compare",uuidS,uuidB,level=4)
             if None == uuidS:
                 self.DEBUG(" |no-transfer: Filesystem for »%s« not mounted: »%s«" % (self.store,self.config.getDevice(store=self.store,tag=args.tag)))
                 return
@@ -947,7 +946,7 @@ class SubVolume(SubVolumeInfo):
             return
 
     def symlink_force(self,target, link_name, store):
-        cmd=['ln','-s','-f',target,link_name]
+        cmd=['ln','-s','-f', '-n', target, link_name]
         self.args.config.remotecommand(tag=self.args.tag, store=store, cmd=cmd)
         self.DEBUG("[II] TARGET => LINKNAME: %s => %s" % (target.strip(),link_name.strip()),level=3)
 
@@ -967,10 +966,10 @@ class SubVolume(SubVolumeInfo):
             StorePath = self.config.getStorePath(st,self.args.tag)
             if not issubvol(self.args,StorePath,st,self.args.tag): continue
             linkName = self.basename+'.'+args.config.getSymLink(args.tag)
-            self.DEBUG('%-12s»<%s>/%s«' % (' =symlink>',st,linkName),level=0)
+            self.DEBUG('%-12s =>»<%s>/%s«' % (' =symlink>',st,linkName),level=0)
             self.symlink_force('./'+self.SnapName, StorePath+'/'+linkName,st)
             if args.config.getSymLink(args.tag) != args.config.getSymLink(): 
-                self.DEBUG('%-12s»<%s>/%s«' % (' =sYmlink>',st,self.basename+'.LAST'),level=0)
+                self.DEBUG('%-12s =>»<%s>/%s«' % (' =symlink>',st,self.basename+'.LAST'),level=0)
                 self.symlink_force('./'+self.SnapName, StorePath+'/'+self.basename+'.LAST',st)
 
     def delete(self):
