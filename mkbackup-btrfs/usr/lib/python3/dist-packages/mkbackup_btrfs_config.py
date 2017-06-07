@@ -27,6 +27,19 @@ else:
     from ConfigParser import ConfigParser
     from ConfigParser import RawConfigParser, NoOptionError, NoSectionError
 
+class Error(Exception):
+    pass
+
+class NoSubvolumeError(Error):
+    def __init__(self):
+        print("ERROR - Snapshot not found" )
+    pass
+
+class SSHConnectionError(Error):
+    def __init__(self):
+        print("ERROR - ssh-connection not available" )
+    pass
+
 def s2bool(s):
     return s.lower() in ['true','yes','y','1'] if s else False
 
@@ -50,10 +63,23 @@ def connect(conn=None):
                 #conn['conn'].close()
                 conn['conn'].connect(conn['host'],conn['port'],conn['user'])
                 conn['active'] = True
-                print("open connection for %s@%s" % (conn['user'], conn['host']))
-            except (paramiko.BadHostKeyException, paramiko.AuthenticationException, paramiko.SSHException, socket.error) as e:
-                print("C",e)
-                raise e 
+                #print("open connection for %s@%s" % (conn['user'], conn['host']))
+#            except (paramiko.BadHostKeyException,
+#                    paramiko.AuthenticationException, paramiko.SSHException,
+#                    socket.gaierror, socket.error) as e:
+#                #print("C",e)
+#                #raise e 
+#                print("No connection to host %s" % (conn['host']))
+#                return(False)
+#            except (paramiko.BadHostKeyException, paramiko.AuthenticationException, paramiko.SSHException, socket.error) as e:
+#                raise e 
+            except:
+                return(False)
+
+            return(True)
+            raise SSHConnectionError
+        else:
+            return(True)
 #        try:
 #            #if conn['conn'].is_active(): print("Session alive")
 #            conn['conn'].close()
@@ -70,17 +96,20 @@ class MountInfo():
         if conn == None:
             mif = open(mountinfo)
         else:
-            connect(conn)
-            #conn['conn'].connect(conn['host'],conn['port'],conn['user'])
-            sftp_client = conn['conn'].open_sftp()
-            mif = sftp_client.open(mountinfo)
-
+            if connect(conn):
+                #conn['conn'].connect(conn['host'],conn['port'],conn['user'])
+                sftp_client = conn['conn'].open_sftp()
+                mif = sftp_client.open(mountinfo)
+            else:
+                print("Host not reachable (MountInfo): %s" % (conn['host']))
+                mif = open(mountinfo)
         try:
             for line in mif:
-                a,b,c,relpath,mntp,d,e,f,fstype,dev,opts = line.split()
+                a,b,c,relpath,mntp,d,e,typ,fstype,dev,opts = line.split()
                 mntp = mntp.replace('\\040',' ')
                 self.mi[mntp] = dict()
                 self.mi[mntp]['relpath'] = relpath
+                self.mi[mntp]['typ'] = typ
                 self.mi[mntp]['fstype'] = fstype
                 self.mi[mntp]['dev'] = dev
                 self.mi[mntp]['opts'] = opts
@@ -113,6 +142,9 @@ class MountInfo():
     def fstype(self,mountpoint):
         return self.__check(mountpoint,'fstype')[2]
 
+    def typ(self,mountpoint):
+        return self.__check(mountpoint,'typ')[2]
+
     def device(self,mountpoint):
         return self.__check(mountpoint,'dev')[2]
 
@@ -127,21 +159,18 @@ class MyConfigParser(ConfigParser):
 
 class Myos():
     def __init__(self):
-        #self.remote = False if conn == None else True
-        #print("Remote",self.remote,uh,p)
         pass
-        #print("INIT myos")
 
     def __run__(self,command,conn=None):
-        #print(command,conn)
         if not conn == None:
-#            print("run remote %s" % (command))
-            connect(conn)
-            out=''
-            stdin, stdout, stderr = conn['conn'].exec_command(command)
-            for line in stdout:
-                out += line
-            return(out)
+            if connect(conn):
+                out=''
+                stdin, stdout, stderr = conn['conn'].exec_command(command)
+                for line in stdout:
+                    out += line
+                return(out)
+            else:
+                print("Host not reachable (Myos): %s" % (conn['host']))
 
     def stat(self,path,conn=None):
         if not conn == None:
@@ -510,64 +539,54 @@ class Config():
             connect(conn)
             return conn['conn'].exec_command(cmd)
 
-    def remotecommand(self,tag='DEFAULT',store='SRC',cmd=''):
+    def remotecommand(self,tag='DEFAULT',store='SRC',cmd='',stderr=subprocess.DEVNULL):
         if self.ssh[tag][store] == None:
-            return(subprocess.check_output(cmd, shell=True).decode())
+            try:
+                ret = subprocess.run(cmd,stderr=stderr,stdout=subprocess.PIPE)
+                if ret.returncode > 0:
+                    pass 
+            except subprocess.CalledProcessError as e:
+                raise
+            return ret.stdout.decode("utf-8").rstrip('/n')
+
         else:
             out = ''
             conn = self.ssh[tag][store]
-            connect(conn)
-            stdin, stdout, stderr = conn['conn'].exec_command(cmd)
-            out = stdout.readlines()
-            err = stderr.readlines()
-            #print("OUTPUT",cmd,out,err)
-            return(''.join(out) if len(err) == 0 else False)
-#            for line in stdout:
-#                out += line
-#            return(out)
+            if connect(conn):
+                stdin, stdout, stderr = conn['conn'].exec_command(' '.join(cmd))
+                if not stdout:
+                    out = stdout.readlines()
+                    err = stderr.readlines()
+                    return(''.join(out) if len(err) == 0 else False)
+                else:
+                    return(stdout.read().decode("utf-8")) 
+            else:
+                print("Host not reachable (remcomd): %s" % (conn['host']))
+                return('')
 
 
     def getDevice(self,store='SRC',tag='DEFAULT'):
         mp = self.getMountPath(store=store,tag=tag,original=False)
-        #login = '' if self.getSSHLogin(store,tag) is None else self.getSSHLogin(store,tag)
-        cmd = """awk -F " " '$1 == "systemd-1" && $2 == "%s" && $3 == "autofs" {printf $1}' /proc/mounts""" % (mp)
-        #print("CMD",tag,store,self.ssh['DEFAULT'].keys(),cmd)
-        #cmd = cmd if login == '' else "%s %s" % (login,quote_argument(cmd))
-
-        # amount = automountpoint
-#        amount =  subprocess.check_output(cmd, shell=True).decode()
-        amount = self.remotecommand(tag,store,cmd)
         conn = self.ssh[tag][store]
         connect(conn)
-                
-        #print("AMOUNT",amount)
-        if amount == '':
-            pass
-        elif amount == 'systemd-1':
+        mi = MountInfo(conn=conn)
+        amount=mi.fstype(mp)
+        if mi.fstype(mp) == 'autofs':
             try:
                 Myos().stat(self.getStorePath(store=store,tag=tag),conn=conn)
             except:
                 Myos().stat(os.path.dirname(self.getStorePath(store=store,tag=tag)),conn=conn)
-        else:
-            print("don't know type of automount: %s" %(amount))
-            return None
-
-        cmd = """awk -F " " '$2 == "%s" && $3 == "btrfs" {printf $1}' /proc/mounts""" % (mp)
-        #cmd = cmd if login == '' else "%s %s" % (login,quote_argument(cmd))
-        #print("CMD",cmd)
-        #device =  subprocess.check_output(cmd, shell=True).decode()
-        device = self.remotecommand(tag,store,cmd).partition('\n')[0]
-        #print("DEVICE",device)
-        return None if device == '' else device
+        mi = MountInfo(conn=self.ssh[tag][store])
+        return(mi.device(mp) if mi.fstype(mp) != 'autofs' else None)
 
     def getUUID(self,store='SRC',tag='DEFAULT'):
         device = self.getDevice(store=store,tag=tag)
+        #print("DEVICE",device,store,tag)
         if device == None: return None
-        cmd = "/sbin/blkid %s -o value -s 'UUID'" % (device)
-        uuid = self.remotecommand(tag,store,cmd).partition('\n')[0]
-        #uuid =  subprocess.check_output(cmd, shell=True).decode().partition('\n')[0]
-        #print("UUID",store,tag,uuid)
-        return uuid if uuid != '' else None
+        cmd = ['/sbin/blkid', device.rstrip("\n"), '-o', 'value', '-s', 'UUID']
+        uuid = self.remotecommand(tag,store,cmd)
+        #print("UUID",uuid,store,tag,' '.join(cmd))
+        return uuid.rstrip('\n') if uuid.rstrip('\n') != '' else None
 
     
     def setBKPPath(self,mount):
