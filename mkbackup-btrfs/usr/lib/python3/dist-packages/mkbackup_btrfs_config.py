@@ -225,6 +225,7 @@ class Myos():
 
     def rename(self,From,To,conn=None):
         if not conn == None:
+#            print("RENAME",From,To,conn['host'])
             command='/bin/mv %s %s' % (From,To)
             return(self.__run__(command,conn))
         else:
@@ -237,6 +238,13 @@ class Myos():
             return(self.__run__(command,conn))
         else:
             return os.path.islink(path)
+
+    def listdir(self,path,conn=None):
+        if not conn == None:
+            command='/bin/ls %s' % (path)
+            return(self.__run__(command,conn))
+        else:
+            return os.listdir(path)
 
 
 class Config():
@@ -541,6 +549,7 @@ class Config():
 
     def remotecommand(self,tag='DEFAULT',store='SRC',cmd='',stderr=subprocess.DEVNULL):
         if self.ssh[tag][store] == None:
+            #print("noconn")
             try:
                 ret = subprocess.run(cmd,stderr=stderr,stdout=subprocess.PIPE)
                 if ret.returncode > 0:
@@ -550,15 +559,18 @@ class Config():
             return ret.stdout.decode("utf-8").rstrip('/n')
 
         else:
+            #print("conn",self.ssh[tag][store]['host'])
             out = ''
             conn = self.ssh[tag][store]
             if connect(conn):
                 stdin, stdout, stderr = conn['conn'].exec_command(' '.join(cmd))
                 if not stdout:
+                    #print("Xr")
                     out = stdout.readlines()
                     err = stderr.readlines()
                     return(''.join(out) if len(err) == 0 else False)
                 else:
+                    #print("Yr",stdout.read().decode("utf-8"))
                     return(stdout.read().decode("utf-8")) 
             else:
                 print("Host not reachable (remcomd): %s" % (conn['host']))

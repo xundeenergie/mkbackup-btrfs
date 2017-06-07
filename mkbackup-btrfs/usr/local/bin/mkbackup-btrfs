@@ -105,7 +105,8 @@ def check_lockfile(args,lf):
             file = open(lf, 'r')
             pid = file.readline()
             file.close()
-            if len(pid) > 0 and Myos().path_isfile('/proc/'+pid+'/cmdline',args.config.ssh[args.tag][st]):
+            #if len(pid) > 0 and Myos().path_isfile('/proc/'+pid+'/cmdline',args.config.ssh[args.tag][st]):
+            if len(pid) > 0 and os.path.isfile('/proc/'+pid+'/cmdline'):
                 DEBUG('lockfile %s in use with process %s' % (lf,pid),level=3,verbose=args.verbose)
                 return(True)
             else:
@@ -188,10 +189,6 @@ class listing:
         self.BkpPath   = args.config.getStorePath('BKP',self.args.tag) # whole path from / to directory where the snapshot lives
         self.svols     = dict()
         self.args      = args
-#        self.BKPLogin  = args.config.getSSHLogin(store='BKP',tag=self.args.tag)
-#        self.SNPLogin  = args.config.getSSHLogin(store='SNP',tag=self.args.tag)
-#        self.SRCLogin  = args.config.getSSHLogin(store='SRC',tag=self.args.tag)
-        #print("LOGINS",self.SRCLogin,self.SNPLogin,self.BKPLogin)
         self.scanfs()
 
     def scanfs(self):
@@ -365,7 +362,6 @@ class SubVolumeInfo(listing):
                         'Top level ID':'tlid',
                         'Flags':'flags',
                         'Snapshot(s)':'snapshots'}
-        #print('SubVolumeInfo',self.SourceName)
         self.parse_btrfs_show()
 
     def parse_btrfs_show(self):
@@ -416,6 +412,7 @@ class SubVolume(SubVolumeInfo):
 
     def __init__(self,args,name,store='SRC',single=False):
         super().__init__(args,store=store,name=name,single=single)
+        print("N",name)
         self.snapped      = False
         self.transferred  = False
         self.exist        = True
@@ -456,7 +453,7 @@ class SubVolume(SubVolumeInfo):
         self.subvolsshort = []
         self.subvolumes   = []
         self.stderr       = args.stderr
-        self.DEBUG('[II]  <%s> is %s: ' % (self.store, self.config.getStorePath(self.store,self.args.tag)),level=2)
+        self.DEBUG('[II]  <%s> is %s: ' % (self.store, self.config.getStorePath(self.store,self.args.tag,original=True)),level=2)
 
     def _createlockfile(self,lf,ln):
         if Myos().path_isfile(self.store+'/'+lf,conn=self.args.config.ssh[self.tag][self.store]):
@@ -522,8 +519,9 @@ class SubVolume(SubVolumeInfo):
                 else: 
                     return
         try:
-            Myos().rename(StorePath+'/'+From,StorePath+'/'+To,self.args.config.ssh[self.tag][self.store])
+            Myos().rename(StorePath+'/'+From,StorePath+'/'+To,self.args.config.ssh[self.tag][store])
         except FileNotFoundError:
+            print("B")
             self.DEBUG('Nothing to rename',level=3)
         except OSError as e:
             print(e)
@@ -752,7 +750,7 @@ class SubVolume(SubVolumeInfo):
                 # If BKPStore exists and is a directory, change it to subvolume
                 #if isbtrfs(self.config.getMountPath(store='BKP',tag=args.tag)):
                 if self._isbtrfs(self.config.getMountPath(store='BKP',tag=args.tag,original=False),'BKP',args.tag):
-                    if os.path.exists(self.BkpPath):
+                    if Myos().path_exists(self.BkpPath,self.args.config.ssh[self.args.tag]['BKP']):
                         if issubvol(self.args,self.BkpPath,'BKP',self.args.tag):
                             self.DEBUG("BKP-Path %s is subvolume" % (self.BkpPath),level=4)
                         else:
@@ -787,7 +785,7 @@ class SubVolume(SubVolumeInfo):
                         self.DEBUG('isdir ==> delete ==> transfer',self.BkpPath,level=3)
                         cmd = ['btrfs','subvolume','create',self.BkpPath]
 #                        sp_call(self.args,cmd)
-                        self.args.config.remotecommand(tag=self.args.tag, store=self.store, cmd=cmd)
+                        self.args.config.remotecommand(tag=self.args.tag, store='BKP', cmd=cmd)
                 else:
                     self.DEBUG(' |no-transfer: no subvolume for backup on external media')
                     return
@@ -948,31 +946,32 @@ class SubVolume(SubVolumeInfo):
             self.DEBUG('no transfer - only information')
             return
 
-    def symlink_force(self,target, link_name):
+    def symlink_force(self,target, link_name, store):
+        cmd=['ln','-s','-f',target,link_name]
+        self.args.config.remotecommand(tag=self.args.tag, store=store, cmd=cmd)
+        self.DEBUG("[II] TARGET => LINKNAME: %s => %s" % (target.strip(),link_name.strip()),level=3)
 
-        try:
-            os.symlink(target, link_name)
-        except OSError as e:
-            if e.errno == errno.EEXIST:
-                    os.remove(link_name)
-                    os.symlink(target, link_name)
-                    self.DEBUG("[II] TARGET => LINKNAME: %s => %s" % (target.strip(),link_name.strip()),level=3)
-            else:
-                raise e
+#        try:
+#            os.symlink(target, link_name)
+#        except OSError as e:
+#            if e.errno == errno.EEXIST:
+#                    os.remove(link_name)
+#                    os.symlink(target, link_name)
+#                    self.DEBUG("[II] TARGET => LINKNAME: %s => %s" % (target.strip(),link_name.strip()),level=3)
+#            else:
+#                raise e
     
-
     def symlink(self):
-
         for st in list(self.args.sourcepath.keys())[0], list(self.args.destpath.keys())[0]:
             #print('C',st,self.snapped,'T',self.transferred,args.action)
             StorePath = self.config.getStorePath(st,self.args.tag)
             if not issubvol(self.args,StorePath,st,self.args.tag): continue
             linkName = self.basename+'.'+args.config.getSymLink(args.tag)
             self.DEBUG('%-12s»<%s>/%s«' % (' =symlink>',st,linkName),level=0)
-            self.symlink_force('./'+self.SnapName, StorePath+'/'+linkName)
+            self.symlink_force('./'+self.SnapName, StorePath+'/'+linkName,st)
             if args.config.getSymLink(args.tag) != args.config.getSymLink(): 
                 self.DEBUG('%-12s»<%s>/%s«' % (' =sYmlink>',st,self.basename+'.LAST'),level=0)
-                self.symlink_force('./'+self.SnapName, StorePath+'/'+self.basename+'.LAST')
+                self.symlink_force('./'+self.SnapName, StorePath+'/'+self.basename+'.LAST',st)
 
     def delete(self):
         self.DEBUG('%-20s from »<%s>/%s«' % (' =delete-snapshot=>',self.store, self.SourceName),level=1)
@@ -1031,12 +1030,6 @@ class SubVolume(SubVolumeInfo):
                     self.del_vol    = self.OrigName.split('.')[0]
                     self.del_ts     = self.OrigName.split('.')[1]
                     self.del_tag    = self.OrigName.split('.')[2]
-                    #print("DELETE LASTRUN %s - %s - %s" % (self.del_vol,self.del_ts,self.del_tag))
-# Experimenteller Code für eine externe Datenbank - funktioniert noch nicht
-#                    try:
-#                        self.args.conn.execute("UPDATE LASTRUN set DELETED = 1 where VOL='%s' AND INTV='%s' AND LRUN = '%s' "% (self.del_vol,self.args.tag,self.del_ts)) ;
-#                    except:
-#                        self.args.conn.execute("INSERT INTO LASTRUN (VOL, INTV, LRUN, DELETED) VALUES ('%s', '%s', '%s', 1)"% (self.del_vol,self.args.tag,self.args.timestamp)) ;
                 except:
                     raise DeleteError
 
@@ -1069,6 +1062,16 @@ def main(args):
             #L.list_sisters()
             #X=SubVolume(listing)
             
+def issubvol(args,path,store='SRC',tag=None):
+    #print("issubvol-store",store,tag,path)
+    if not path == None:
+        cmd = ['stat', '-c', '%i', path ]
+        try:
+            return True if int(args.config.remotecommand(tag=args.tag, store=store, cmd=cmd, stderr=subprocess.DEVNULL)) == 256 else False
+        except:
+            return False
+        return True if int(output) == 256 else False
+                
 
 
 def cleanup(args):
@@ -1135,7 +1138,7 @@ def cleanup(args):
             if args.npb: pt.update()
 
             DEBUG(args,'  --cleanup unused lockfiles',level=3)
-            for lf in os.listdir(args.config.getStorePath(st,args.tag)):
+            for lf in Myos().listdir(args.config.getStorePath(st,args.tag),args.config.ssh[args.tag][st]):
                 if explock.search(lf):
                     if check_lockfile(args,lf):
                         pass
@@ -1143,22 +1146,12 @@ def cleanup(args):
                         pass
                     else:
                         DEBUG(' --> remove unused lockfile: '+lf,level=1,verbose=args.verbose)
-                        os.remove(lf)
+                        Myos().remove(lf,args.config.ssh[args.tag][st])
             if args.npb: pt.update()
 
     if args.npb: pt.finish()
     return
 
-def issubvol(args,path,store='SRC',tag=None):
-    #print("issubvol-store",store,tag,path)
-    if not path == None:
-        cmd = ['stat', '-c', '%i', path ]
-        try:
-            return True if int(args.config.remotecommand(tag=args.tag, store=store, cmd=cmd, stderr=subprocess.DEVNULL)) == 256 else False
-        except:
-            return False
-        return True if int(output) == 256 else False
-                
 def create(args):
     SRC=dict()
     for snap in args.snapshots:
@@ -1254,7 +1247,6 @@ def lists(args):
             for st in args.store:
                 ST[st]=dict()
                 #for vol in args.config.getVolumes():
-                #print("S",args.snapshots)
                 for vol in args.snapshots if len(args.snapshots) > 0 else '*':
                     #print('VOL',vol)
                     ST[st][vol]=dict()
@@ -1755,11 +1747,6 @@ if __name__ == '__main__':
     if args.verbose > 0:
         args.npb = False 
         
-#    args.db = '/var/lib/mkbackup-btrfs'
-#    if not os.path.exists(args.db) and not os.path.exists(args.db+'/mkbackup-btrfs.db'):
-#        create_db(db=args.db)
-
-#    args.conn = sqlite3.connect(args.db+'/mkbackup-btrfs.db')
 
     #DEBUG("Arguments",args,verbose=args.verbose)
     if args.verbose > 3:
