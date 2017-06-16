@@ -11,7 +11,7 @@ import re
 import paramiko
 
 __author__ = "Jakobus Schuerz <jakobus.schuerz@gmail.com>"
-__version__ = "0.01.0"
+__version__ = "0.04.0"
 
 
 # Useful for very coarse version differentiation.

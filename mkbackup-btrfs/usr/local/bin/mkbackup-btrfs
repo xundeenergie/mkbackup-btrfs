@@ -21,7 +21,11 @@ except:
     TREE=False
 
 #from mksnapshotconfig import Config
-from mkbackup_btrfs_config import Config, MountInfo, connect, Myos
+from mkbackup_btrfs_config import Config, MountInfo, connect, Myos, __version__
+from mkbackup_btrfs_config import __version__ as confversion
+
+__author__ = "Jakobus Schürz <jakob@schuerz.at>"
+__version__ = "0.02.0"
 
 #define progress timer class
 class progress_timer:
@@ -1703,21 +1707,27 @@ if __name__ == '__main__':
 
     # set store and path to store depending on action
     args.sourcepath, args.destpath  = dict(), dict()
-    if args.action == 'create' or args.action == 'transfer':
-        if 'BKP' in args.store: args.store.pop(args.store.index('BKP'))
-        if 'SRC' in args.store or 'SNP' not in args.store:
-            args.sourcepath['SRC'] = args.config.getStorePath('SRC',args.tag)
-        else:
-            args.sourcepath['SNP'] = args.config.getStorePath('SNP',args.tag)
-        args.destpath['BKP'] = args.config.getStorePath('BKP',args.tag)
-    else:
-        if len(args.store) == 0:
-            args.sourcepath['SRC'] = args.config.getStorePath('SRC',args.tag)
+    if hasattr(args,'action'):
+        if args.action == 'create' or args.action == 'transfer':
+            if 'BKP' in args.store: args.store.pop(args.store.index('BKP'))
+            if 'SRC' in args.store or 'SNP' not in args.store:
+                args.sourcepath['SRC'] = args.config.getStorePath('SRC',args.tag)
+            else:
+                args.sourcepath['SNP'] = args.config.getStorePath('SNP',args.tag)
             args.destpath['BKP'] = args.config.getStorePath('BKP',args.tag)
         else:
-            for st in args.store:
-                args.sourcepath[st] = args.config.getStorePath(st,args.tag)
-                args.destpath[st] = args.config.getStorePath(st,args.tag)
+            if len(args.store) == 0:
+                args.sourcepath['SRC'] = args.config.getStorePath('SRC',args.tag)
+                args.destpath['BKP'] = args.config.getStorePath('BKP',args.tag)
+            else:
+                for st in args.store:
+                    args.sourcepath[st] = args.config.getStorePath(st,args.tag)
+                    args.destpath[st] = args.config.getStorePath(st,args.tag)
+    else:
+        print("""Version mkbackup_btrfs_config: %s
+Version mkbackup-btrfs: %s
+Author: %s""" % (confversion,__version__,__author__))
+        quit()
 
     DEBUG('SRC',args.sourcepath,level=5,verbose=args.verbose)
     DEBUG('DST',args.destpath,level=5,verbose=args.verbose)
