@@ -1,12 +1,12 @@
 Package: mkbackup-btrfs
-Version: 0.8.12
+Version: 0.8.13
 Section: backup
 Priority: extra
 Architecture: all
 Maintainer: Jakobus Schürz <xundeenergie@gmail.com>
 Homepage: http://github.com/xundeenergie/mksnapshot
 Provides: mkbackup-btrfs
-Depends: python3, python3-progressbar, python3-psutil, btrfs-progs, systemd-alt-cron, my-services, linux-image-amd64, console-setup, tzdata, python3-paramiko, python-paramiko, python-fuse
+Depends: python3, python3-progressbar, python3-psutil, btrfs-progs, systemd-alt-cron, my-services, linux-image-amd64, console-setup, tzdata, python3-paramiko, python-paramiko, python-fuse, deb-systemd-helper-new
 Recommends: python3-pip, install-on-btrfs
 Description: Backup-Suite for btrfs written in python3 
  This backup-suite handles all around making backups on btrfs-filesystems, including a gnome-shell-extension 
