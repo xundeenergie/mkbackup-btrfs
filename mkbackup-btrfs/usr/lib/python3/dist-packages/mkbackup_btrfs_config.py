@@ -592,7 +592,15 @@ class Config():
         return(mi.device(mp) if mi.fstype(mp) != 'autofs' else None)
 
     def getUUID(self,store='SRC',tag='DEFAULT'):
-        device = self.getDevice(store=store,tag=tag)
+        try:
+            device = self.getDevice(store=store,tag=tag)
+        except FileNotFoundError:
+            #print("UID_NOENT")
+            #raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), store + " " + tag) 
+            raise 
+        except:
+            return None
+
         #print("DEVICE",device,store,tag)
         if device == None: return None
         cmd = ['/sbin/blkid', device.rstrip("\n"), '-o', 'value', '-s', 'UUID']

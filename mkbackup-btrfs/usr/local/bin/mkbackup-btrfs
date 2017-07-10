@@ -732,8 +732,22 @@ class SubVolume(SubVolumeInfo):
             
             #get uuids of SNP/SRC and BKP and compare. If they are the same, no transfer, if they are different, make transfer to external media
             #print(self.config.getDevice(store='BKP'))
-            uuidS = self.config.getUUID(store=self.store,tag=self.args.tag)
-            uuidB = self.config.getUUID(store='BKP',tag=self.args.tag)
+            try:
+                uuidS = self.config.getUUID(store=self.store,tag=self.args.tag)
+            except FileNotFoundError:
+                self.DEBUG(" |no-transfer: directory for »%s« not existing: »%s«" % (self.store,self.config.getMountPath(store=self.store,tag=args.tag)))
+                return
+            except:
+                uuidS = None
+
+            try:
+                uuidB = self.config.getUUID(store='BKP',tag=self.args.tag)
+            except FileNotFoundError:
+                self.DEBUG(" |no-transfer: directory for »%s« not existing: »%s«" % ('BKP',self.config.getMountPath(store='BKP',tag=args.tag)))
+                return
+            except:
+                uuidB = None
+
             self.DEBUG("UUID-compare",uuidS,uuidB,level=4)
             if None == uuidS:
                 self.DEBUG(" |no-transfer: Filesystem for »%s« not mounted: »%s«" % (self.store,self.config.getDevice(store=self.store,tag=args.tag)))
