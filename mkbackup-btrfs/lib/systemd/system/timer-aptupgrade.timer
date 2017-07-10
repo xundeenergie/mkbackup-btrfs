@@ -1,0 +1,15 @@
+[Unit]
+Description=Runs backup %I before system-update/upgrade with apt
+#BindsTo=mkbackup@BKP.target
+PartOf=mkbackup@SNP.target
+OnFailure=status-email-root@%n.service
+BindsTo=timer-xe.target
+
+[Timer]
+OnActiveSec=1s
+AccuracySec=2s
+Unit=timer-aptupgrade.target
+RemainAfterElapse=false
+
+[Install]
+WantedBy=mkbackup@SNP.target

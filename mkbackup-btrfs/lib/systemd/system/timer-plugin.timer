@@ -1,0 +1,16 @@
+[Unit]
+Description=Runs backup %I after pluggin in external HD
+BindsTo=mkbackup@BKP.target
+#PartOf=mkbackup@BKP.target
+OnFailure=status-email-root@%n.service
+RefuseManualStart=yes
+RefuseManualStop=yes
+
+[Timer]
+OnActiveSec=30s
+AccuracySec=10min
+Unit=timer-plugin.target
+RemainAfterElapse=false
+
+[Install]
+WantedBy=mkbackup@BKP.target
