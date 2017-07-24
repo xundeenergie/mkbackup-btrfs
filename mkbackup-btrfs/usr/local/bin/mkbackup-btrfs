@@ -1464,12 +1464,14 @@ def transfer(args):
 
 def restore(args):
     #print('RESTORE FILES', args)
+    # if User running "mkbackup restore" is root, set uroot=True
     if os.getuid() == 0:
         uroot = True  
     else:
         uroot = False
 
     if args.no_preserve:
+        # If set no_preserve (-n or --no-preserve), create no backup from destination-file
         cpopts=['-b','--suffix=.'+args.timestamp+'.bak']
 
 
@@ -1515,7 +1517,9 @@ def restore(args):
                     try:
                         os.rename(dst,bkp)
                     except:
-                        raise
+                        print("Destination-file »%s« not existing -> continue" % (dst))
+                        pass
+                        #raise
 
                 #print('cp',src,dst)
                 #print('no copy - do it manually - activate in code')
