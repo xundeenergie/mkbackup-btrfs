@@ -35,6 +35,8 @@ ExecStartPre=/bin/sh -c "(/bin/systemctl is-active -q mkbackup.target)"
 ExecStart=/usr/local/bin/mkbackup -V -v -t %i create SNP
 #ExecStopPost=-/bin/rm /run/mkbackup-%i/systemd.lock
 
+KillMode=mixed
+
 [Install]
 WantedBy=timer-%i.target 
 DefaultInstance=mkbackup@manually.service

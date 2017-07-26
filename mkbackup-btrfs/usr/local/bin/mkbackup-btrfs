@@ -234,10 +234,11 @@ class listing:
             isbkp = self.config.getStorePath(st,args.tag) == self.config.getStorePath('BKP',args.tag)
             for sub in sorted(self.svols.keys(),key=int):
                 if self.svols[sub]['path'] == snap: stroot = self.svols[sub]['uuid']
-                try:
-                    vars()[str(self.svols[sub]['uuid'])] = Node(str(self.svols[sub]['path']),parent=vars()[self.svols[sub]['puuid']])
+                ext = " (gen: "+str(self.svols[sub]['gen'])+" cgen: "+str(self.svols[sub]['gen'])+")"
+                try:                                       
+                    vars()[str(self.svols[sub]['uuid'])] = Node(str(self.svols[sub]['path'])+ext,parent=vars()[self.svols[sub]['puuid']])
                 except:
-                    vars()[str(self.svols[sub]['uuid'])] = Node(str(self.svols[sub]['path']),parent=wood)
+                    vars()[str(self.svols[sub]['uuid'])] = Node(str(self.svols[sub]['path'])+ext,parent=wood)
 
             for pre, fill, node in RenderTree(wood if snap == None else vars()[stroot]):
                 print("%s%s" % (pre, node.name))
@@ -254,9 +255,9 @@ class listing:
             if self.svols[sub]['puuid'] == self.svols[ID]['puuid'] and not sub == ID:
                 #print('XXX',self.svols[sub]['gen'],self.svols[ID]['gen'],self.svols[sub]['cgen'],self.svols[ID]['cgen'],self.svols[sub]['path'],self.svols[ID]['path'])
                 if older:
-                    if int(self.svols[sub]['cgen']) >= int(self.svols[ID]['cgen']): continue
+                    if int(self.svols[sub]['gen']) >= int(self.svols[ID]['gen']): continue
                 if younger:
-                    if int(self.svols[sub]['cgen']) <= int(self.svols[ID]['cgen']): continue
+                    if int(self.svols[sub]['gen']) <= int(self.svols[ID]['gen']): continue
                 self.DEBUG('SISTER',self.svols[sub]['id'],self.svols[sub]['path'],level=5)
                 result.append(self.svols[sub]['path']) if names else result.append(sub)
         return(self._ret(result,reverse=rev))
@@ -827,18 +828,23 @@ class SubVolume(SubVolumeInfo):
 
             for sub in self.list_subvolumes(sid,names=False):
                 plist = dict() #parent list
-                for sis in self.list_sisters(self.svols[sub]['id'],older=True,younger=False,names=False):
+                for sis in self.list_sisters(self.svols[sub]['id'],older=True,younger=False,names=False,rev=False):
                     for bsub in sorted(BKP.svols):
                         if BKP.svols[bsub]['ruuid'] == self.svols[sis]['uuid']:
-                            plist[self.svols[sis]['id']] = self.svols[sis]['gen']
+                            plist[self.svols[sis]['id']] = self.svols[sis]['id']
 
                 
                 transfers[self.svols[sub]['path']] = dict()
                 if len(plist) > 0:
-                    v=list(plist.values())
+                    #plist = sorted(plist)
+                    #v=list(plist.values())
+                    v=[int(i) for i in plist.values()]
                     k=list(plist.keys())
                     parent = k[v.index(max(v))]
+                    #k=[int(i) for i in plist.keys()]
+                    #parent = str(k[v.index(max(v))])
                     transfers[self.svols[sub]['path']]['parent'] = self.svols[parent]['path']
+                    self.DEBUG(self.svols[parent]['path'],"id: ",k,level=3)
                 else:
                     pass
 
