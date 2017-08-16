@@ -1,4 +1,5 @@
 #!/usr/bin/python3 -u
+#!/usr/bin/pkexec /usr/bin/python3
 
 import argparse
 import re
@@ -13,6 +14,7 @@ import shutil
 import psutil
 # sqlite3 is used for writing database about last runs - it is read by list and from gnome-extension (planned)
 import sqlite3
+
 
 try:
     from anytree import Node, RenderTree
