@@ -91,7 +91,7 @@ $SYSTEMCTL daemon-reload
 # Create udev-Rule for new external drive
 register () {
 cat <<EOF > "${DESTUDEV}99-ext-bkp-volume-${PRE}${DUUID}.rules"
-ACTION=="add", KERNEL=="sd*", SUBSYSTEMS=="usb", ENV{${SUUID}}=="$DUUID", SYMLINK+="disk/mars", TAG+="systemd", ENV{SYSTEMD_WANTS}+="mkbackup-external@${PRE}${DUUID}.service", ENV{SYSTEMD_WANTS}+="mkbackup@BKP.target", ENV{SYSTEMD_WANTS}+="smartctl-fast@$(/bin/systemd-escape /dev/disk/by-${ID}/${DUUID}).service"
+ACTION=="add", KERNEL=="sd*", SUBSYSTEMS=="usb", ENV{${SUUID}}=="$DUUID", SYMLINK+="disk/mars", TAG+="systemd", ENV{SYSTEMD_WANTS}+="mkbackup-external@${PRE}${DUUID}.service", ENV{SYSTEMD_WANTS}+="mkbackup@BKP.target", ENV{SYSTEMD_WANTS}+="smartctl-fast@$(/bin/systemd-escape -p /dev/disk/by-${ID}/${DUUID}).service"
 
 ACTION=="remove", KERNEL=="sd*", SUBSYSTEMS=="usb", ENV{${SUUID}}="$DUUID", \
 RUN+="${SYSTEMCTL} --no-block stop mkbackup@BKP.target"

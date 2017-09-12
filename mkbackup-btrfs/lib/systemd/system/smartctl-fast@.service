@@ -1,0 +1,5 @@
+[Unit]
+Description=Smartctl Health-Test for %f
+
+[Service]
+ExecStart=/usr/sbin/smartctl -H %f
