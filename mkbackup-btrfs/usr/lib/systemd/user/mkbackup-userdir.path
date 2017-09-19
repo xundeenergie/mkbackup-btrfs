@@ -1,7 +1,7 @@
 [Unit]
 #Description=Starts mounting backups to %h/backup, if this directory exists
 #BindsTo=mkbackup-userdir.path
-Conflicts=shutdown.target
+Conflicts=shutdown.target sleep.target suspend.target
 
 [Path]
 PathExists=%h/backup
