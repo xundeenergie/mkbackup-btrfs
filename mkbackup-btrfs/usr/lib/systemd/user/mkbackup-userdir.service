@@ -1,7 +1,7 @@
 [Unit]
 Description=Show all userspezific backups in %h/backup
 BindsTo=mkbackup-userdir.path
-Conflicts=shutdown.target reboot.target sleep.target umount.target
+Conflicts=shutdown.target reboot.target umount.target
 Before=shutdown.target reboot.target sleep.target umount.target
 
 [Service]

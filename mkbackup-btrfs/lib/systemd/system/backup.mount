@@ -1,4 +1,5 @@
 [Unit]
+Description=Mounts Backup-Snapshots from System to /backup
 #Before=local-fs.target
 #BindsTo=backup.automount
 
