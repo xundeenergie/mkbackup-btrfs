@@ -207,7 +207,9 @@ class listing:
         output = self.args.config.remotecommand(tag=self.args.tag, store=self.store, cmd=cmd)
         try:
             for line in output.splitlines():
-                argmts = line.split(' ')
+                # btrfs-subvolume list 4.13 output field separator is not anymore only one space. uuid-fields are filled up with whitespaces, so split(' ') does not work anymore!!!
+                #argmts = line.split(' ')
+                argmts = line.split()
                 #ID 2412 gen 8547 cgen 8547 top level 2393 parent_uuid 7991115b-8a6b-6d4d-b664-03db01e902d0 received_uuid - uuid 368490e7-5aca-0d4d-9b7a-becff0487ebd path aldebaran/__ALWAYSCURRENT__.2016-10-15_22:40:25.hourly.part/var-spool-dovecot
                 self.svols[argmts[1]] = dict() 
                 self.svols[argmts[1]]['id'] = argmts[1]
@@ -311,6 +313,12 @@ class listing:
         first = '' if names else id 
         if incl_self: result.append(first)
         for sub in self._lssub(id):
+            print("A",self.svols[sub]['path'])
+            print("B",self.svols[id]['path']+'/')
+            if names:
+                print("append1",sub,":",self.svols[sub]['path'].partition(self.svols[id]['path']+'/')[2])
+            else:
+                print("append2",sub,":",sub)
             result.append(self.svols[sub]['path'].partition(self.svols[id]['path']+'/')[2]) if names else result.append(sub)
         return(self._ret(result,reverse=rev))
 
@@ -662,12 +670,16 @@ class SubVolume(SubVolumeInfo):
         if self.args.npb: pt = progress_timer(description= ' =create-snapshot=> from »<%s>/%s«: ' % (self.store, self.SourceName), n_iter=len(self.list_subvolumes(self.id,names=True)))
         #if self.exist:
         if issubvol(self.args,self.StorePath+'/'+self.SourceName,self.store,self.args.tag):
+            print("DB1")
             try:
+                print("DB2",self.list_subvolumes(self.id,names=True))
                 for sub in self.list_subvolumes(self.id,names=True):
                     # Test if subvolume is in ignorelist - only debug-output now
+                    print("Sub: "+sub,dir(self))
                     if re_ign != None and re_ign.search('/'+sub):
                         self.DEBUG('%-12s»<%s>/%s«:' % (' -IGNORE->',self.store, sub),level=2)
                     else:
+                        print("SUB: "+sub,"DB3")
                         #print('/'+sub,re_ign,re_ign.search('/'+sub))
                         # Test the Source for local snapshotting
                         if issubvol(self.args,self.StorePath+'/'+self.SourceName+'/'+sub,self.store,self.args.tag):
@@ -678,6 +690,7 @@ class SubVolume(SubVolumeInfo):
                             # Test the destination for local snapshotting
                             if issubvol(self.args,self.StorePath+'/'+dest,self.store,self.args.tag):
                                 # Test if top level snapshot is existing and a snapshot
+                                self.DEBUG(dest,self.StorePath+'/'+dest,self.store,self.args.tag,level=1)
                                 raise RuntimeError('FAILURE - Destination exists: %s' % (self.StorePath+'/'+dest), 0)
                             elif issubvol(self.args,self.StorePath+'/'+dest,self.store,self.args.tag) == False:
                                 # If destination exists and is a directory and not a snapshot, delete dir and create snapshot (for subvolumes of snapshot)
@@ -1092,9 +1105,13 @@ def issubvol(args,path,store='SRC',tag=None):
     if not path == None:
         cmd = ['stat', '-c', '%i', path ]
         try:
+            print("DEBUG1",path,int(args.config.remotecommand(tag=args.tag, store=store, cmd=cmd, stderr=subprocess.DEVNULL)))
+            print(True if int(args.config.remotecommand(tag=args.tag, store=store, cmd=cmd, stderr=subprocess.DEVNULL)) == 256 else False)
             return True if int(args.config.remotecommand(tag=args.tag, store=store, cmd=cmd, stderr=subprocess.DEVNULL)) == 256 else False
         except:
+            print("DEBUG2",path)
             return False
+        print("DEBUG3",path)
         return True if int(output) == 256 else False
                 
 
