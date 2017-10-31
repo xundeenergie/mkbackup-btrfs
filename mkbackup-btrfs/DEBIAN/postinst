@@ -32,7 +32,49 @@ set -e
 case "$1" in
 
     configure)
-        SERVICES="mkbackup.target backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service"
+        # normal systemd-units
+        #SERVICES="mkbackup.target backup.automount var-cache-backup.automount btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service"
+        SERVICES="mkbackup.target backup.automount var-cache-backup.automount"
+        for s in $SERVICES; do
+            deb-systemd-helper-new unmask $s >/dev/null || true
+            if deb-systemd-helper-new --quiet was-enabled $s; then
+                    # Enables the unit on first installation, creates new
+                    # symlinks on upgrades if the unit file has changed.
+                    deb-systemd-helper-new enable $s >/dev/null || true
+            else
+                    # Update the statefile to add new symlinks (if any), which need to be
+                    # cleaned up on purge. Also remove old symlinks.
+                    deb-systemd-helper-new update-state $s >/dev/null || true
+            fi
+        done
+
+        # instantiated systemd-units
+
+        DEVICE=$(awk '$9 == "btrfs" && $5 == "/" {gsub("/dev/","",$10);print $10}' /proc/self/mountinfo)
+        ROT=$(cat /sys/block/$(printf '%s' "$DEVICE" | sed 's/[0-9]//g')/queue/rotational)
+        if test $ROT -eq 0; then
+            INTERVALS="hourly daily weekly aptupgrade plugin afterboot manually"
+        else
+            INTERVALS="aptupgrade plugin manually"
+        fi
+        CINT=$(for i in $INTERVALS;do echo "mkbackup@${i}.service" ; done)
+        SERVICES="btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service mkbackup-conf@mkbackup\x2dbtrfs.path mkbackup-conf@mkbackup\x2dbtrfs.service $CINT"
+
+        for s in $SERVICES; do
+            #deb-systemd-helper-new-xe unmask $s >/dev/null || true
+            deb-systemd-helper-new unmask $s || true
+            # was-enabled defaults to true, so new installations run enable.
+            echo "enable $s"
+            if deb-systemd-helper-new --quiet was-enabled $s; then
+                    # Enables the unit on first installation, creates new
+                    # symlinks on upgrades if the unit file has changed.
+                    deb-systemd-helper-new enable $s >/dev/null || true
+            else
+                    # Update the statefile to add new symlinks (if any), which need to be
+                    # cleaned up on purge. Also remove old symlinks.
+                    deb-systemd-helper-new update-state $s >/dev/null || true
+            fi
+        done
         ;;
     abort-upgrade|abort-remove|abort-deconfigure)
         exit 0
@@ -45,48 +87,6 @@ case "$1" in
 
 esac
 
-# normal systemd-units
-SERVICES="mkbackup.target backup.automount var-cache-backup.automount"
-for s in $SERVICES; do
-    deb-systemd-helper-new unmask $s >/dev/null || true
-    if deb-systemd-helper-new --quiet was-enabled $s; then
-            # Enables the unit on first installation, creates new
-            # symlinks on upgrades if the unit file has changed.
-            deb-systemd-helper-new enable $s >/dev/null || true
-    else
-            # Update the statefile to add new symlinks (if any), which need to be
-            # cleaned up on purge. Also remove old symlinks.
-            deb-systemd-helper-new update-state $s >/dev/null || true
-    fi
-done
-
-# instantiated systemd-units
-
-DEVICE=$(awk '$9 == "btrfs" && $5 == "/" {gsub("/dev/","",$10);print $10}' /proc/self/mountinfo)
-ROT=$(cat /sys/block/$(printf '%s' "$DEVICE" | sed 's/[0-9]//g')/queue/rotational)
-if test $ROT -eq 0; then
-    INTERVALS="hourly daily weekly aptupgrade plugin afterboot manually"
-else
-    INTERVALS="aptupgrade plugin manually"
-fi
-CINT=$(for i in $INTERVALS;do echo "mkbackup@${i}.service" ; done)
-SERVICES="btrfs-scrub@var-cache-btrfs_pool_SYSTEM.service mkbackup-conf@mkbackup\x2dbtrfs.path mkbackup-conf@mkbackup\x2dbtrfs.service $CINT"
-
-for s in $SERVICES; do
-    #deb-systemd-helper-new-xe unmask $s >/dev/null || true
-    deb-systemd-helper-new unmask $s || true
-    # was-enabled defaults to true, so new installations run enable.
-    echo "enable $s"
-    if deb-systemd-helper-new --quiet was-enabled $s; then
-            # Enables the unit on first installation, creates new
-            # symlinks on upgrades if the unit file has changed.
-            deb-systemd-helper-new enable $s >/dev/null || true
-    else
-            # Update the statefile to add new symlinks (if any), which need to be
-            # cleaned up on purge. Also remove old symlinks.
-            deb-systemd-helper-new update-state $s >/dev/null || true
-    fi
-done
 
 exit 0
 

@@ -36,6 +36,6 @@ ExecStart=/bin/btrfs balance start -musage=5 -dusage=5 -v %f
 #ExecStart=/bin/btrfs balance start -dusage=10 -v %f
 #ExecStart=/bin/btrfs balance start -dusage=40 -v %f
 #ExecStart=/bin/btrfs balance start -dusage=65 -v %f
-ExecStop=/etc/systemd/system/scripts/btrfs-action.sh %f balance $MAINPID
+ExecStop=/usr/lib/systemd/scripts/btrfs-action.sh %f balance $MAINPID
 ExecStopPost=/bin/rm /run/btrfs-actions/balance-systemd.lock
 

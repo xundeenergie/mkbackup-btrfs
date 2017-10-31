@@ -27,7 +27,7 @@ CPUSchedulingPolicy=idle
 
 ExecStartPre=/bin/touch /run/btrfs-actions/scrub-systemd-%i.lock
 ExecStart=/bin/btrfs scrub start -Bd %f
-ExecStop=/etc/systemd/system/scripts/btrfs-action.sh %f scrub $MAINPID
+ExecStop=/usr/lib/systemd/scripts/btrfs-action.sh %f scrub $MAINPID
 ExecStopPost=/bin/rm /run/btrfs-actions/scrub-systemd-%i.lock
 
 
