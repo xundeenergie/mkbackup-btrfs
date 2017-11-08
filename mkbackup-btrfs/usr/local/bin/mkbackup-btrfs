@@ -313,12 +313,12 @@ class listing:
         first = '' if names else id 
         if incl_self: result.append(first)
         for sub in self._lssub(id):
-            print("A",self.svols[sub]['path'])
-            print("B",self.svols[id]['path']+'/')
-            if names:
-                print("append1",sub,":",self.svols[sub]['path'].partition(self.svols[id]['path']+'/')[2])
-            else:
-                print("append2",sub,":",sub)
+#            print("A",self.svols[sub]['path'])
+#            print("B",self.svols[id]['path']+'/')
+#            if names:
+#                print("append1",sub,":",self.svols[sub]['path'].partition(self.svols[id]['path']+'/')[2])
+#            else:
+#                print("append2",sub,":",sub)
             result.append(self.svols[sub]['path'].partition(self.svols[id]['path']+'/')[2]) if names else result.append(sub)
         return(self._ret(result,reverse=rev))
 
@@ -670,16 +670,16 @@ class SubVolume(SubVolumeInfo):
         if self.args.npb: pt = progress_timer(description= ' =create-snapshot=> from »<%s>/%s«: ' % (self.store, self.SourceName), n_iter=len(self.list_subvolumes(self.id,names=True)))
         #if self.exist:
         if issubvol(self.args,self.StorePath+'/'+self.SourceName,self.store,self.args.tag):
-            print("DB1")
+            #print("DB1")
             try:
-                print("DB2",self.list_subvolumes(self.id,names=True))
+                #print("DB2",self.list_subvolumes(self.id,names=True))
                 for sub in self.list_subvolumes(self.id,names=True):
                     # Test if subvolume is in ignorelist - only debug-output now
-                    print("Sub: "+sub,dir(self))
+                    #print("Sub: "+sub,dir(self))
                     if re_ign != None and re_ign.search('/'+sub):
                         self.DEBUG('%-12s»<%s>/%s«:' % (' -IGNORE->',self.store, sub),level=2)
                     else:
-                        print("SUB: "+sub,"DB3")
+                        #print("SUB: "+sub,"DB3")
                         #print('/'+sub,re_ign,re_ign.search('/'+sub))
                         # Test the Source for local snapshotting
                         if issubvol(self.args,self.StorePath+'/'+self.SourceName+'/'+sub,self.store,self.args.tag):
@@ -1105,13 +1105,9 @@ def issubvol(args,path,store='SRC',tag=None):
     if not path == None:
         cmd = ['stat', '-c', '%i', path ]
         try:
-            print("DEBUG1",path,int(args.config.remotecommand(tag=args.tag, store=store, cmd=cmd, stderr=subprocess.DEVNULL)))
-            print(True if int(args.config.remotecommand(tag=args.tag, store=store, cmd=cmd, stderr=subprocess.DEVNULL)) == 256 else False)
             return True if int(args.config.remotecommand(tag=args.tag, store=store, cmd=cmd, stderr=subprocess.DEVNULL)) == 256 else False
         except:
-            print("DEBUG2",path)
             return False
-        print("DEBUG3",path)
         return True if int(output) == 256 else False
                 
 

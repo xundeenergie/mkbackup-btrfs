@@ -105,7 +105,10 @@ class MountInfo():
                 mif = open(mountinfo)
         try:
             for line in mif:
-                a,b,c,relpath,mntp,d,e,typ,fstype,dev,opts = line.split()
+                if len(line.split()) == 10:
+                    a,b,c,relpath,mntp,d,typ,fstype,dev,opts = line.split()
+                else:
+                    a,b,c,relpath,mntp,d,e,typ,fstype,dev,opts = line.split()
                 mntp = mntp.replace('\\040',' ')
                 self.mi[mntp] = dict()
                 self.mi[mntp]['relpath'] = relpath
