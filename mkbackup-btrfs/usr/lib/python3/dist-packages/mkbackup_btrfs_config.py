@@ -161,7 +161,8 @@ class MyConfigParser(ConfigParser):
             return ConfigParser.get(self, 'DEFAULT', option, raw=True)
 
 class Myos():
-    def __init__(self):
+    def __init__(self,dry=False):
+        self.dry = dry
         pass
 
     def __run__(self,command,conn=None):
@@ -219,21 +220,30 @@ class Myos():
             return os.path.exists(path)
 
     def remove(self,path,conn=None):
-        if not conn == None:
-            command='/bin/rm %s' % (path)
-            return(self.__run__(command,conn))
+        if self.dry == True:
+            print('Remove %s (dry run)' % (path))
+            return
         else:
-#            print("remove-local %s" % (path))
-            return os.remove(path)
+            if not conn == None:
+                command='/bin/rm %s' % (path)
+                return(self.__run__(command,conn))
+            else:
+    #            print("remove-local %s" % (path))
+                return os.remove(path)
 
     def rename(self,From,To,conn=None):
-        if not conn == None:
-#            print("RENAME",From,To,conn['host'])
-            command='/bin/mv %s %s' % (From,To)
-            return(self.__run__(command,conn))
+        if self.dry == True:
+            print('Rename %s to %s (dry run)' % (From,To))
+            return
         else:
-#            print("rename-local %s %s" % (From,To))
-            return os.rename(From,To)
+            if not conn == None:
+    #            print("RENAME",From,To,conn['host'])
+                command='/bin/mv %s %s' % (From,To)
+                return(self.__run__(command,conn))
+            else:
+    #            print("rename-local %s %s" % (From,To))
+                return os.rename(From,To)
+            
 
     def path_islink(self,path,conn=None):
         if not conn == None:
@@ -396,7 +406,9 @@ class Config():
                 'volumes': '$S,__ALWAYSCURRENT__',
                 'interval': 5,
                 'symlink': 'LAST',
-                'transfer': False}
+                'transfer': False,
+                'notification': False,
+                'notify_type': None}
         self.config['hourly'] = {'volumes':  '$S,__ALWAYSCURRENT__','interval': '24','transfer': True}
         self.config['daily'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '7','transfer': True}
         self.config['weekly'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '5','transfer': True}
@@ -405,7 +417,9 @@ class Config():
         self.config['afterboot'] = {'volumes':  '$S','interval': '4','symlink': 'LASTBOOT'}
         self.config['aptupgrade'] = {'volumes':  '$S','interval': '6','symlink': 'BEFOREUPDATE'}
         self.config['dmin'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '6'}
-        self.config['plugin'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '5','transfer': True}
+        self.config['plugin'] = {'volumes': '$S,__ALWAYSCURRENT__','interval':
+                '5','transfer': True, 'notification': True, 'notify_type':
+                'mail'}
         self.config['manually'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '5','symlink': 'MANUALLY','transfer': True}
 
         with open(self.cfile, 'w') as configfile:

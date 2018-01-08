@@ -104,7 +104,10 @@ class Xmp(Fuse):
         elif n == 2:
             return subvolname+'--'+location
         elif n == 3:
-            sndt = datetime.strptime(subvolname.split('.')[1],"%Y-%m-%d_%H:%M:%S") #snapshot-timestamp
+            try:
+                sndt = datetime.strptime(subvolname.split('.')[1],"%Y-%m-%d_%H:%M:%S") #snapshot-timestamp
+            except:
+                return subvolname+'--'+location
             action = subvolname.split('.')[2]
             if self.uroot:
                 ac='-'+action
