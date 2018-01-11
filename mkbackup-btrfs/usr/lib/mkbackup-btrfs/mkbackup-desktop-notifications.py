@@ -17,12 +17,14 @@ icon = '/usr/share/icons/oxygen/base/48x48/actions/svn-update.png'
 
 def notify_updates(*args):
     """format is defined here:
-    https://developer.gnome.org/notification-spec/"""
-    notifications.Notify("Backup finished", 0, icon, "%s-Backup" % (args[0]), 
-            ' '.join(args[1:]),
+    https://developer.gnome.org/notification-spec/
+    convert arguments from dbus.String to normal string with str() to avoid
+    errors"""
+    notifications.Notify("Backup finished", 0, icon, "%s-Backup" % (str(args[0])), 
+            str(' '.join(args[1:])),
             "", {}, 0)
 
-systembus.add_signal_receiver(notify_updates, 'interval', 'at.xundeenergie.MkBackup')
+systembus.add_signal_receiver(notify_updates, 'Finished', 'at.xundeenergie.mkbackup')
 
 
 gtk.main()

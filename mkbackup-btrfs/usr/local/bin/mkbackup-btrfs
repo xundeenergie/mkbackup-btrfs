@@ -1626,11 +1626,11 @@ def restore(args):
                         
 import dbus
 class desktop_notification:
-    def __init__(self, args, signal_name='interval'):
+    def __init__(self, args, signal_name='Finished'):
         self.args         = args
-        self.dbus_path    = "/at/xundeenergie/MkBackup"
-        self.dbus_iface   = "at.xundeenergie.MkBackup"
-        self.dbus_busname = "at.xundeenergie.MkBackup"
+        self.dbus_path    = "/at/xundeenergie/mkbackup"
+        self.dbus_iface   = "at.xundeenergie.mkbackup"
+        self.dbus_busname = "at.xundeenergie.mkbackup"
         self.timestamp    = datetime.datetime.now()
         self.time         = self.timestamp.strftime('%H:%M:%S')
         self.date         = self.timestamp.strftime('%d. %B. %Y')
@@ -1644,10 +1644,7 @@ class desktop_notification:
 \rum %s Uhr abgeschlossen.
 \rVolumes: 
 \r%s """ % (self.date, self.time, '\n'.join(args)))
-        #print('TYPE: ',type(msg))
-        #args = (self.time, self.date,) + args[0:]
         for i in msg:
-            #print('Type von %s:' % (i),type(i), signature)
             if type(i) is float:
                 signature += 'd' 
             elif type(i) is int:
@@ -1657,8 +1654,6 @@ class desktop_notification:
             else:
                 signature += 'v'
 
-        #print('MSG: ',*msg, 'S', signature)
-        #print('MST: ', type(msg), type(signature))
         message = dbus.lowlevel.SignalMessage(self.dbus_path, self.dbus_iface, self.signal_name)
         message.append(signature=signature, *msg)
         self.bus.send_message(message)
