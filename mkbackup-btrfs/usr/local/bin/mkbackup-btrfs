@@ -1626,11 +1626,11 @@ def restore(args):
                         
 import dbus
 class desktop_notification:
-    def __init__(self, args, signal_name='Finished'):
+    def __init__(self, args, signal_name='Notification'):
         self.args         = args
-        self.dbus_path    = "/at/xundeenergie/mkbackup"
-        self.dbus_iface   = "at.xundeenergie.mkbackup"
-        self.dbus_busname = "at.xundeenergie.mkbackup"
+        self.dbus_path    = "/at/xundeenergie/notifications"
+        self.dbus_iface   = "at.xundeenergie.notifications"
+        self.dbus_busname = "at.xundeenergie.notifications"
         self.timestamp    = datetime.datetime.now()
         self.time         = self.timestamp.strftime('%H:%M:%S')
         self.date         = self.timestamp.strftime('%d. %B. %Y')
@@ -1640,7 +1640,7 @@ class desktop_notification:
     def send_signal(self, intv='default', *args):
         """Send a signal on the bus."""
         signature=''
-        msg = (self.args.tag, """am %s 
+        msg = ("%s-Backup" % (self.args.tag), """am %s 
 \rum %s Uhr abgeschlossen.
 \rVolumes: 
 \r%s """ % (self.date, self.time, '\n'.join(args)))
