@@ -1640,7 +1640,7 @@ class desktop_notification:
     def send_signal(self, intv='default', *args):
         """Send a signal on the bus."""
         signature=''
-        msg = ("%s-Backup" % (self.args.tag), """am %s 
+        msg = ("mkbackup", "%s-Backup" % (self.args.tag), """am %s 
 \rum %s Uhr abgeschlossen.
 \rVolumes: 
 \r%s """ % (self.date, self.time, '\n'.join(args)))
