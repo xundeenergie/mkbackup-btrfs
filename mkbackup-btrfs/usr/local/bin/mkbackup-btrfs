@@ -112,7 +112,7 @@ def check_lockfile(args,lf):
     # Returns None, when lockfile is not existing
     for st in args.store:
         #print("A",args.tag,st)
-        if Myos().path_isfile(lf,args.config.ssh[args.tag][st]):
+        if Myos().path_isfile(lf,args.config.getssh(args.tag,st)):
             #print("B")
             file = open(lf, 'r')
             pid = file.readline()
@@ -341,7 +341,7 @@ class listing:
 
     
     def _isbtrfs(self,path,store='SRC',tag='DEFAULT'):
-        mi = MountInfo(conn=self.args.config.ssh[tag][store])
+        mi = MountInfo(conn=self.args.config.getssh(tag,store))
         self.DEBUG("Filesysem for »%s« is %s" % (path,mi.fstype(path)),level=2)
         return True if mi.fstype(path) == 'btrfs' else False
 
@@ -459,7 +459,7 @@ class SubVolume(SubVolumeInfo):
         else:
             self.OLockFile    = '.'+self.OrigName+'.~lock' if args.action != 'transfer' else '.'+self.SourceName+'.~lock'
         if args.action == 'rollback':
-            print(self.OrigName,self.basename,self.otimestamp)
+            print('rollback',self.OrigName,self.basename,self.otimestamp)
             self.SnapName     = self.basename+'.rollback-from-'+self.otimestamp+'-on-'+self.timestamp+'.'+"current"
             self.SysVol       = MountInfo().relpath('/')
             self.SysVolOld       = self.SysVol.split('.')[0]+'.'+self.timestamp+'.oldcurrent'
@@ -483,7 +483,8 @@ class SubVolume(SubVolumeInfo):
         self.DEBUG('[II]  <%s> is %s: ' % (self.store, self.config.getStorePath(self.store,self.args.tag,original=True)),level=2)
 
     def _createlockfile(self,lf,ln):
-        if Myos().path_isfile(self.store+'/'+lf,conn=self.args.config.ssh[self.tag][self.store]):
+        #print(self.args.config.getssh(self.tag,self.store))
+        if Myos().path_isfile(self.store+'/'+lf,conn=self.args.config.getssh(self.tag,self.store)):
             self.DEBUG('Nothing to lock',level=2)
         else:
             self.DEBUG("%-12s»<%s>/%s«" % (' =lock>',self.store,ln),level=0)
@@ -503,7 +504,7 @@ class SubVolume(SubVolumeInfo):
                 self.DEBUG('ERROR - lockfile in use: <%s - %s>/%s' % (self.store,self.StorePath,path+lf),level=2)
                 return
         try:
-            Myos(dry=self.args.dry_run).remove(path+lf,args.config.ssh[self.args.tag][self.store])
+            Myos(dry=self.args.dry_run).remove(path+lf,args.config.getssh(self.tag,self.store))
         except OSError as e:
             if e.errno == errno.EEXIST or errno.ENOENT:
                 pass 
@@ -530,7 +531,7 @@ class SubVolume(SubVolumeInfo):
                 elif To == i:
                     raise RuntimeError('ERROR - Systemvolume not allowed to rename (To): %s' % (To),1)
                 else:
-                    print('Action "%s" (%s) From: %s or To: %s is ok' % (Action,i,From,To))
+                    self.DEBUG('Action "%s" (%s) From: %s or To: %s is ok' % (Action,i,From,To),level=3)
 
         st = self.store if store == None else store
 
@@ -543,7 +544,7 @@ class SubVolume(SubVolumeInfo):
         pass
 
         self.DEBUG(" =unlock>  <%s>/%s" % (st,To),level=1)
-        if Myos().path_exists(StorePath+'/'+To,self.args.config.ssh[self.tag][st]):
+        if Myos().path_exists(StorePath+'/'+To,self.args.config.getssh(self.tag,st)):
             self.DEBUG(' =%-10s»%s« exists. Nothing to rename' % (Action+':',To),level=3)
             return
         else:
@@ -557,8 +558,8 @@ class SubVolume(SubVolumeInfo):
                 else: 
                     return
         try:
-            print('DRY',self.args.dry_run)
-            Myos(dry=self.args.dry_run).rename(StorePath+'/'+From,StorePath+'/'+To,self.args.config.ssh[self.tag][store])
+            #print('DRY',self.args.dry_run)
+            Myos(dry=self.args.dry_run).rename(StorePath+'/'+From,StorePath+'/'+To,self.args.config.getssh(self.tag,store))
         except FileNotFoundError:
             self.DEBUG('Nothing to rename',level=3)
         except OSError as e:
@@ -572,7 +573,7 @@ class SubVolume(SubVolumeInfo):
         store = self.store
         self.DEBUG('try to lock on action %s' % (self.args.action),level=4)
         try:
-            self.DEBUG('Action is %s' % (self.args.action),level=1)
+            self.DEBUG('Action is %s' % (self.args.action),level=3)
             if self.args.action == 'create':
                 self.DEBUG(' ++> create lockfile for Snapshot (%s)' % (self.args.action),level=3)
                 self._createlockfile(self.SLockFile,self.SnapName)
@@ -608,7 +609,7 @@ class SubVolume(SubVolumeInfo):
         self.DEBUG('try to unlock on action %s' % (self.args.action),level=4)
         try:
             if self.args.action == 'create':
-                print('A')
+                #print('A')
                 self.DEBUG(' --unlock-> %s' % (self.args.action),level=4)
                 self.DEBUG(' --> delete lockfile from Snapshot (%s)' % (self.args.action),level=3)
                 self._deletelockfile(self.SLockFile,self.SnapName,checked=False)
@@ -617,14 +618,14 @@ class SubVolume(SubVolumeInfo):
                 self._rename('unlock',self.SnapLock,self.SnapName,'BKP')
                 pass
             elif self.args.action == 'delete':
-                print('B')
+                #print('B')
                 self.DEBUG(' --> delete lockfile from Original (%s)' % (self.args.action),level=3)
                 self._deletelockfile(self.OLockFile,self.SourceName,checked=False)
                 self.DEBUG(' --> rename to OrigName',level=3)
                 self._rename('unlock',self.OrigLock,self.OrigName,store)
                 pass
             elif self.args.action == 'transfer':
-                print('C')
+                #print('C')
                 self.DEBUG(' --> delete lockfile from Original (%s)' % (self.args.action),level=3)
                 self._deletelockfile(self.OLockFile,self.SourceName,checked=False)
                 self.DEBUG(' --> (%s) rename to OrigName' % (self.args.action),level=3)
@@ -632,12 +633,12 @@ class SubVolume(SubVolumeInfo):
                 self._rename('unlock',self.OrigLock,self.OrigName,'BKP')
                 pass
             if self.args.action == 'rollback':
-                print('D')
+                #print('D')
                 self.DEBUG(' --unlock-> %s' % (self.args.action),level=4)
                 self.DEBUG(' --> delete lockfile from Snapshot (%s)' % (self.args.action),level=3)
                 self._deletelockfile(self.SLockFile,self.SnapName,checked=False)
                 self.DEBUG(' --> rename to SnapName',level=3)
-                print('XXX',self.SnapLock,self.SnapName,self.SysVol,self.SysVolOld)
+                #print('XXX',self.SnapLock,self.SnapName,self.SysVol,self.SysVolOld)
                 # rollback snapshot from old snapshot to current volume
                 self._rename('rollback',self.SnapLock,self.SnapName,store)
                 # rename current sysvolume to oldcurrent
@@ -645,7 +646,7 @@ class SubVolume(SubVolumeInfo):
                 #self._rename('unlock',self.SnapLock,self.SnapName,'BKP')
                 pass
             else:
-                print('E')
+                #print('E')
                 self.DEBUG(' --> delete lockfile from Snapshot (%s)' % (self.args.action),level=3)
                 self._deletelockfile(self.SLockFile,self.SnapName)
                 self.DEBUG(' --> rename to SnapName',level=3)
@@ -822,7 +823,7 @@ class SubVolume(SubVolumeInfo):
                 # If BKPStore exists and is a directory, change it to subvolume
                 #if isbtrfs(self.config.getMountPath(store='BKP',tag=args.tag)):
                 if self._isbtrfs(self.config.getMountPath(store='BKP',tag=args.tag,original=False),'BKP',args.tag):
-                    if Myos().path_exists(self.BkpPath,self.args.config.ssh[self.args.tag]['BKP']):
+                    if Myos().path_exists(self.BkpPath,self.args.config.getssh(self.args.tag,'BKP')):
                         if issubvol(self.args,self.BkpPath,'BKP',self.args.tag):
                             self.DEBUG("BKP-Path %s is subvolume" % (self.BkpPath),level=4)
                         else:
@@ -911,7 +912,7 @@ class SubVolume(SubVolumeInfo):
                 dest = args.config.getStorePath('BKP',args.tag)+'/'+t
                 destdir = os.path.dirname(dest.rstrip('/'))+'/'
                 if issubvol(self.args,dest,self.store,self.args.tag) == False:
-                    if Myos().path_exists(dest,self.args.config.ssh[self.args.tag]['BKP']):
+                    if Myos().path_exists(dest,self.args.config.getssh(self.args.tag,'BKP')):
                         self.DEBUG('isdir ==> delete ==> transfer',dest,level=3)
                         cmd = ['rm','-r','-f',dest]
                         #sp_call(self.args,cmd)
@@ -978,7 +979,7 @@ class SubVolume(SubVolumeInfo):
         first = ['btrfs','send'] + tclones + tparent + [self.StorePath+'/'+source]
         second = ['btrfs','receive',dest]
 
-        ssh = self.args.config.ssh[self.tag]
+        ssh = self.args.config.getSsh(self.tag)
         if ssh[self.store] != None:
             send=ssh[self.store]['user']+'@'+ssh[self.store]['host']
             first = ['ssh','-p',str(ssh[self.store]['port']),send]+first
@@ -1084,7 +1085,7 @@ class SubVolume(SubVolumeInfo):
                     pass
                 else:
                     if issub:
-                        if not Myos().path_isfile(self.StorePath+'/'+slock,self.args.config.ssh[self.tag][self.store]):
+                        if not Myos().path_isfile(self.StorePath+'/'+slock,self.args.config.getssh(self.tag,self.store)):
                             self.DEBUG(' -prepare-to-delete> <%s>/%s' % (self.store,sname+'/'+sub),level=1)
                             delsubs.append(self.StorePath+'/'+sname+'/'+sub)
                         else:
@@ -1218,7 +1219,7 @@ def cleanup(args):
             if args.npb: pt.update()
 
             DEBUG(args,'  --cleanup unused lockfiles',level=3)
-            for lf in Myos().listdir(args.config.getStorePath(st,args.tag),args.config.ssh[args.tag][st]):
+            for lf in Myos().listdir(args.config.getStorePath(st,args.tag),args.config.getssh(args.tag,st)):
                 if explock.search(lf):
                     if check_lockfile(args,lf):
                         pass
@@ -1226,7 +1227,7 @@ def cleanup(args):
                         pass
                     else:
                         DEBUG(' --> remove unused lockfile: '+lf,level=1,verbose=args.verbose)
-                        Myos(dry=self.args.dry_run).remove(lf,args.config.ssh[args.tag][st])
+                        Myos(dry=self.args.dry_run).remove(lf,args.config.getssh(args.tag,st))
             if args.npb: pt.update()
 
     if args.npb: pt.finish()
@@ -1567,7 +1568,7 @@ def restore(args):
 
     for f in args.file:
         #print('restore',os.getcwd(),f,os.path.realpath(f))
-        src = Myos().path_realpath(f,args.config.ssh[args.tag]['SRC'])
+        src = Myos().path_realpath(f,args.config.getssh(args.tag,'SRC'))
         bkpsubdir = '/'
         mountp = src
         while mountp > '/':
@@ -1960,18 +1961,27 @@ Author: %s""" % (confversion,__version__,__author__))
                 link = p+'/'+vol+'.'+sln
                 #print("LINK",p,vol,sln,link)
                 #print("X",args.tag,st,args.config.ssh[args.tag][st])
-                if Myos().path_exists(link,args.config.ssh[args.tag][st]):
+                if Myos().path_exists(link,args.config.getssh(args.tag,st)):
                     #print("XX",args.tag,st)
-                    if Myos().path_islink(link,args.config.ssh[args.tag][st]):
+                    if Myos().path_islink(link,args.config.getssh(args.tag,st)):
                         DEBUG("Symlink ok: %s/%s.%s" % (st,vol,sln),level=4,verbose=args.verbose)
                     else:
                         DEBUG("Symlink broken: %s/%s.%s --> remove it" % (st,vol,sln),level=4,verbose=args.verbose)
-                        Myos(dry=self.args.dry_run).remove(link,args.config.ssh[args.tag][st])
+                        Myos(dry=self.args.dry_run).remove(link,args.config.getssh(args.tag,st))
                 else:
                     DEBUG("Symlink missing: %s/%s.%s" % (st,vol,sln),level=4,verbose=args.verbose)
     for t in args.config.ssh_cons.keys():
         DEBUG("Close Connection to %s" % (t),level=3,verbose=args.verbose)
-        args.config.ssh_cons[t].close()
+        try:
+            connection = args.config.ssh_cons[t]
+            transport = connection.get_transport()
+            connection.close()
+            transport.send_ignore()
+        except:
+            # connection is closed
+            pass
+        DEBUG(' -> closed' if args.config.ssh_cons[t].get_transport() == None else 'not closed', level=3,verbose=args.verbose)
+        #args.config.ssh_cons[t].close()
 #        for s in args.config.ssh[t].keys():
 #            if not args.config.ssh[t][s]['ssh'] == None:
 #                print("CLOSE",t,s)
@@ -1992,6 +2002,7 @@ snapshots: %s
             i = listing.CreatedSubvolumes.pop()
             cv += '\n\r'+i[1]
             print(i)
+        cv += '---'
         print('''---
 ''')
         DEBUG("Transfered Subvolumes:",level=0,verbose=args.verbose)
@@ -1999,6 +2010,7 @@ snapshots: %s
             i = listing.TransferedSubvolumes.pop()
             tv += '\n\r'+i[1]
             print(i)
+        tv += '---'
         print('''---
 ''')
         DEBUG("Deleted Subvolumes:",level=0,verbose=args.verbose)
@@ -2006,10 +2018,11 @@ snapshots: %s
             i = listing.DeletedSubvolumes.pop()
             dv += '\n\r'+i[1]
             print(i)
+        dv += '---'
         print('---')
 
     if args.notification['bool'] == True:
-        print('ARGS',type(args),args)
+        #print('ARGS',type(args),args)
         notify = desktop_notification(args)
         notify.send_signal(args, '\n\r'+cv, '\n\r'+tv, '\n\r'+dv) 
 

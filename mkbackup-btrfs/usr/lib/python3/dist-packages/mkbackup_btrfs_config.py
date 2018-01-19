@@ -61,7 +61,7 @@ def connect(conn=None):
             try:
                 #if conn['conn'].is_active(): print("Session alive")
                 #conn['conn'].close()
-                conn['conn'].connect(conn['host'],conn['port'],conn['user'])
+                conn['conn'].connect(conn['host'],conn['port'],conn['user'],auth_timeout=10)
                 conn['active'] = True
                 #print("open connection for %s@%s" % (conn['user'], conn['host']))
 #            except (paramiko.BadHostKeyException,
@@ -328,7 +328,8 @@ class Config():
                             orig = self.config.get(j,k) + ',' if self.config.has_option(j,k) else ''
                         elif k == 'description':
                             # only attend pattern on option 'description'
-                            orig = self.config.get(j,k) if self.config.has_option(j,k) else ''
+                            #orig = self.config.get(j,k) if self.config.has_option(j,k) else ''
+                            orig = ''
                         else:
                             # if option is not ignore, do the same as without
                             # +, but remove + as first character
@@ -352,6 +353,7 @@ class Config():
                             orig = self.config.get(j,k) + ',' if self.config.has_option(j,k) else ''
                         elif k == 'description':
                             # only attend pattern on option 'description'
+                            #print(self.config.get(j,k))
                             orig = self.config.get(j,k) if self.config.has_option(j,k) else ''
                         else:
                             # if option is not ignore, do the same as without
@@ -395,6 +397,14 @@ class Config():
 #            for j in self.config.options(i):
 #                print("XX"+j+' = ',self.__trnName(self.config.get(i,j)))
 #            print('')
+
+    def getssh(self,tag,store):
+        tg = tag if tag in self.ssh else 'DEFAULT'
+        return(self.ssh[tg][store])
+
+    def getSsh(self,tag):
+        tg = tag if tag in self.ssh else 'DEFAULT'
+        return(self.ssh[tg])
 
     def CreateConfig(self):
         self.config['DEFAULT'] = {
@@ -493,6 +503,7 @@ class Config():
         else:
             print("EE - getMountPath: store %s is not allowed (%s) set path to SRC" % (store,tag))
             path = self.config.get('DEFAULT','SRC')
+        #print('PATH',tag,path)
 
         _ssh = path.split(':')
         if len(_ssh) == 1:
@@ -556,16 +567,16 @@ class Config():
         return(self.getMountPath(store=store,tag=tag,original=original) + sn)
 
     def cmdsh(self,tag='DEFAULT',store='SRC',cmd=''):
-        if self.ssh[tag][store] == None:
+        if self.getssh(tag,store) == None:
             return('',subprocess.check_output(cmd, shell=True).decode(),'')
         else:
             out = ''
-            conn = self.ssh[tag][store]
+            conn = self.getssh(tag,store)
             connect(conn)
             return conn['conn'].exec_command(cmd)
 
     def remotecommand(self,tag='DEFAULT',store='SRC',cmd='',stderr=None):
-        if self.ssh[tag][store] == None:
+        if self.getssh(tag,store) == None:
             #print("noconn")
             try:
                 ret = subprocess.run(cmd,stderr=stderr,stdout=subprocess.PIPE)
@@ -578,7 +589,7 @@ class Config():
         else:
             #print("conn",self.ssh[tag][store]['host'])
             out = ''
-            conn = self.ssh[tag][store]
+            conn = self.getssh(tag,store)
             if connect(conn):
                 stdin, stdout, stderr = conn['conn'].exec_command(' '.join(cmd))
                 if not stdout:
@@ -596,7 +607,7 @@ class Config():
 
     def getDevice(self,store='SRC',tag='DEFAULT'):
         mp = self.getMountPath(store=store,tag=tag,original=False)
-        conn = self.ssh[tag][store]
+        conn = self.getssh(tag,store)
         connect(conn)
         mi = MountInfo(conn=conn)
         amount=mi.fstype(mp)
@@ -605,7 +616,7 @@ class Config():
                 Myos().stat(self.getStorePath(store=store,tag=tag),conn=conn)
             except:
                 Myos().stat(os.path.dirname(self.getStorePath(store=store,tag=tag)),conn=conn)
-        mi = MountInfo(conn=self.ssh[tag][store])
+        mi = MountInfo(conn=self.getssh(tag,store))
         return(mi.device(mp) if mi.fstype(mp) != 'autofs' else None)
 
     def getUUID(self,store='SRC',tag='DEFAULT'):
