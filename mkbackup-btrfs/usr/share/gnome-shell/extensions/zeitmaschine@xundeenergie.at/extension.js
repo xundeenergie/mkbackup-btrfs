@@ -1,45 +1,45 @@
-const GLib = imports.gi.GLib;
-const Lang = imports.lang;
-const Main = imports.ui.main;
-const PanelMenu = imports.ui.panelMenu;
-const PopupMenu = imports.ui.popupMenu;
+var GLib = imports.gi.GLib;
+var Lang = imports.lang;
+var Main = imports.ui.main;
+var PanelMenu = imports.ui.panelMenu;
+var PopupMenu = imports.ui.popupMenu;
 
-const St = imports.gi.St;
-const Shell = imports.gi.Shell;
+var St = imports.gi.St;
+var Shell = imports.gi.Shell;
 
-const Gettext = imports.gettext.domain('gnome-shell-extensions');
-const _ = Gettext.gettext;
+var Gettext = imports.gettext.domain('gnome-shell-extensions');
+var _ = Gettext.gettext;
 
-const ExtensionUtils = imports.misc.extensionUtils;
-const Me = ExtensionUtils.getCurrentExtension();
-const Convenience = Me.imports.convenience;
-const Util = imports.misc.util;
-const PopupServiceItem = Me.imports.popupServiceItem.PopupServiceItem;
-const PopupTargetItem = Me.imports.popupTargetItem.PopupTargetItem;
-const PopupMenuItem = Me.imports.popupManuallyItem.PopupServiceItem;
-const MountMenuItem = Me.imports.popupMountItem.MountMenuItem;
-const DriveMenuItem = Me.imports.popupDriveItem.DriveMenuItem;
-const VolMenuItem = Me.imports.popupBkpVolumItem.PopupBKPItem;
+var ExtensionUtils = imports.misc.extensionUtils;
+var Me = ExtensionUtils.getCurrentExtension();
+var Convenience = Me.imports.convenience;
+var Util = imports.misc.util;
+var PopupServiceItem = Me.imports.popupServiceItem.PopupServiceItem;
+var PopupTargetItem = Me.imports.popupTargetItem.PopupTargetItem;
+var PopupMenuItem = Me.imports.popupManuallyItem.PopupServiceItem;
+var MountMenuItem = Me.imports.popupMountItem.MountMenuItem;
+var DriveMenuItem = Me.imports.popupDriveItem.DriveMenuItem;
+var VolMenuItem = Me.imports.popupBkpVolumItem.PopupBKPItem;
 var Gio = imports.gi.Gio;
-const Mainloop = imports.mainloop;
+var Mainloop = imports.mainloop;
 
-const refreshTime = 3.0;
-let MainLabel;
-let icon;
-let MainIcon;
-let ExtIcon;
-let extMediaName = 'external backup-drive';
-let Drives = new Object();
+var refreshTime = 3.0;
+var MainLabel;
+var icon;
+var MainIcon;
+var ExtIcon;
+var extMediaName = 'external backup-drive';
+var Drives = new Object();
 
-//const DisabledIcon = 'my-caffeine-off-symbolic';
-//const EnabledIcon = 'my-caffeine-on-symbolic';
-const DisabledIcon = 'system-run-symbolic';
-const EnabledIcon = 'system-run-symbolic';
-//const ConfFile = '/etc/mkbackup-btrfs.conf';
-const ConfFile = '/tmp/mkbackup-btrfs.conf.tmp';
+//var DisabledIcon = 'my-caffeine-off-symbolic';
+//var EnabledIcon = 'my-caffeine-on-symbolic';
+var DisabledIcon = 'system-run-symbolic';
+var EnabledIcon = 'system-run-symbolic';
+//var ConfFile = '/etc/mkbackup-btrfs.conf';
+var ConfFile = '/tmp/mkbackup-btrfs.conf.tmp';
 
 
-const BackupManager = new Lang.Class({
+var BackupManager = new Lang.Class({
     Name: 'BackupManager',
     Extends: PanelMenu.Button,
 
@@ -54,7 +54,8 @@ const BackupManager = new Lang.Class({
         //Set a FileMonitor on the config-File. So the Config-File is only
         //read, when it changed.
         this.GF = Gio.File.new_for_path(ConfFile);
-        this._monitorConf = this.GF.monitor_file(Gio.FileMonitorFlags.NONE,null,null,null)
+        //this._monitorConf = this.GF.monitor_file(Gio.FileMonitorFlags.NONE,null,null,null)
+        this._monitorConf = this.GF.monitor_file(Gio.FileMonitorFlags.NONE,null)
         this._monitorConf.connect("changed", Lang.bind(this, function(monitor, file, o, event) {
             // without this test, _loadConfig() is called more than once!!
             if (event == Gio.FileMonitorEvent.CHANGES_DONE_HINT && ! /~$/.test(file.get_basename())) {
@@ -67,7 +68,7 @@ const BackupManager = new Lang.Class({
 
 		PanelMenu.Button.prototype._init.call(this, 0.0);
 
-		let hbox = new St.BoxLayout({ style_class: 'panel-status-menu-box' });
+		var hbox = new St.BoxLayout({ style_class: 'panel-status-menu-box' });
 		MainIcon = new St.Icon({icon_name: 'drive-harddisk-usb-symbolic', 
                                 style_class: 'system-status-icon'});
 		ExtIcon = new St.Icon({icon_name: 'drive-harddisk-usb-symbolic', 
@@ -94,9 +95,9 @@ const BackupManager = new Lang.Class({
 
         // Fill the Menu
         // First a Entry to open backup-Location
-		let bkpitem = this.menu.addAction(_("Open Backups"), function(event) {
-			let context = global.create_app_launch_context(event.get_time(), -1);
-			let GF = Gio.File.new_for_path('backup');
+		var bkpitem = this.menu.addAction(_("Open Backups"), function(event) {
+			var context = global.create_app_launch_context(event.get_time(), -1);
+			var GF = Gio.File.new_for_path('backup');
 			Gio.AppInfo.launch_default_for_uri(GF.get_uri(),context);
 		});
 
@@ -162,7 +163,7 @@ const BackupManager = new Lang.Class({
         this._addedMountId = this._monitor.connect('mount-added', Lang.bind(this, function(monitor, mount) {
             log('MOUNT CONNECTED',mount.get_name())
             log(mount.get_name())
-            let volume = mount.get_volume()
+            var volume = mount.get_volume()
             log(volume.get_name(),volume.get_uuid())
             //log(mount.get_name())
             //this._showDrive(drive);
@@ -173,9 +174,9 @@ const BackupManager = new Lang.Class({
 	},
 
     _DriveAdded: function(drive) {
-        let Dident = drive.enumerate_identifiers();
-        let u_dev = drive.get_identifier('unix-device');
-        let d_name =  drive.get_name();
+        var Dident = drive.enumerate_identifiers();
+        var u_dev = drive.get_identifier('unix-device');
+        var d_name =  drive.get_name();
         //log('DRIVE unix-device',u_dev,d_name)
         this._drives[d_name] = new Object()
         this._drives[d_name]['drive'] = drive;
@@ -185,9 +186,9 @@ const BackupManager = new Lang.Class({
         log("ABCDE",this._drives[d_name]['device']);
         /*if (drive.has_volumes()) {
             log('DHV',drive.get_volumes());
-            let VList = drive.get_volumes();
+            var VList = drive.get_volumes();
             VList.forEach(Lang.bind(this, function(volume){
-                let v_name = volume.get_name();
+                var v_name = volume.get_name();
                 log(v_name)
                 this._drives[d_name]['volumes'][v_name] = this._addVolume(volume);
             }));
@@ -210,12 +211,12 @@ const BackupManager = new Lang.Class({
     },
 
     _addVolume: function(volume) {
-        let drives = volume.get_drive();
+        var drives = volume.get_drive();
         //log('D',drives.get_name())
         //log('V',volume.get_name())
         //this._drives[drives.get_name()][volume.get_name()] = volume;
         volume.enumerate_identifiers();
-        let vol = new Object()
+        var vol = new Object()
         //log(volume.get_identifier('uuid'))
         //log(volume.get_identifier('unix-device'))
         //log(volume.get_identifier('class'))
@@ -230,7 +231,7 @@ const BackupManager = new Lang.Class({
     },
 
     _DriveRemoved: function(drive) {
-        let me = this.menu._getMenuItems();
+        var me = this.menu._getMenuItems();
         this._removeItemByLabel(this.menu, drive.get_name());
 
 
@@ -248,7 +249,7 @@ const BackupManager = new Lang.Class({
         log('ID',this._addedVolumeId)
         if (volume.get_drive() == null)
             return
-        let drive = volume.get_drive()
+        var drive = volume.get_drive()
         if ( !volume.can_mount() || !drive.is_removable())
             return
         log(volume.get_mount())
@@ -257,13 +258,13 @@ const BackupManager = new Lang.Class({
         log(volume.get_identifier('unix-device'))
         log(volume.get_identifier('class'))
         log(volume.get_identifier('label'))
-        let dr = volume.get_drive()
+        var dr = volume.get_drive()
         this._drives[dr.get_name()] = dr
         log(dr.get_name())
         log(dr.enumerate_identifiers())
         log(dr.get_identifier('unix-device'))
 
-        let me
+        var me
         try {
             me = this.drvsubmenu.menu._getMenuItems();
         } catch(e) {
@@ -271,9 +272,9 @@ const BackupManager = new Lang.Class({
         }
         //me = this.drvsubmenu.menu._getMenuItems();
 
-        let menuItem = new VolMenuItem(volume, false);
+        var menuItem = new VolMenuItem(volume, false);
 
-        let VF = Gio.File.new_for_path('/etc/udev/rules.d/99-ext-bkp-volume-u-'+volume.get_identifier('uuid')+'.rules');
+        var VF = Gio.File.new_for_path('/etc/udev/rules.d/99-ext-bkp-volume-u-'+volume.get_identifier('uuid')+'.rules');
         if (VF.query_exists(null)) {
             log('UDEV exists','/etc/udev/rules.d/99-ext-bkp-volume-u-'+volume.get_identifier('uuid')+'.rules')
             menuItem.setToggleState(true);
@@ -285,7 +286,7 @@ const BackupManager = new Lang.Class({
 
         //this._removeItemByLabel(this.drvsubmenu.menu, volume.get_name());
         //this.drvsubmenu.menu.addMenuItem(menuItem);
-        let connID = menuItem.connect('toggled', Lang.bind(this, function() {
+        var connID = menuItem.connect('toggled', Lang.bind(this, function() {
             log('ACTIVE?',menuItem.state,menuItem.label.text)
             if (menuItem.state) {
                 reg = 'register'
@@ -301,9 +302,9 @@ const BackupManager = new Lang.Class({
 
     _removeItemByLabel: function(menu, label) { 
         log('LAB',label)
-        let children = menu._getMenuItems(); 
-        for (let i = 0; i < children.length; i++) { 
-            let item = children[i]; 
+        var children = menu._getMenuItems(); 
+        for (var i = 0; i < children.length; i++) { 
+            var item = children[i]; 
             log('REM',item.label.text,label)
             if (item.label.text == label)
                 log('DESTROY',item.label.text)
@@ -314,14 +315,14 @@ const BackupManager = new Lang.Class({
     
 
     _addMount: function(mount) {
-        let item = new MountMenuItem(mount);
+        var item = new MountMenuItem(mount);
         this._mounts.unshift(item);
         this.menu.addMenuItem(item, 0);
     },
 
     _removeMount: function(mount) {
-        for (let i = 0; i < this._mounts.length; i++) {
-            let item = this._mounts[i];
+        for (var i = 0; i < this._mounts.length; i++) {
+            var item = this._mounts[i];
             if (item.mount == mount) {
             item.destroy();
             this._mounts.splice(i, 1);
@@ -332,9 +333,10 @@ const BackupManager = new Lang.Class({
     },
 
     _run_command: function(COMMAND) {
-        let output = "";
+        var output = "";
         try {
-                output = GLib.spawn_command_line_sync(COMMAND, null, null, null, null);
+                //output = GLib.spawn_command_line_sync(COMMAND, null, null, null, null);
+                output = GLib.spawn_command_line_sync(COMMAND);
             } catch(e) {
                 throw e;
             }
@@ -345,8 +347,8 @@ const BackupManager = new Lang.Class({
 
 
     _showVolume: function(volume) {
-        let drive = volume.get_drive();
-        let mount = volume.get_mount();
+        var drive = volume.get_drive();
+        var mount = volume.get_mount();
         if (drive != null && drive.is_removable()){
             log('SVDRIVE',drive.get_name(),drive.is_removable())
             log('SVVOL',volume.get_name(),volume.get_uuid(),drive.is_removable());
@@ -364,7 +366,7 @@ const BackupManager = new Lang.Class({
                 if (volume.can_mount()){
                     log('SDVOL',volume.get_name());
                     if ( volume.get_mount() != null ) {
-                        let mount = volume.get_mount();
+                        var mount = volume.get_mount();
                         log('SDMR',mount.get_root());
                     }
                 }
@@ -381,7 +383,7 @@ const BackupManager = new Lang.Class({
     },
 
 	_getCommand: function(service, action, type) {
-		let command = "systemctl"
+		var command = "systemctl"
 
 		command += " " + action
 		command += " " + service
@@ -403,17 +405,17 @@ const BackupManager = new Lang.Class({
 
         //log('YY',this._drives['ST1000LM024 HN-M101MBB']['volumes'])
         //log('YY',this._drives['ST1000LM024 HN-M101MBB'])
-        let active = false;
-        let volumes = []
-        let mounted = false;
+        var active = false;
+        var volumes = []
+        var mounted = false;
         volumes.push(this.watchvolume)
 
         // TODO: find all Volumes on the drive, holding the backup and add this
         // volumes to the list
         volumes.push('home-jakob-Videos-extern.mount')
         volumes.push('home-media.mount')
-        //for (let d in this._drives['ST1000LM024 HN-M101MBB']) {
-        /*for (let d in this._drives) {
+        //for (var d in this._drives['ST1000LM024 HN-M101MBB']) {
+        /*for (var d in this._drives) {
             log("D",d,this._drives[d].get_name());
         };*/
 
@@ -421,10 +423,10 @@ const BackupManager = new Lang.Class({
             this._getCommand(this.services.join(' '), 'is-active', 'system'))[1].toString().split('\n');
         //log(this.aout.indexOf('active'));
 
-        let apos = this.aout.indexOf('active')
+        var apos = this.aout.indexOf('active')
         active = this.aout.indexOf('active') >= 0
 
-        let vout = GLib.spawn_command_line_sync(
+        var vout = GLib.spawn_command_line_sync(
                 this._getCommand(volumes.join(' '), 'is-active', 'system'))[1].toString().split('\n');
         mounted = vout.indexOf('active') >= 0
 
@@ -434,15 +436,15 @@ const BackupManager = new Lang.Class({
         (mounted ? ExtIcon.show() : ExtIcon.hide());
         
         //ExtIcon.actor = (mounted ? "visibile = true;" : "visible = false;");
-        let mlabel = (mounted ? _("mounted") : "");
-        let alabel = (active ? this.services[apos] : "");
+        var mlabel = (mounted ? _("mounted") : "");
+        var alabel = (active ? this.services[apos] : "");
         MainLabel.set_text(mlabel + ' ' + alabel);
         //MainLabel.set_text(mounted ? _("mounted") : "");
         //MainLabel.set_text(active ? this.services[apos] : "");
 
 		if (this.menu.isOpen) {
             //Menu is open
-            let me = this.menu._getMenuItems();
+            var me = this.menu._getMenuItems();
 			me.forEach(Lang.bind(this, function(item) {
                 //log(item.label.text)
 				if ( item.label.text == extMediaName ) {
@@ -464,16 +466,16 @@ const BackupManager = new Lang.Class({
     },
 
     _check_service: function(service,stat) {
-        let [_, aout, aerr, astat] = GLib.spawn_command_line_sync(
+        var [_, aout, aerr, astat] = GLib.spawn_command_line_sync(
             this._getCommand(service, 'is-'+stat, 'system'));
         return (astat == 0);
     },
 
 	_refresh: function() {
-		let me = this.bkpsubmenu.menu._getMenuItems();
+		var me = this.bkpsubmenu.menu._getMenuItems();
         //log(this.services.join(' '))
 
-        let eout = GLib.spawn_command_line_sync(
+        var eout = GLib.spawn_command_line_sync(
             this._getCommand(this.services.join(' '), 'is-enabled', 'system'))[1].toString().split('\n');
         //log(eout);
 
@@ -491,7 +493,7 @@ const BackupManager = new Lang.Class({
         }));
 
 		this._entries.forEach(Lang.bind(this, function(service,index,arr) {
-			let serviceItem
+			var serviceItem
 			me.forEach(Lang.bind(this, function(item) {
 				if ( item.label.text == service['descr']+' ('+service['name'] + ')' ) {
 					arr[index].found = true;
@@ -551,9 +553,9 @@ const BackupManager = new Lang.Class({
         }));
 
 		this.bkpsubmenu.menu._getMenuItems().forEach(Lang.bind(this, function(item) {
-            let mic = 0
+            var mic = 0
 			if ( me.length > mic ) {
-				for (let i = mic; i < me.length; i++) {
+				for (var i = mic; i < me.length; i++) {
 					if (item == me[i]) {
                         log('DESTROY',me[i].label.text);
 						item.destroy();
@@ -567,10 +569,10 @@ const BackupManager = new Lang.Class({
 
     _loadConfig: function() {
         //log('LOAD CONFIG')
-        let intervals
+        var intervals
         this.services = []
-        let kf = new GLib.KeyFile()
-        let obj = new Object();
+        var kf = new GLib.KeyFile()
+        var obj = new Object();
         this._entries = [];
 
         if(kf.load_from_file(ConfFile,GLib.KeyFileFlags.NONE)){
@@ -579,8 +581,8 @@ const BackupManager = new Lang.Class({
 
             //log('BKP',this.bkppath)
             kf.get_groups()[0].forEach(Lang.bind(this, function(interval) {
-                let obj = new Object();
-                let i = ""
+                var obj = new Object();
+                var i = ""
                 if (interval === 'DEFAULT')
                     i = 'misc'
                 else
@@ -616,11 +618,11 @@ const BackupManager = new Lang.Class({
     }
 });
 
-let backupManager;
+var backupManager;
 
 function init(extensionMeta) {
     //Convenience.initTranslations();
-    let theme = imports.gi.Gtk.IconTheme.get_default();
+    var theme = imports.gi.Gtk.IconTheme.get_default();
     theme.append_search_path(extensionMeta.path + "/icons");
 }
 

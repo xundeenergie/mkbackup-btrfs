@@ -1656,7 +1656,7 @@ class desktop_notification:
                 signature += 'v'
 
         message = dbus.lowlevel.SignalMessage(self.dbus_path, self.dbus_iface, self.signal_name)
-        message.append(signature=signature, *msg)
+        message.append(*msg)
         self.bus.send_message(message)
         
 def notify(args):

@@ -1,14 +1,14 @@
-const Lang = imports.lang;
-const PopupMenu = imports.ui.popupMenu;
-const St = imports.gi.St;
-const Clutter = imports.gi.Clutter;
-const Util = imports.misc.util;
-const Gtk = imports.gi.Gtk;
+var Lang = imports.lang;
+var PopupMenu = imports.ui.popupMenu;
+var St = imports.gi.St;
+var Clutter = imports.gi.Clutter;
+var Util = imports.misc.util;
+var Gtk = imports.gi.Gtk;
 
-const ExtensionSystem = imports.ui.extensionSystem;
-const ExtensionUtils = imports.misc.extensionUtils;
+var ExtensionSystem = imports.ui.extensionSystem;
+var ExtensionUtils = imports.misc.extensionUtils;
 
-const PopupTargetItem = new Lang.Class({
+var PopupTargetItem = new Lang.Class({
     Name: 'PopupServiceItem',
     Extends: PopupMenu.PopupSwitchMenuItem,
 

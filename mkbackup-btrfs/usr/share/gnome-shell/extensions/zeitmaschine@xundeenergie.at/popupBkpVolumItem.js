@@ -1,17 +1,17 @@
-const Lang = imports.lang;
-const PopupMenu = imports.ui.popupMenu;
-const St = imports.gi.St;
-const Clutter = imports.gi.Clutter;
-const Gio = imports.gi.Gio;
-const Util = imports.misc.util;
-const Gtk = imports.gi.Gtk;
+var Lang = imports.lang;
+var PopupMenu = imports.ui.popupMenu;
+var St = imports.gi.St;
+var Clutter = imports.gi.Clutter;
+var Gio = imports.gi.Gio;
+var Util = imports.misc.util;
+var Gtk = imports.gi.Gtk;
 
-const ExtensionSystem = imports.ui.extensionSystem;
-const ExtensionUtils = imports.misc.extensionUtils;
-const DisabledIcon = 'my-caffeine-off-symbolic';
-//const DisabledIcon = 'gnome-spinner';
+var ExtensionSystem = imports.ui.extensionSystem;
+var ExtensionUtils = imports.misc.extensionUtils;
+var DisabledIcon = 'my-caffeine-off-symbolic';
+//var DisabledIcon = 'gnome-spinner';
 
-const PopupBKPItem = new Lang.Class({
+var PopupBKPItem = new Lang.Class({
     Name: 'PopupBKPItem',
     Extends: PopupMenu.PopupSwitchMenuItem,
 
@@ -25,9 +25,9 @@ const PopupBKPItem = new Lang.Class({
 
         this.mount = mount;
 
-        let ejectIcon = new St.Icon({ icon_name: 'media-eject-symbolic',
+        var ejectIcon = new St.Icon({ icon_name: 'media-eject-symbolic',
                           style_class: 'popup-menu-icon ' });
-        let ejectButton = new St.Button({ child: ejectIcon });
+        var ejectButton = new St.Button({ child: ejectIcon });
         ejectButton.connect('clicked', Lang.bind(this, this._eject));
         this.actor.add(ejectButton);
 
@@ -51,7 +51,7 @@ const PopupBKPItem = new Lang.Class({
         if (this.mount.is_shadowed())
             return false;
 
-        let volume = this.mount.get_volume();
+        var volume = this.mount.get_volume();
 
         if (volume == null) {
             // probably a GDaemonMount, could be network or
@@ -67,7 +67,7 @@ const PopupBKPItem = new Lang.Class({
     },
 
     _eject: function() {
-        let mountOp = new ShellMountOperation.ShellMountOperation(this.mount);
+        var mountOp = new ShellMountOperation.ShellMountOperation(this.mount);
 
 	if (this.mount.can_eject())
 	    this.mount.eject_with_operation(Gio.MountUnmountFlags.NONE,
@@ -98,12 +98,12 @@ const PopupBKPItem = new Lang.Class({
     },
 
     _reportFailure: function(exception) {
-	let msg = _("Ejecting drive '%s' failed:").format(this.mount.get_name());
+	var msg = _("Ejecting drive '%s' failed:").format(this.mount.get_name());
 	Main.notifyError(msg, exception.message);
     },
 
     /*activate: function(event) {
-        let context = global.create_app_launch_context(event.get_time(), -1);
+        var context = global.create_app_launch_context(event.get_time(), -1);
         Gio.AppInfo.launch_default_for_uri(this.mount.get_root().get_uri(),
                                            context);
 

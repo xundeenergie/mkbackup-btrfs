@@ -1,14 +1,14 @@
-const Lang = imports.lang;
-const PopupMenu = imports.ui.popupMenu;
-const St = imports.gi.St;
-const Clutter = imports.gi.Clutter;
-const Util = imports.misc.util;
-const Gtk = imports.gi.Gtk;
+var Lang = imports.lang;
+var PopupMenu = imports.ui.popupMenu;
+var St = imports.gi.St;
+var Clutter = imports.gi.Clutter;
+var Util = imports.misc.util;
+var Gtk = imports.gi.Gtk;
 
-const ExtensionSystem = imports.ui.extensionSystem;
-const ExtensionUtils = imports.misc.extensionUtils;
+var ExtensionSystem = imports.ui.extensionSystem;
+var ExtensionUtils = imports.misc.extensionUtils;
 
-const DriveMenuItem = new Lang.Class({
+var DriveMenuItem = new Lang.Class({
     Name: 'DriveMenuItem',
     Extends: PopupMenu.PopupBaseMenuItem,
 
@@ -21,10 +21,10 @@ const DriveMenuItem = new Lang.Class({
 
 	this.drive = drive;
 
-	let ejectIcon = new St.Icon({ icon_name: 'drive-harddisk-usb-symbolic',
+	var ejectIcon = new St.Icon({ icon_name: 'drive-harddisk-usb-symbolic',
 				      style_class: 'popup-menu-icon ' });
-    //let ejectIcon = mount.get_icon();
-	let ejectButton = new St.Button({ child: ejectIcon });
+    //var ejectIcon = mount.get_icon();
+	var ejectButton = new St.Button({ child: ejectIcon });
 //	ejectButton.connect('clicked', Lang.bind(this, this._eject));
 	this.actor.add(ejectButton);
 

@@ -2,4 +2,4 @@
 Description=dbus-notification after umount from %I
 
 [Service]
-ExecStart=/usr/bin/dbus-send --system /at/xundeenergie/notifications at.xundeenergie.notifications.Notification string:"External Disk" string:"%I unmounted" string:"Platte <b>kann</b> ausgesteckt werden"
+ExecStart=/usr/bin/dbus-send --system /at/xundeenergie/notifications at.xundeenergie.notifications.Notification string:"External Disk" string:"%I unmounted" string:"Platte kann ausgesteckt werden"

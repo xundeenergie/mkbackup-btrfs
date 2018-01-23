@@ -1,17 +1,17 @@
-const Lang = imports.lang;
-const PopupMenu = imports.ui.popupMenu;
-const St = imports.gi.St;
-const Clutter = imports.gi.Clutter;
-const Util = imports.misc.util;
-const Gtk = imports.gi.Gtk;
+var Lang = imports.lang;
+var PopupMenu = imports.ui.popupMenu;
+var St = imports.gi.St;
+var Clutter = imports.gi.Clutter;
+var Util = imports.misc.util;
+var Gtk = imports.gi.Gtk;
 
-const ExtensionSystem = imports.ui.extensionSystem;
-const ExtensionUtils = imports.misc.extensionUtils;
-const DisabledIcon = 'my-caffeine-off-symbolic';
-const description = "Beschreibung";
-//const DisabledIcon = 'gnome-spinner';
+var ExtensionSystem = imports.ui.extensionSystem;
+var ExtensionUtils = imports.misc.extensionUtils;
+var DisabledIcon = 'my-caffeine-off-symbolic';
+var description = "Beschreibung";
+//var DisabledIcon = 'gnome-spinner';
 
-const PopupServiceItem = new Lang.Class({
+var PopupServiceItem = new Lang.Class({
     Name: 'PopupServiceItem',
     Extends: PopupMenu.PopupSwitchMenuItem,
 
@@ -34,7 +34,7 @@ const PopupServiceItem = new Lang.Class({
                 accessible_name: 'restart',
                 style_class: 'system-menu-action services-systemd-button-reload' });
 
-        let icon = new St.Icon({ icon_name: DisabledIcon }) 
+        var icon = new St.Icon({ icon_name: DisabledIcon }) 
         this.actionButton.child = icon;
         this.actor.add(this.actionButton, { expand: false, x_align: St.Align.END });
 
