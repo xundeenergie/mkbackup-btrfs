@@ -1627,7 +1627,7 @@ def restore(args):
                         
 import dbus
 class desktop_notification:
-    def __init__(self, args, signal_name='Notification'):
+    def __init__(self, args, signal_name='Notification_normal'):
         self.args         = args
         self.dbus_path    = "/at/xundeenergie/notifications"
         self.dbus_iface   = "at.xundeenergie.notifications"
@@ -1640,23 +1640,16 @@ class desktop_notification:
 
     def send_signal(self, intv='default', *args):
         """Send a signal on the bus."""
-        signature=''
-        msg = ("mkbackup", "%s-Backup" % (self.args.tag), """am %s 
+        msg = dict()
+        msg['sender'] = "mkbackup"
+        msg['msgheader'] = "%s-backup" % (self.args.tag)
+        msg['msgbody'] = """am %s 
 \rum %s Uhr abgeschlossen.
 \rVolumes: 
-\r%s """ % (self.date, self.time, '\n'.join(args)))
-        for i in msg:
-            if type(i) is float:
-                signature += 'd' 
-            elif type(i) is int:
-                signature += 'i' 
-            elif type(i) is str:
-                signature += 's' 
-            else:
-                signature += 'v'
-
+\r%s """ % (self.date, self.time, '\n'.join(args))
+        msg['expiration_timeout'] = '-1'
         message = dbus.lowlevel.SignalMessage(self.dbus_path, self.dbus_iface, self.signal_name)
-        message.append(*msg)
+        message.append(msg)
         self.bus.send_message(message)
         
 def notify(args):

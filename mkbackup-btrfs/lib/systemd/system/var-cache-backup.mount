@@ -6,8 +6,8 @@ Documentation=man:fstab(5) man:systemd-fstab-generator(8)
 PartOf=var-cache-backup.automount
 #Wants=backup.mount backup.automount
 #Before=backup.mount
-Before=umount-notification@%p.service
-Wants=umount-notification@%P.service
+#Before=umount-notification@%p.service
+#Wants=umount-notification@%P.service
 
 [Mount]
 #What - drop-in in var-cache-backup.mount.d by mkbackup-start@...service which is started by udev-rule
