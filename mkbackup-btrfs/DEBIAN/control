@@ -1,5 +1,5 @@
 Package: mkbackup-btrfs
-Version: 0.8.42
+Version: 0.8.43
 Section: backup
 Priority: extra
 Architecture: all

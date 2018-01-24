@@ -430,7 +430,7 @@ var BackupManager = new Lang.Class({
                 this._getCommand(volumes.join(' '), 'is-active', 'system'))[1].toString().split('\n');
         mounted = vout.indexOf('active') >= 0
 
-        log('active: ' + active);
+        //log(active);
         this.bkpsubmenu.icon.style = (active ? "color: #ff0000;" : "color: revert;");
         MainIcon.style = (mounted ? "color: #ff0000;" : "color: revert;");
         ExtIcon.style = (mounted ? "color: #ff0000;" : "color: revert;");
