@@ -22,11 +22,7 @@ try:
 except:
     TREE=False
 
-try:
-    import ntfy
-    NOTIFY=True
-except:
-    NOTIFY=False
+import dbus
 
 #from mksnapshotconfig import Config
 from mkbackup_btrfs_config import Config, MountInfo, connect, Myos, __version__
@@ -1254,7 +1250,6 @@ def create(args):
             pass
         except:
             raise
-    notify(args)
     cleanup(args)
     return
 
@@ -1625,18 +1620,23 @@ def restore(args):
                 #shutil.copy(src,dest)
         mounts.close()
                         
-import dbus
 class desktop_notification:
-    def __init__(self, args, signal_name='Notification_normal'):
+    def __init__(self, args, urgency=1):
         self.args         = args
         self.dbus_path    = "/at/xundeenergie/notifications"
-        self.dbus_iface   = "at.xundeenergie.notifications"
+        self.dbus_iface   = "at.xundeenergie.notifications.advanced"
         self.dbus_busname = "at.xundeenergie.notifications"
         self.timestamp    = datetime.datetime.now()
         self.time         = self.timestamp.strftime('%H:%M:%S')
-        self.date         = self.timestamp.strftime('%d. %B. %Y')
+        self.date         = self.timestamp.strftime('%d. %B %Y')
         self.bus          = dbus.SystemBus()
-        self.signal_name  = signal_name
+        if int(urgency) == 0:
+            self.signal_name  = 'Notification_low'
+        elif int(urgency) == 1:
+            self.signal_name  = 'Notification_normal'
+        else:
+            self.signal_name  = 'Notification_critical'
+        print('NO',int(urgency),self.signal_name)
 
     def send_signal(self, intv='default', *args):
         """Send a signal on the bus."""
@@ -1644,20 +1644,18 @@ class desktop_notification:
         msg['sender'] = "mkbackup"
         msg['msgheader'] = "%s-backup" % (self.args.tag)
         msg['msgbody'] = """am %s 
-\rum %s Uhr abgeschlossen.
-\rVolumes: 
-\r%s """ % (self.date, self.time, '\n'.join(args))
+um %s Uhr abgeschlossen.
+
+%s 
+http://www.google.com
+<a href="file:///home/jakob/backup">TEST</a>
+(Ugency: %s)
+""" % (self.date, self.time, '\r'.join(args), self.signal_name)
         msg['expiration_timeout'] = '-1'
         message = dbus.lowlevel.SignalMessage(self.dbus_path, self.dbus_iface, self.signal_name)
         message.append(msg)
         self.bus.send_message(message)
         
-def notify(args):
-    print('NOTIFICATION')
-    if args.notification['bool'] is True:
-        msg="""Datensicherung von %s ist abgeschlossen""" % (args.snapshots)
-        #ntfy.notify(msg,'Backup erstellen', backend='default' if args.notification['type'] == None else args.notification['type'])
-        #print('ARGS',args)
 
 
 
@@ -1694,6 +1692,8 @@ parser.add_argument('-s', '--snapshot-store',
         dest='snpstore', 
         default=config.getStoreName('SNP'), 
         help='''set storename in snapshot-mount. (default=%s) overrides 'BKP-Store':''' % (config.getStoreName('SNP')))
+parser.add_argument('-N', '--notification', default=None, help='''Send notification. Possible values are "desktop" ''')
+parser.add_argument('-U', '--notification_urgency', default=None, help='''Send notification. Possible values are 0=low, 1=normal, 2=critical ''')
 #parser.set_defaults(func=main)
 
 subparsers = parser.add_subparsers()
@@ -1737,8 +1737,6 @@ create_parser.add_argument("store",
                         which to be created in the same store.
                         BKP is ignored!!!""")
 create_parser.add_argument('--no-clones', action='store_true', default=False, help="""do not use clones for transfer, only parent (if present)""")
-create_parser.add_argument('--no-notify', dest='notify', action='store_false', default=True, help="""Send notification to destination configured with --notify-backend""")
-#create_parser.add_argument('--notify-backend', action='store', default=None, help="""Send notification to this backend""")
 create_parser.set_defaults(func=create)
 create_parser.set_defaults(action='create')
 
@@ -1821,9 +1819,9 @@ if __name__ == '__main__':
     args.config = config
     stores = []
     snapshots = []
-    args.notification = dict()
-    args.notification['bool']=False
-    args.notification['type']=None
+#    args.notification = dict()
+#    args.notification['bool']=False
+#    args.notification['type']=None
 
     if not 'dry_run' in args:
         args.dry_run=False
@@ -1844,10 +1842,10 @@ if __name__ == '__main__':
             snapshots.extend([i.rstrip('/')])
     if len(stores) == 0: stores = ['SRC']
 
-    if 'notify' in args:
-        args.notification['bool'] = True if args.notify is True else False
-    if 'notify_backend' in args:
-        args.notification['type'] = args.notify_backend
+#    if 'notify' in args:
+#        args.notification['bool'] = True if args.notify is True else False
+#    if 'notify_backend' in args:
+#        args.notification['type'] = args.notify_backend
 
 
 
@@ -1981,9 +1979,7 @@ Author: %s""" % (confversion,__version__,__author__))
 #                args.config.ssh[t][s]['ssh'].close() 
 
     # print summary over all actions 
-    cv = 'created:'
-    dv = 'deleted:'
-    tv = 'transfered:'
+    volumes = list()
 
     if not args.action == 'list' and not args.action == 'restore':
         DEBUG("---=== SUMMARY ===---",level=0,verbose=args.verbose)
@@ -1991,33 +1987,55 @@ Author: %s""" % (confversion,__version__,__author__))
 snapshots: %s
                 """ % (args.store,args.snapshots))
         DEBUG("Created Subvolumes:",level=0,verbose=args.verbose)
+        volumes.append('<b>Volumes created:</b>')
+        if listing.CreatedSubvolumes.is_empty(): 
+            volumes.append('---')
+            print('''---
+                    ''')
         while not listing.CreatedSubvolumes.is_empty():
             i = listing.CreatedSubvolumes.pop()
-            cv += '\n\r'+i[1]
+            volumes.append(i[1])
             print(i)
-        cv += '---'
-        print('''---
-''')
+        volumes.append('')
+
         DEBUG("Transfered Subvolumes:",level=0,verbose=args.verbose)
+        volumes.append('<b>Volumes transfered:</b>')
+        if listing.TransferedSubvolumes.is_empty(): 
+            volumes.append('---')
+            print('''---
+                    ''')
         while not listing.TransferedSubvolumes.is_empty():
             i = listing.TransferedSubvolumes.pop()
-            tv += '\n\r'+i[1]
+            volumes.append(i[1])
             print(i)
-        tv += '---'
-        print('''---
-''')
+        volumes.append('')
+        
         DEBUG("Deleted Subvolumes:",level=0,verbose=args.verbose)
+        volumes.append('<b>Volumes deleted:</b>')
+        if listing.DeletedSubvolumes.is_empty(): 
+            volumes.append('---')
+            print(''' ---
+                    ''')
         while not listing.DeletedSubvolumes.is_empty():
             i = listing.DeletedSubvolumes.pop()
-            dv += '\n\r'+i[1]
+            volumes.append(i[1])
             print(i)
-        dv += '---'
-        print('---')
+        volumes.append('')
 
-    if args.notification['bool'] == True:
-        #print('ARGS',type(args),args)
-        notify = desktop_notification(args)
-        notify.send_signal(args, '\n\r'+cv, '\n\r'+tv, '\n\r'+dv) 
+    print(args.notification, config.getNotification(intv=args.tag), args.notification_urgency, config.getUrgency(intv=args.tag))
+    if args.notification == None: 
+        args.notification = config.getNotification(intv=args.tag)
+    if args.notification_urgency == None: 
+        args.notification_urgency = config.getUrgency(intv=args.tag)
+    print(args.notification, args.notification_urgency)
+
+    if args.notification == 'desktop':
+        notify = desktop_notification(args, urgency=args.notification_urgency)
+        notify.send_signal(args, *volumes) 
+    elif args.notification == None:
+        DEBUG("No notification at all", level=1, verbose=args.verbose)
+    else:
+        DEBUG("No notification at all", level=1, verbose=args.verbose)
 
     
     DEBUG("---== (%s) finnished %s %s at %s ==---" % (os.getpid(),args.func.__name__, args.tag, args.timestamp),level=1,verbose=args.verbose)

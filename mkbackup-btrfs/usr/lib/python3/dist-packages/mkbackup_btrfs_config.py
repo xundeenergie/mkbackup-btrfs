@@ -417,8 +417,8 @@ class Config():
                 'interval': 5,
                 'symlink': 'LAST',
                 'transfer': False,
-                'notification': False,
-                'notify_type': None}
+                'notification': None,
+                'notification_urgency': None}
         self.config['hourly'] = {'volumes':  '$S,__ALWAYSCURRENT__','interval': '24','transfer': True}
         self.config['daily'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '7','transfer': True}
         self.config['weekly'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '5','transfer': True}
@@ -428,9 +428,9 @@ class Config():
         self.config['aptupgrade'] = {'volumes':  '$S','interval': '6','symlink': 'BEFOREUPDATE'}
         self.config['dmin'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '6'}
         self.config['plugin'] = {'volumes': '$S,__ALWAYSCURRENT__','interval':
-                '5','transfer': True, 'notification': True, 'notify_type':
-                'mail'}
-        self.config['manually'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '5','symlink': 'MANUALLY','transfer': True}
+                '5','transfer': True, 'notification': 'desktop', 'notification_urgency': 1}
+        self.config['manually'] = {'volumes': '$S,__ALWAYSCURRENT__','interval': '5','symlink': 'MANUALLY', 
+                'transfer': True, 'notification': 'desktop', 'notification_urgency': 2}
 
         with open(self.cfile, 'w') as configfile:
             try:
@@ -713,6 +713,28 @@ class Config():
         except:
             try:
                 r = self.config.get('DEFAULT','ignore')
+            except:
+                r=None
+        return(None if r == '' or r == None else r)
+
+    def getNotification(self,intv='misc'):
+        #print('GN',intv)
+        try:
+            r = self.config.get(intv,'notification')
+        except:
+            try:
+                r = self.config.get('DEFAULT','notification')
+            except:
+                r=None
+        return(None if r == '' or r == None else r)
+
+    def getUrgency(self,intv='misc'):
+        #print('GU',intv)
+        try:
+            r = self.config.get(intv,'notification_urgency')
+        except:
+            try:
+                r = self.config.get('DEFAULT','notification_urgency')
             except:
                 r=None
         return(None if r == '' or r == None else r)
