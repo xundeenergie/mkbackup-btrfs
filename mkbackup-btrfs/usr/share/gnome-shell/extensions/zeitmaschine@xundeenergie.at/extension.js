@@ -110,7 +110,7 @@ var BackupManager = new Lang.Class({
         }));
         this.menu.addMenuItem(this.extItem);
 
-		this.snapitem = new PopupMenu.PopupMenuItem(_("Take snapshot now"));
+		this.snapitem = new PopupMenu.PopupMenuItem(_("Take snapshot now (tag: manually)"));
 		this.snapitem.connect('activate', Lang.bind(this, function() {
 		    GLib.spawn_command_line_async(
 			this._getCommand('mkbackup@manually.service', 'restart', 'system'));
@@ -431,6 +431,7 @@ var BackupManager = new Lang.Class({
         mounted = vout.indexOf('active') >= 0
 
         this.bkpsubmenu.icon.style = (active ? "color: #ff0000;" : "color: revert;");
+        //this.bkpsubmenu.icon.style_class = (active ? "system-status-icon" : "system-status-icon-red");
         MainIcon.style = (mounted ? "color: #ff0000;" : "color: revert;");
         ExtIcon.style = (mounted ? "color: #ff0000;" : "color: revert;");
         (mounted ? ExtIcon.show() : ExtIcon.hide());

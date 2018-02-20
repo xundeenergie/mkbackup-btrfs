@@ -45,7 +45,7 @@ var PopupBKPItem = new Lang.Class({
     },
 
     _isInteresting: function() {
-        return true
+        //return true
         if (!this.mount.can_eject() && !this.mount.can_unmount())
             return false;
         if (this.mount.is_shadowed())

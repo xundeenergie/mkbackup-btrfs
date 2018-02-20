@@ -15,6 +15,14 @@ import psutil
 # sqlite3 is used for writing database about last runs - it is read by list and from gnome-extension (planned)
 import sqlite3
 
+# Useful for very coarse version differentiation.
+PY2 = sys.version_info[0] == 2
+PY3 = sys.version_info[0] == 3
+PY34 = sys.version_info[0:2] >= (3, 4)
+
+# --- Logger ---
+import logging
+
 
 try:
     from anytree import Node, RenderTree
@@ -23,6 +31,9 @@ except:
     TREE=False
 
 import dbus
+import dbus.service
+import dbus.glib
+from system_notification_emitter import Emitter 
 
 #from mksnapshotconfig import Config
 from mkbackup_btrfs_config import Config, MountInfo, connect, Myos, __version__
@@ -30,6 +41,10 @@ from mkbackup_btrfs_config import __version__ as confversion
 
 __author__ = "Jakobus Schürz <jakob@schuerz.at>"
 __version__ = "1.01.0"
+
+class Notification(Emitter):
+    def __init__(self):
+        super().__init__(conn=dbus.SystemBus(), object_path='/at/xundeenergie/notifications/advanced/Notification')
 
 #define progress timer class
 class progress_timer:
@@ -107,22 +122,22 @@ def check_lockfile(args,lf):
     # Returns True, when lockfile is in use, and False if lockfile is unused
     # Returns None, when lockfile is not existing
     for st in args.store:
-        #print("A",args.tag,st)
         if Myos().path_isfile(lf,args.config.getssh(args.tag,st)):
-            #print("B")
             file = open(lf, 'r')
             pid = file.readline()
             file.close()
             #if len(pid) > 0 and Myos().path_isfile('/proc/'+pid+'/cmdline',args.config.ssh[args.tag][st]):
             if len(pid) > 0 and os.path.isfile('/proc/'+pid+'/cmdline'):
-                DEBUG('lockfile %s in use with process %s' % (lf,pid),level=3,verbose=args.verbose)
+                logger.warn('lockfile %s in use with process %s' % (lf,pid))
+                #DEBUG('lockfile %s in use with process %s' % (lf,pid),level=3,verbose=args.verbose)
                 return(True)
             else:
-                DEBUG('lockfile %s unused' % (lf),level=3,verbose=args.verbose)
+                logger.warn('lockfile %s unused' % (lf))
+                #DEBUG('lockfile %s unused' % (lf),level=3,verbose=args.verbose)
                 return(False)
         else:
-            #print("C")
-            DEBUG('lockfile %s not existing' % (lf),level=3,verbose=args.verbose)
+            logger.warn('lockfile %s not existing' % (lf))
+            #DEBUG('lockfile %s not existing' % (lf),level=3,verbose=args.verbose)
             return(None)
 
 class Stack:
@@ -203,7 +218,8 @@ class listing:
         self.scanfs()
 
     def scanfs(self):
-        DEBUG('SCAN btrfs-drive: %s' % (self.StorePath),level=3)
+        logger.warn('SCAN btrfs-drive: %s' % (self.StorePath))
+        #DEBUG('SCAN btrfs-drive: %s' % (self.StorePath),level=3)
         if self.single:
             cmd=['btrfs','subvolume','list','-R','-u','-q','-c','-o',self.StorePath]
         else:
@@ -267,7 +283,8 @@ class listing:
                     if int(self.svols[sub]['gen']) >= int(self.svols[ID]['gen']): continue
                 if younger:
                     if int(self.svols[sub]['gen']) <= int(self.svols[ID]['gen']): continue
-                self.DEBUG('SISTER',self.svols[sub]['id'],self.svols[sub]['path'],level=5)
+                logger.debug('SISTER',self.svols[sub]['id'],self.svols[sub]['path'])
+                #self.DEBUG('SISTER',self.svols[sub]['id'],self.svols[sub]['path'],level=5)
                 result.append(self.svols[sub]['path']) if names else result.append(sub)
         return(self._ret(result,reverse=rev))
 
@@ -275,7 +292,8 @@ class listing:
         result = []
         for sub in sorted(self.svols.keys(),key=int):
             if self.svols[sub]['uuid'] == puuid:
-                self.DEBUG('PARENT',self.svols[sub]['path'],level=5)
+                logger.debug('PARENT',self.svols[sub]['path'])
+                #self.DEBUG('PARENT',self.svols[sub]['path'],level=5)
                 result.append(self.svols[sub]['path']) if names else result.append(sub)
         return(self._ret(result,reverse=rev))
 
@@ -283,7 +301,8 @@ class listing:
         result = []
         for sub in sorted(self.svols.keys(),key=int):
             if self.svols[sub]['puuid'] == uuid:
-                self.DEBUG('PARENTX',names,sub,self.svols[sub]['path'] if names else sub,"Y",level=5)
+                logger.debug('PARENTX',names,sub,self.svols[sub]['path'] if names else sub,"Y")
+                #self.DEBUG('PARENTX',names,sub,self.svols[sub]['path'] if names else sub,"Y",level=5)
                 result.append(self.svols[sub]['path']) if names else result.append(sub)
         return(self._ret(result,reverse=rev))
 
@@ -291,7 +310,8 @@ class listing:
         result = []
         for sub in sorted(self.svols.keys(),key=int):
             if expr.search(self.svols[sub]['path']):
-                self.DEBUG('REGEX',self.svols[sub]['path'],level=5)
+                logger.debug('REGEX',self.svols[sub]['path'])
+                #self.DEBUG('REGEX',self.svols[sub]['path'],level=5)
                 result.append(self.svols[sub]['path']) if names else result.append(sub)
         return(self._ret(result,reverse=rev))
 
@@ -299,7 +319,8 @@ class listing:
         result = []
         for sub in sorted(self.svols.keys(),key=int):
             if expr.search(self.svols[sub]['path']):
-                self.DEBUG('REGEX',self.svols[sub]['path'],level=5)
+                logger.debug('REGEX',self.svols[sub]['path'])
+                #self.DEBUG('REGEX',self.svols[sub]['path'],level=5)
                 result.append(self.svols[sub]['path']) if names else result.append(sub)
         return(self._ret(result,reverse=rev))
 
@@ -331,14 +352,16 @@ class listing:
                     if self.svols[sub]['gen'] >= self.svols[ID]['gen']: continue
                 if younger:
                     if self.svols[sub]['gen'] <= self.svols[ID]['gen']: continue
-                self.DEBUG('SISTER',self.svols[sub]['id'],self.svols[sub]['path'],level=5)
+                logger.debug('SISTER',self.svols[sub]['id'],self.svols[sub]['path'])
+                #self.DEBUG('SISTER',self.svols[sub]['id'],self.svols[sub]['path'],level=5)
                 result.append(self.svols[sub]['path']) if names else result.append(sub)
         return(self._ret(result,reverse=rev))
 
     
     def _isbtrfs(self,path,store='SRC',tag='DEFAULT'):
         mi = MountInfo(conn=self.args.config.getssh(tag,store))
-        self.DEBUG("Filesysem for »%s« is %s" % (path,mi.fstype(path)),level=2)
+        logger.info("Filesysem for »%s« is %s" % (path,mi.fstype(path)))
+        #self.DEBUG("Filesysem for »%s« is %s" % (path,mi.fstype(path)),level=2)
         return True if mi.fstype(path) == 'btrfs' else False
 
     def main(self):
@@ -379,7 +402,8 @@ class SubVolumeInfo(listing):
         self.parse_btrfs_show()
 
     def parse_btrfs_show(self):
-        self.DEBUG('[II]  parse subvolume store<%s> %s' % (self.store,self.SourceName),level=2)
+        logger.info('[II]  parse subvolume store<%s> %s' % (self.store,self.SourceName))
+        #self.DEBUG('[II]  parse subvolume store<%s> %s' % (self.store,self.SourceName),level=2)
         subvolume_data = dict()
         if self.SourceName.startswith(self.StoreName):
             SourceName = re.sub(self.StoreName+'/','',self.SourceName)
@@ -464,13 +488,13 @@ class SubVolume(SubVolumeInfo):
         self.SnapLock     = self.SnapName+'.part'
         self.SLockFile    = '.'+self.SnapName+'.~lock'
         self.SnapID       = None
-        self.DEBUG('OrigName  ',self.OrigName,level=4)
-        self.DEBUG('SourceName',self.SourceName,level=4)
-        self.DEBUG('OrigLock  ',self.OrigLock,level=4)
-        self.DEBUG('OLockFile ',self.OLockFile,level=4)
-        self.DEBUG('SnapName  ',self.SnapName,level=4)
-        self.DEBUG('SnapLock  ',self.SnapLock,level=4)
-        self.DEBUG('SLockFile ',self.SLockFile,level=4)
+        logger.warn('OrigName  : %s' % (self.OrigName))
+        logger.warn('SourceName: %s' % (self.SourceName))
+        logger.warn('OrigLock  : %s' % (self.OrigLock))
+        logger.warn('OLockFile : %s' % (self.OLockFile))
+        logger.warn('SnapName  : %s' % (self.SnapName))
+        logger.warn('SnapLock  : %s' % (self.SnapLock))
+        logger.warn('SLockFile : %s' % (self.SLockFile))
 
         self.parent       = ''
         self.subvolsshort = []
@@ -567,7 +591,8 @@ class SubVolume(SubVolumeInfo):
 
     def lock(self,store=None):
         store = self.store
-        self.DEBUG('try to lock on action %s' % (self.args.action),level=4)
+        logger.error('try to lock on action %s' % (self.args.action))
+        #self.DEBUG('try to lock on action %s' % (self.args.action),level=4)
         try:
             self.DEBUG('Action is %s' % (self.args.action),level=3)
             if self.args.action == 'create':
@@ -1655,11 +1680,6 @@ http://www.google.com
         message = dbus.lowlevel.SignalMessage(self.dbus_path, self.dbus_iface, self.signal_name)
         message.append(msg)
         self.bus.send_message(message)
-        
-
-
-
-
 
 # PARSER
 
@@ -1672,6 +1692,7 @@ parser.add_argument('-V', '--systemvolumes', action='store_true',
         always SNP''')
 parser.add_argument('-t', '--tag', default=None, help='''one of %s''' % (config.ListIntervals()))
 parser.add_argument('-v', '--verbose', action='count', default=0, help='''verbose output''' )
+parser.add_argument('-L', '--logfile', default=None, help='''Write output also to this file in /var/log/''')
 #parser.add_argument('-i', '--info', action='store_true', default=False, help='''Print infos, action is "list"''')
 parser.add_argument('-i', '--ignore', action='append', help='''Regular expression pattern for ignoring several subvolumes to be not backed up (and subvolumes unter them)
         Use it more than once''')
@@ -1817,11 +1838,42 @@ restore_parser.set_defaults(action='restore')
 if __name__ == '__main__':
     args = parser.parse_args()
     args.config = config
+    args.scriptname = os.path.basename(__file__)
     stores = []
     snapshots = []
 #    args.notification = dict()
 #    args.notification['bool']=False
 #    args.notification['type']=None
+
+    # --- Logger --- 
+    levels = (logging.CRITICAL, logging.ERROR, logging.WARNING, logging.INFO, logging.DEBUG, logging.NOTSET)
+    #print(logging.CRITICAL, logging.ERROR, logging.WARNING, logging.INFO, logging.DEBUG, logging.NOTSET)
+    print('verbose', args.verbose, levels[args.verbose])
+    logger = logging.getLogger(args.scriptname)
+    logger.setLevel(logging.DEBUG)
+    # create formatter
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # create file handler which logs even debug messages
+    # add formatter it to the handlers
+    if args.logfile is not None:
+        fh = logging.FileHandler('/var/log/'+args.logfile)
+        fh.setLevel(logging.DEBUG)
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+    # create console handler with a higher log level
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.ERROR)
+    # create formatter and add it to the handlers
+    #ch.setFormatter(formatter)
+    # add the handlers to logger
+    logger.addHandler(ch)
+
+    # 'application' code
+    logger.debug('debug message')
+    logger.info('info message')
+    logger.warn('warn message')
+    logger.error('error message')
+    logger.critical('critical message')
 
     if not 'dry_run' in args:
         args.dry_run=False
@@ -1889,18 +1941,19 @@ if __name__ == '__main__':
                 for st in args.store:
                     args.sourcepath[st] = args.config.getStorePath(st,args.tag)
                     args.destpath[st]   = args.config.getStorePath(st,args.tag)
-        #print(args.store,args.sourcepath,args.destpath)
-        DEBUG('''Action is %s
+        logger.warn('''Action is %s
         Source is %s
-        Destination is %s''' % (args.action,args.sourcepath,args.destpath),level=3,verbose=args.verbose)
+        Destination is %s''' % (args.action,args.sourcepath,args.destpath))
     else:
-        print("""Version mkbackup_btrfs_config: %s
+        logger.notset("""Version mkbackup_btrfs_config: %s
 Version mkbackup-btrfs: %s
 Author: %s""" % (confversion,__version__,__author__))
         quit()
 
-    DEBUG('SRC',args.sourcepath,level=5,verbose=args.verbose)
-    DEBUG('DST',args.destpath,level=5,verbose=args.verbose)
+#    DEBUG('SRC',args.sourcepath,level=5,verbose=args.verbose)
+#    DEBUG('DST',args.destpath,level=5,verbose=args.verbose)
+    logger.debug('SRC',args.sourcepath)
+    logger.debug('DST',args.destpath)
 
     # Set timestamp equal for all operations
     args.ts  = datetime.datetime.now()
@@ -2022,6 +2075,7 @@ snapshots: %s
             print(i)
         volumes.append('')
 
+
     print(args.notification, config.getNotification(intv=args.tag), args.notification_urgency, config.getUrgency(intv=args.tag))
     if args.notification == None: 
         args.notification = config.getNotification(intv=args.tag)
@@ -2030,15 +2084,37 @@ snapshots: %s
     print(args.notification, args.notification_urgency)
 
     if args.notification == 'desktop':
-        notify = desktop_notification(args, urgency=args.notification_urgency)
-        notify.send_signal(args, *volumes) 
+#        notify = desktop_notification(args, urgency=args.notification_urgency)
+#        notify.send_signal(args, *volumes) 
+#        print(volumes)
+#        print(*volumes)
+
+        msg = dict()
+        msg['sender'] = "mkbackup"
+        msg['header'] = "%s-backup" % (args.tag)
+        msg['body'] = """am %s 
+um %s Uhr abgeschlossen.
+
+%s 
+http://www.google.com
+<a href="file:///home/jakob/backup">TEST</a>
+(Ugency: normal)
+""" % (args.ts.strftime('%Y-%m-%d'), args.ts.strftime('%H:%M:%S'), '\r'.join(volumes))
+#        msg['action'] = dict()
+#        msg['action']['action1'] = dict()
+#        msg['action']['action1']['title'] = 'Open Backup'
+#        msg['action']['action1']['loc'] = 'file:~/backup'
+        
+
+        advnotify = Notification()
+        advnotify.normal(msg)
     elif args.notification == None:
-        DEBUG("No notification at all", level=1, verbose=args.verbose)
+        logger.critical("No notification at all")
     else:
-        DEBUG("No notification at all", level=1, verbose=args.verbose)
+        logger.critical("No notification at all")
 
     
-    DEBUG("---== (%s) finnished %s %s at %s ==---" % (os.getpid(),args.func.__name__, args.tag, args.timestamp),level=1,verbose=args.verbose)
+    logger.critical("---== (%s) finnished %s %s at %s ==---" % (os.getpid(),args.func.__name__, args.tag, args.timestamp))
 
     
 #import ntfy
@@ -2047,10 +2123,10 @@ snapshots: %s
 #    server = smtplib.SMTP('localhost', 587)
 #
 #    #Next, log in to the server
-#    server.login("jakob", "dJeAbKiOaBnU8S4")
+#    server.login("username", "verysecret")
 #
 #    #Send the mail
 #    msg = """
 #    Hello!""" # The /n separates the message from the headers
-#    server.sendmail("jakob@localhost", "jakobus.schuerz@ebcont.com", msg)
+#    server.sendmail("first.recipient@provider1.example", "second.recipient@provider2.example", msg)
 #
