@@ -44,6 +44,7 @@ buildonlydeb: $(FILES)
 
 .update: $(ORIGS)
 	@#for i in $(ORIGS); do $$i;done
+	@echo "$(ORIGS)"
 	@echo "Copy originals to $(DIR)"
 	@for i in $(ORIGS); do sudo cp -uv $$i $(DIR)$$i;done
 	touch .update

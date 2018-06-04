@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+
+# Take in a single optional integral argument
+import sys
+import argparse
+import os
+
+arg_parser = argparse.ArgumentParser(description='Get random numbers')
+arg_parser.add_argument('bits', nargs='?', default=16)
+arg_parser.add_argument('-s', '--slow', action='store_true',
+                        default=False, required=False,
+                        help='Use the slow method')
+
+args = arg_parser.parse_args()
+
+# Encapsulate calling the Status object on the session bus with a main loop
+import dbus, dbus.exceptions, dbus.mainloop.glib
+import dbus.service
+import threading
+from gi.repository import GLib
+
+from time import sleep
+
+from mkbackup_emitter import Emitter as EM
+class EmDBUS(EM):
+    """ Example to use
+    progress = Emitter(dbus.SystemBus(),
+            '/at/xundeenergie/mkbackup/Status')
+
+    progress.start(
+            {'intv': 'hourly'})
+
+    progress.update(
+            {'intv': 'hourly', 'progr': 5})
+
+    progress.finished(
+            {'intv': 'hourly'})
+
+    progress.reset(
+            {'intv': 'hourly'})
+    """
+    def __init__(self, interval):
+        super().__init__(conn=dbus.SystemBus(), bus_name='at.xundeenergie', object_path=os.path.join('/at/xundeenergie/mkbackup/Intervals', interval))
+
+parser = argparse.ArgumentParser()
+args = parser.parse_args()
+args.action='daily'
+args.mdb = EmDBUS(args.action)
+args.mdb.Reset()
+args.mdb.Start()
+print("RUN PROGRAMM")
+steps = 20
+for i in range(0,steps):
+    sleep(0.5)
+    args.mdb.Update(100/steps)
+args.mdb.Finished()

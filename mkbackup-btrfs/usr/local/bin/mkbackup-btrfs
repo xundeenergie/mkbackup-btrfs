@@ -33,11 +33,12 @@ except:
 import dbus
 import dbus.service
 import dbus.glib
-from system_notification_emitter import Emitter 
+from mkbackup.system_notification_emitter import Emitter 
+from mkbackup.mkbackup_emitter import Emitter as EM
 
 #from mksnapshotconfig import Config
-from mkbackup_btrfs_config import Config, MountInfo, connect, Myos, __version__
-from mkbackup_btrfs_config import __version__ as confversion
+from mkbackup.mkbackup_btrfs_config import Config, MountInfo, connect, Myos, __version__
+from mkbackup.mkbackup_btrfs_config import __version__ as confversion
 
 __author__ = "Jakobus Schürz <jakob@schuerz.at>"
 __version__ = "1.01.0"
@@ -45,6 +46,26 @@ __version__ = "1.01.0"
 class Notification(Emitter):
     def __init__(self):
         super().__init__(conn=dbus.SystemBus(), object_path='/at/xundeenergie/notifications/advanced/Notification')
+
+class EmDBUS(EM):
+    """ Example to use
+    progress = Emitter(dbus.SystemBus(),
+            '/at/xundeenergie/mkbackup/Status')
+
+    progress.start(
+            {'intv': 'hourly'})
+
+    progress.update(
+            {'intv': 'hourly', 'progr': 5})
+
+    progress.finished(
+            {'intv': 'hourly'})
+
+    progress.reset(
+            {'intv': 'hourly'})
+    """
+    def __init__(self):
+        super().__init__(conn=dbus.SystemBus(), object_path='/at/xundeenergie/mkbackup/Status')
 
 #define progress timer class
 class progress_timer:
@@ -93,24 +114,6 @@ def DEBUG(*msg,level=0,verbose=0):
         for i in msg: print(i)
         return
 
-#def sp_call(args,cmdl,level=4):
-#    stdout = subprocess.DEVNULL
-#    stderr = subprocess.DEVNULL
-#    stdout = args.stdout
-#    stderr = args.stderr
-#    
-#    DEBUG('[II][cmdl]  '+' '.join(cmdl),level=level,verbose=args.verbose)
-#    try:
-#        r = subprocess.call(cmdl, stdout=stdout, stderr=stderr)
-#    except subprocess.CalledProcessError as e:
-#        DEBUG(e,level=level,verbose=args.verbose)
-#        pass # handle errors in the called executable
-#    except OSError as e:
-#        DEBUG(e,level=level,verbose=args.verbose)
-#        raise SystemExit
-#        pass 
-#    return(r)
-    
 def isstring(s):
     # if we use Python 3
     if (sys.version_info[0] == 3):
@@ -153,6 +156,9 @@ class Stack:
     def is_empty(self):
         return(self.item == [])
 
+    def len(self):
+        return(len(self.item))
+
     def all(self):
         return(self.item)
 
@@ -173,7 +179,6 @@ class ScanFsError(Error):
 
 class NoBtrfsVolumeError(Error):
     def __init__(self,vol='unknown'):
-        #print("BlaERROR - Read systemvolume failed. Volume not found: %s"  % (vol))
         pass
     pass
 
@@ -193,9 +198,8 @@ class SystemVolumeError(Error):
     def __init__(self,action='undefined'):
         print("Action %s on Systemvolume not allowed" % (action))
 
-class listing:
-    what = "Listing of all subvolumes in store"
-    #Lists = Stack()
+class BtrfsListing:
+    what = "BtrfsListing of all subvolumes in store"
     CreatedSubvolumes = Stack()
     DeletedSubvolumes = Stack()
     TransferedSubvolumes = Stack()
@@ -203,7 +207,7 @@ class listing:
 
 
     def __init__(self,args,store='SRC',single=False):
-        #listing.Lists.push(store)
+        #BtrfsListing.Lists.push(store)
         self.args      = args
         self.store     = store
         self.single    = single
@@ -219,7 +223,6 @@ class listing:
 
     def scanfs(self):
         logger.warn('SCAN btrfs-drive: %s' % (self.StorePath))
-        #DEBUG('SCAN btrfs-drive: %s' % (self.StorePath),level=3)
         if self.single:
             cmd=['btrfs','subvolume','list','-R','-u','-q','-c','-o',self.StorePath]
         else:
@@ -278,13 +281,11 @@ class listing:
         if younger == None: younger = self.args.younger
         for sub in sorted(self.svols.keys(),key=int):
             if self.svols[sub]['puuid'] == self.svols[ID]['puuid'] and not sub == ID:
-                #print('XXX',self.svols[sub]['gen'],self.svols[ID]['gen'],self.svols[sub]['cgen'],self.svols[ID]['cgen'],self.svols[sub]['path'],self.svols[ID]['path'])
                 if older:
                     if int(self.svols[sub]['gen']) >= int(self.svols[ID]['gen']): continue
                 if younger:
                     if int(self.svols[sub]['gen']) <= int(self.svols[ID]['gen']): continue
                 logger.debug('SISTER',self.svols[sub]['id'],self.svols[sub]['path'])
-                #self.DEBUG('SISTER',self.svols[sub]['id'],self.svols[sub]['path'],level=5)
                 result.append(self.svols[sub]['path']) if names else result.append(sub)
         return(self._ret(result,reverse=rev))
 
@@ -293,7 +294,6 @@ class listing:
         for sub in sorted(self.svols.keys(),key=int):
             if self.svols[sub]['uuid'] == puuid:
                 logger.debug('PARENT',self.svols[sub]['path'])
-                #self.DEBUG('PARENT',self.svols[sub]['path'],level=5)
                 result.append(self.svols[sub]['path']) if names else result.append(sub)
         return(self._ret(result,reverse=rev))
 
@@ -302,7 +302,6 @@ class listing:
         for sub in sorted(self.svols.keys(),key=int):
             if self.svols[sub]['puuid'] == uuid:
                 logger.debug('PARENTX',names,sub,self.svols[sub]['path'] if names else sub,"Y")
-                #self.DEBUG('PARENTX',names,sub,self.svols[sub]['path'] if names else sub,"Y",level=5)
                 result.append(self.svols[sub]['path']) if names else result.append(sub)
         return(self._ret(result,reverse=rev))
 
@@ -311,7 +310,6 @@ class listing:
         for sub in sorted(self.svols.keys(),key=int):
             if expr.search(self.svols[sub]['path']):
                 logger.debug('REGEX',self.svols[sub]['path'])
-                #self.DEBUG('REGEX',self.svols[sub]['path'],level=5)
                 result.append(self.svols[sub]['path']) if names else result.append(sub)
         return(self._ret(result,reverse=rev))
 
@@ -320,12 +318,11 @@ class listing:
         for sub in sorted(self.svols.keys(),key=int):
             if expr.search(self.svols[sub]['path']):
                 logger.debug('REGEX',self.svols[sub]['path'])
-                #self.DEBUG('REGEX',self.svols[sub]['path'],level=5)
                 result.append(self.svols[sub]['path']) if names else result.append(sub)
         return(self._ret(result,reverse=rev))
 
     def _lssub(self,id):
-        # recursiv listing of all subvolumes below a given snapshot
+        # recursiv BtrfsListing of all subvolumes below a given snapshot
         result = []
         for i in self.svols:
             if self.svols[i]['tlid'] == id:
@@ -341,6 +338,11 @@ class listing:
         for sub in self._lssub(id):
             result.append(self.svols[sub]['path'].partition(self.svols[id]['path']+'/')[2]) if names else result.append(sub)
         return(self._ret(result,reverse=rev))
+
+    def count_subvolumes(self,id,incl_self=True):
+        result = 0
+        result = len(self._lssub(id))
+        return(result if incl_self else result + 1)
 
     def get_oldest(self,ID,rev=False,older=None,younger=None,names=True):
         result = []
@@ -367,7 +369,7 @@ class listing:
     def main(self):
         self.scanfs()
 
-class SubVolumeInfo(listing):
+class SubVolumeInfo(BtrfsListing):
 
     def __init__(self,args,name,store='SRC',single=False):
         super().__init__(args,store=store,single=single)
@@ -412,16 +414,7 @@ class SubVolumeInfo(listing):
         cmd = ['btrfs','subvolume','show',self.StorePath+'/'+SourceName]
         sv = False
         snaps=[]
-#        try:
-#            res = subprocess.Popen(cmd,stdout=subprocess.PIPE, stderr=self.args.stderr)
-#            output,error = res.communicate()
-#            if res.returncode > 0:
-#                raise NoSubvolumeError
-#        except:
-#            raise
-
         output = self.args.config.remotecommand(tag=self.args.tag, store=self.store, cmd=cmd)
-        #print(output)
 
         try:
             for line in output.splitlines():
@@ -440,7 +433,6 @@ class SubVolumeInfo(listing):
                         self.path=argmnts[0].strip()
             self.snapshots = snaps
             self.dir       = os.path.dirname(self.path)
-            #print('XXX',snaps)
             return
         except:
             print("Subvolume does not exist: %s" % (self.SourceName))
@@ -450,7 +442,7 @@ class SubVolume(SubVolumeInfo):
     # read Subclasses:  http://www.python-course.eu/python3_inheritance.php
     what = 'store all informations about a btrfs-Subvolume'
 
-    def __init__(self,args,name,store='SRC',single=False):
+    def __init__(self, args, name, store='SRC', single=False, mdbslice=100):
         super().__init__(args,store=store,name=name,single=single)
         self.snapped      = False
         self.transferred  = False
@@ -501,6 +493,21 @@ class SubVolume(SubVolumeInfo):
         self.subvolumes   = []
         self.stderr       = args.stderr
         self.DEBUG('[II]  <%s> is %s: ' % (self.store, self.config.getStorePath(self.store,self.args.tag,original=True)),level=2)
+        #self.partstep = (100 / (self.args.mdbpart * self.args.mdbsteps)) / len(self.list_subvolumes(self.id)) 
+        self.partstep = mdbslice / len(self.list_subvolumes(self.id)) 
+        logger.debug("""Steps
+        mdpart: %i
+        count subvolumes: %i
+        len list_subvolumes: %i
+        mdparts (mdbpart * mdbsteps): %i
+        pparts: %i
+        partstep: %f""" % (self.args.mdbpart, 
+                self.count_subvolumes(self.id), 
+                len(self.list_subvolumes(self.id)),
+                self.args.mdbpart * self.args.mdbsteps,
+                100,
+                self.partstep))
+                #100 / (self.args.mdbpart * self.args.mdbsteps),
 
     def _createlockfile(self,lf,ln):
         #print(self.args.config.getssh(self.tag,self.store))
@@ -689,7 +696,6 @@ class SubVolume(SubVolumeInfo):
             return att
 
     def setprop(self,ro=True):
-        #login = [] if self.config.getSSHLogin(self.store,self.tag) is None else self.config.getSSHLogin(self.store,self.tag).split(' ')
         if self.args.action == 'create':
             sname = self.SnapLock
         elif self.args.action == 'setprop': 
@@ -712,7 +718,7 @@ class SubVolume(SubVolumeInfo):
                     self.args.config.remotecommand(tag=self.args.tag, store=self.store, cmd=cmd)
                 except:
                     self.DEBUG('setprop error',level=1)
-                    
+                   
             else:
                 pass
                 
@@ -721,27 +727,21 @@ class SubVolume(SubVolumeInfo):
         #compile regular expression for ignoring subvolume-names
         if self.args.ignore == None:
             if not self.config.getIgnores(self.args.tag) == None:
-                #print("XXX",self.config.getIgnores(self.args.tag).split(','))
                 re_ign = re.compile('|'.join(self.config.getIgnores(self.args.tag).split(',')))
             else:
                 re_ign = None
         else:
             re_ign = re.compile('|'.join(self.args.ignore))
-        #print('IGNORES',re_ign)
+        logger.debug('Ignores for %s: %s' % (self.tag, re_ign))
         if self.args.npb: pt = progress_timer(description= ' =create-snapshot=> from »<%s>/%s«: ' % (self.store, self.SourceName), n_iter=len(self.list_subvolumes(self.id,names=True)))
-        #if self.exist:
         if issubvol(self.args,self.StorePath+'/'+self.SourceName,self.store,self.args.tag):
-            #print("DB1")
             try:
-                #print("DB2",self.list_subvolumes(self.id,names=True))
                 for sub in self.list_subvolumes(self.id,names=True):
                     # Test if subvolume is in ignorelist - only debug-output now
-                    #print("Sub: "+sub,dir(self))
                     if re_ign != None and re_ign.search('/'+sub):
                         self.DEBUG('%-12s»<%s>/%s«:' % (' -IGNORE->',self.store, sub),level=2)
+                        self.args.mdb.update(self.args.tag,self.partstep )
                     else:
-                        #print("SUB: "+sub,"DB3")
-                        #print('/'+sub,re_ign,re_ign.search('/'+sub))
                         # Test the Source for local snapshotting
                         if issubvol(self.args,self.StorePath+'/'+self.SourceName+'/'+sub,self.store,self.args.tag):
                             dest = self.SnapLock+'/'+sub
@@ -756,14 +756,11 @@ class SubVolume(SubVolumeInfo):
                             elif issubvol(self.args,self.StorePath+'/'+dest,self.store,self.args.tag) == False:
                                 # If destination exists and is a directory and not a snapshot, delete dir and create snapshot (for subvolumes of snapshot)
                                 self.DEBUG('%-12s»<%s>/%s«' % (' =create>',self.store,dest),level=1)
-#                                sp_call(self.args,['rm','-r','-f',self.StorePath+'/'+dest])
-#                                sp_call(self.args,cmd)                           
                                 output = self.args.config.remotecommand(tag=self.args.tag, store=self.store, cmd=['rm','-r','-f',self.StorePath+'/'+dest])
                                 output = self.args.config.remotecommand(tag=self.args.tag, store=self.store, cmd=cmd)
                             else:
                                 # If destination doesnt exist, create the snapshot
                                 self.DEBUG('%-12s»<%s>/%s«' % (' =create>',self.store,dest),level=1)
-#                                sp_call(self.args,cmd)                           
                                 output = self.args.config.remotecommand(tag=self.args.tag, store=self.store, cmd=cmd)
                             sync()
 
@@ -772,8 +769,10 @@ class SubVolume(SubVolumeInfo):
                         else:
                             self.DEBUG( " Source-subvolume not existing: %s" % (self.OrigName+'/'+sub),level=3)
                     if self.args.npb: pt.update()
+                    self.args.mdb.update(self.args.tag,self.partstep )
                 else:
                     if self.args.npb: pt.update()
+                    self.args.mdb.update(self.args.tag,self.partstep )
                     pass
                 if self.args.npb: pt.finish()
                 self.snapped = True
@@ -783,7 +782,7 @@ class SubVolume(SubVolumeInfo):
                 for i in self.grep_volume(ex,names=False,rev=True):
                     self.DEBUG('SnapID,SnapName %s %s'%(self.svols[i]['id'],self.svols[i]['path']),level=5)
                     self.SnapID = self.svols[i]['id']
-                    listing.CreatedSubvolumes.push((self.store,self.SnapName))
+                    BtrfsListing.CreatedSubvolumes.push((self.store,self.SnapName))
                     return(list([self.svols[i]['id'],self.svols[i]['path']]))
                 
                 raise CreateError('FAILURE - create new snapshot failed %s' % (self.SnapLock), 0)
@@ -812,7 +811,8 @@ class SubVolume(SubVolumeInfo):
             try:
                 uuidS = self.config.getUUID(store=self.store,tag=self.args.tag)
             except FileNotFoundError:
-                self.DEBUG(" |no-transfer: directory for »%s« not existing: »%s«" % (self.store,self.config.getMountPath(store=self.store,tag=args.tag)))
+                #self.DEBUG(" |no-transfer: directory for »%s« not existing: »%s«" % (self.store,self.config.getMountPath(store=self.store,tag=args.tag)))
+                logger.critical(" |no-transfer: directory for »%s« not existing: »%s«" % (self.store,self.config.getMountPath(store=self.store,tag=args.tag)))
                 return
             except:
                 uuidS = None
@@ -820,35 +820,34 @@ class SubVolume(SubVolumeInfo):
             try:
                 uuidB = self.config.getUUID(store='BKP',tag=self.args.tag)
             except FileNotFoundError:
-                self.DEBUG(" |no-transfer: directory for »%s« not existing: »%s«" % ('BKP',self.config.getMountPath(store='BKP',tag=args.tag)))
+                logger.critical(" |no-transfer: directory for »%s« not existing: »%s«" % ('BKP',self.config.getMountPath(store='BKP',tag=args.tag)))
                 return
             except:
                 uuidB = None
 
             self.DEBUG("UUID-compare",uuidS,uuidB,level=4)
             if None == uuidS:
-                self.DEBUG(" |no-transfer: Filesystem for »%s« not mounted: »%s«" % (self.store,self.config.getDevice(store=self.store,tag=args.tag)))
+                logger.critical(" |no-transfer: Filesystem for »%s« not mounted: »%s«" % (self.store,self.config.getDevice(store=self.store,tag=args.tag)))
                 return
             if None == uuidB:
-                self.DEBUG(" |no-transfer: Filesystem for »%s« not mounted: »%s«" % ('BKP',self.config.getMountPath(store='BKP',tag=args.tag)))
+                logger.critical(" |no-transfer: Filesystem for »%s« not mounted: »%s«" % ('BKP',self.config.getMountPath(store='BKP',tag=args.tag)))
                 return
 
             if uuidS == uuidB: 
                 # Same Filesystem on SRC/SNP and BKP. No transfer
-                self.DEBUG(' |no-transfer: external backupmedia obviously not mounted')
+                logger.critical(" |no-transfer: external backupmedia obviously not mounted")
                 return
             else:
                 # Test if path to external backup-store is a btrfs-subvolume. if not, no transfer
                 # first check if BKP-mount is btrfs, then check if BKP-Store exists and is a subvolume.
                 # If BKP-mount is btrfs, and BKPStore does not exist, create it as subvolume
                 # If BKPStore exists and is a directory, change it to subvolume
-                #if isbtrfs(self.config.getMountPath(store='BKP',tag=args.tag)):
                 if self._isbtrfs(self.config.getMountPath(store='BKP',tag=args.tag,original=False),'BKP',args.tag):
                     if Myos().path_exists(self.BkpPath,self.args.config.getssh(self.args.tag,'BKP')):
                         if issubvol(self.args,self.BkpPath,'BKP',self.args.tag):
-                            self.DEBUG("BKP-Path %s is subvolume" % (self.BkpPath),level=4)
+                            logger.debug("BKP-Path %s is subvolume" % (self.BkpPath))
                         else:
-                            self.DEBUG(" |no-transfer: %s should be subvolume, is directory on external media" % (self.BkpPath))
+                            logger.critical(" |no-transfer: %s should be subvolume, is directory on external media" % (self.BkpPath))
                             return
 #                           # TODO move ro-subvolumes to another place... this code is not working
 #                            try:
@@ -876,7 +875,8 @@ class SubVolume(SubVolumeInfo):
 
                     else:
                         print('%s not exists -> create subvolume' % (self.BkpPath))
-                        self.DEBUG('isdir ==> delete ==> transfer',self.BkpPath,level=3)
+                        #self.DEBUG('isdir ==> delete ==> transfer',self.BkpPath,level=3)
+                        logger.debug('isdir ==> delete ==> transfer',self.BkpPath)
                         cmd = ['btrfs','subvolume','create',self.BkpPath]
 #                        sp_call(self.args,cmd)
                         self.args.config.remotecommand(tag=self.args.tag, store='BKP', cmd=cmd)
@@ -884,7 +884,7 @@ class SubVolume(SubVolumeInfo):
                     self.DEBUG(' |no-transfer: no subvolume for backup on external media')
                     return
 
-            BKP = listing(self.args,store='BKP')
+            BKP = BtrfsListing(self.args,store='BKP')
             transfers = dict()
             regexpart = re.compile('\.part$|\.part/')
 
@@ -956,13 +956,14 @@ class SubVolume(SubVolumeInfo):
                     raise TransferError
 
                 if self.args.npb: pt.update()
+                self.args.mdb.update(self.args.tag,self.partstep )
                 try:
                     cmd = ['btrfs','property','set','-ts',dest,'ro','false']
                     X = self.args.config.remotecommand(tag=self.args.tag, store='BKP', cmd=cmd)
                 except:
                     raise TransferError
 
-            listing.TransferedSubvolumes.push(re.sub('\.part$','',sname))
+            BtrfsListing.TransferedSubvolumes.push(re.sub('\.part$','',sname))
             for t in reversed(sorted(transfers.keys())):
                 dest = args.config.getStorePath('BKP',args.tag)+'/'+t
                 destdir = os.path.dirname(dest.rstrip('/'))+'/'
@@ -1127,7 +1128,7 @@ class SubVolume(SubVolumeInfo):
                     self.args.config.remotecommand(tag=self.args.tag, store=self.store, cmd=cmd)
                     self.DEBUG(' -subvolumes-deleted>',level=1)
                     #linkName = self.basename+'.'+args.config.getSymLink(args.tag)
-                    listing.DeletedSubvolumes.push((self.store,re.sub('\.part$','',sname)))
+                    BtrfsListing.DeletedSubvolumes.push((self.store,re.sub('\.part$','',sname)))
                     self.del_vol    = self.OrigName.split('.')[0]
                     self.del_ts     = self.OrigName.split('.')[1]
                     self.del_tag    = self.OrigName.split('.')[2]
@@ -1161,7 +1162,7 @@ def main(args):
             L.list_sisters(L.id,rev=True)
             #L.main()
             #L.list_sisters()
-            #X=SubVolume(listing)
+            #X=SubVolume(BtrfsListing)
             
 def issubvol(args,path,store='SRC',tag=None):
     #print("issubvol-store",store,tag,path)
@@ -1176,7 +1177,10 @@ def issubvol(args,path,store='SRC',tag=None):
 
 
 def cleanup(args):
+    args.mdbsteps = 4 #create, setprop, transfer, cleanup
+    args.mdbslice =  100 / 4
     DEBUG(' --== cleanup ==-->',verbose=args.verbose,level=1)
+    #self.partstep = (100 / (args.mdbpart * args.mdbsteps)) / len(self.list_subvolumes(self.id)) 
     if args.npb: pt = progress_timer(description= ' --== cleanup ==-->', n_iter=6)
     args.action = 'cleanup'
     #DEL = dict() 
@@ -1195,12 +1199,11 @@ def cleanup(args):
         if not issubvol(args,StorePath,st,args.tag):
             DEBUG(args,' =cleanup: store doesnt exist: %s' % (StorePath),level=3)
             continue
-    #        if args.npb: pt.update()
             if args.npb: pt.update()
         else:
             DEBUG(args,' -Cleanup store <%s>:%s' % (st,StorePath),level=3)
             StorePath = args.config.getStorePath(st,args.tag)+'/'
-            ST[st] = listing(args,store=st,single=True)
+            ST[st] = BtrfsListing(args,store=st,single=True)
             if len(args.snapshots) > 0:
                 DEBUG(args,'  --cleanup interval-snapshots',level=3)
                 for sn in [v.partition('.current')[0] for v in args.snapshots]:
@@ -1228,9 +1231,10 @@ def cleanup(args):
 
             # Delete them
             while not DEL.is_empty():
+                print("DEL len: ", DEL.len())
                 S = DEL.pop()
                 try:
-                    L=SubVolume(args,S[1],store=S[0])
+                    L=SubVolume(args,S[1],store=S[0], mdbslice=args.mdbslice / (DEL.len() + 1))
                     L.lock()
                     L.delete()
                 except NoSubvolumeError:
@@ -1256,9 +1260,11 @@ def cleanup(args):
 
 def create(args):
     SRC=dict()
+    args.mdbsteps = 4 #create, setprop, transfer, cleanup
+    args.mdbslice =  100 / 4
     for snap in args.snapshots:
         try:
-            SRC[snap] = SubVolume(args,snap,store=list(args.sourcepath.keys())[0])
+            SRC[snap] = SubVolume(args,snap,store=list(args.sourcepath.keys())[0], mdbslice=args.mdbslice)
             SRC[snap].create()
             SRC[snap].lock()
             SRC[snap].setprop(ro=True)
@@ -1280,6 +1286,8 @@ def create(args):
 
 def rollback(args):
     SRC=dict()
+    args.mdbsteps = 4 #create, setprop, transfer, cleanup
+    args.mdbslice =  100 / 4
     for snap in args.snapshots:
         try:
             SRC[snap] = SubVolume(args,snap,store=list(args.sourcepath.keys())[0])
@@ -1304,6 +1312,8 @@ def rollback(args):
     return
 
 def delete(args):
+    args.mdbsteps = 4 #create, setprop, transfer, cleanup
+    args.mdbslice =  100 / 4
     for st in args.sourcepath.keys():
         SRC=dict()
         for snap in args.snapshots:
@@ -1325,6 +1335,8 @@ def delete(args):
     return
             
 def setprop(args):
+    args.mdbsteps = 4 #create, setprop, transfer, cleanup
+    args.mdbslice =  100 / 4
     for st in args.sourcepath.keys():
         SRC=dict()
         for snap in args.snapshots:
@@ -1347,6 +1359,8 @@ def setprop(args):
     return
             
 def lists(args):
+    args.mdbsteps = 4 #create, setprop, transfer, cleanup
+    args.mdbslice =  100 / 4
     if args.info:
         if args.showpathstore:
             for st in args.store: print(args.config.getStorePath(st,args.tag,original=True))
@@ -1558,6 +1572,8 @@ def lists(args):
     return
 
 def transfer(args):
+    args.mdbsteps = 4 #create, setprop, transfer, cleanup
+    args.mdbslice =  100 / 4
     SRC=dict()
     for snap in args.snapshots:
         try:
@@ -1574,6 +1590,8 @@ def transfer(args):
     cleanup(args)
 
 def restore(args):
+    args.mdbsteps = 4 #create, setprop, transfer, cleanup
+    args.mdbslice =  100 / 4
     #print('RESTORE FILES', args)
     # if User running "mkbackup restore" is root, set uroot=True
     if os.getuid() == 0:
@@ -1645,41 +1663,39 @@ def restore(args):
                 #shutil.copy(src,dest)
         mounts.close()
                         
-class desktop_notification:
-    def __init__(self, args, urgency=1):
-        self.args         = args
-        self.dbus_path    = "/at/xundeenergie/notifications"
-        self.dbus_iface   = "at.xundeenergie.notifications.advanced"
-        self.dbus_busname = "at.xundeenergie.notifications"
-        self.timestamp    = datetime.datetime.now()
-        self.time         = self.timestamp.strftime('%H:%M:%S')
-        self.date         = self.timestamp.strftime('%d. %B %Y')
-        self.bus          = dbus.SystemBus()
-        if int(urgency) == 0:
-            self.signal_name  = 'Notification_low'
-        elif int(urgency) == 1:
-            self.signal_name  = 'Notification_normal'
-        else:
-            self.signal_name  = 'Notification_critical'
-        print('NO',int(urgency),self.signal_name)
-
-    def send_signal(self, intv='default', *args):
-        """Send a signal on the bus."""
-        msg = dict()
-        msg['sender'] = "mkbackup"
-        msg['msgheader'] = "%s-backup" % (self.args.tag)
-        msg['msgbody'] = """am %s 
-um %s Uhr abgeschlossen.
-
-%s 
-http://www.google.com
-<a href="file:///home/jakob/backup">TEST</a>
-(Ugency: %s)
-""" % (self.date, self.time, '\r'.join(args), self.signal_name)
-        msg['expiration_timeout'] = '-1'
-        message = dbus.lowlevel.SignalMessage(self.dbus_path, self.dbus_iface, self.signal_name)
-        message.append(msg)
-        self.bus.send_message(message)
+#class desktop_notification:
+#    def __init__(self, args, urgency=1):
+#        self.args         = args
+#        self.dbus_path    = "/at/xundeenergie/notifications"
+#        self.dbus_iface   = "at.xundeenergie.notifications.advanced"
+#        self.dbus_busname = "at.xundeenergie.notifications"
+#        self.timestamp    = datetime.datetime.now()
+#        self.time         = self.timestamp.strftime('%H:%M:%S')
+#        self.date         = self.timestamp.strftime('%d. %B %Y')
+#        self.bus          = dbus.SystemBus()
+#        if int(urgency) == 0:
+#            self.signal_name  = 'Notification_low'
+#        elif int(urgency) == 1:
+#            self.signal_name  = 'Notification_normal'
+#        else:
+#            self.signal_name  = 'Notification_critical'
+#        print('NO',int(urgency),self.signal_name)
+#
+#    def send_signal(self, intv='default', *args):
+#        """Send a signal on the bus."""
+#        msg = dict()
+#        msg['sender'] = "mkbackup"
+#        msg['msgheader'] = "%s-backup" % (self.args.tag)
+#        msg['msgbody'] = """am %s 
+#um %s Uhr abgeschlossen.
+#
+#%s 
+#(Ugency: %s)
+#""" % (self.date, self.time, '\n'.join(args), self.signal_name)
+#        msg['expiration_timeout'] = '-1'
+#        message = dbus.lowlevel.SignalMessage(self.dbus_path, self.dbus_iface, self.signal_name)
+#        message.append(msg)
+#        self.bus.send_message(message)
 
 # PARSER
 
@@ -1988,10 +2004,15 @@ Author: %s""" % (confversion,__version__,__author__))
     elif args.verbose > 1:
         DEBUG("Arguments",args,verbose=args.verbose)
 
+    args.mdbpart = len(args.snapshots ) * len(args.store)
+    args.mdb = EmDBUS()
+    args.mdb.reset(args.tag)
+    args.mdb.start(args.tag)
     #################################################################
     ##                       Run action                            ##
     #################################################################
     args.func(args)
+
 
     # Check symlinks in stores, if they exist and ok or missing.
     #for vol in Config().getVolumes():
@@ -2008,9 +2029,11 @@ Author: %s""" % (confversion,__version__,__author__))
                 if Myos().path_exists(link,args.config.getssh(args.tag,st)):
                     #print("XX",args.tag,st)
                     if Myos().path_islink(link,args.config.getssh(args.tag,st)):
-                        DEBUG("Symlink ok: %s/%s.%s" % (st,vol,sln),level=4,verbose=args.verbose)
+                        logger.debug("Symlink ok: %s/%s.%s" % (st,vol,sln))
+                        #DEBUG("Symlink ok: %s/%s.%s" % (st,vol,sln),level=4,verbose=args.verbose)
                     else:
-                        DEBUG("Symlink broken: %s/%s.%s --> remove it" % (st,vol,sln),level=4,verbose=args.verbose)
+                        #DEBUG("Symlink broken: %s/%s.%s --> remove it" % (st,vol,sln),level=4,verbose=args.verbose)
+                        logger.debug("Symlink broken: %s/%s.%s --> remove it" % (st,vol,sln))
                         Myos(dry=self.args.dry_run).remove(link,args.config.getssh(args.tag,st))
                 else:
                     DEBUG("Symlink missing: %s/%s.%s" % (st,vol,sln),level=4,verbose=args.verbose)
@@ -2041,36 +2064,36 @@ snapshots: %s
                 """ % (args.store,args.snapshots))
         DEBUG("Created Subvolumes:",level=0,verbose=args.verbose)
         volumes.append('<b>Volumes created:</b>')
-        if listing.CreatedSubvolumes.is_empty(): 
+        if BtrfsListing.CreatedSubvolumes.is_empty(): 
             volumes.append('---')
             print('''---
                     ''')
-        while not listing.CreatedSubvolumes.is_empty():
-            i = listing.CreatedSubvolumes.pop()
+        while not BtrfsListing.CreatedSubvolumes.is_empty():
+            i = BtrfsListing.CreatedSubvolumes.pop()
             volumes.append(i[1])
             print(i)
         volumes.append('')
 
         DEBUG("Transfered Subvolumes:",level=0,verbose=args.verbose)
         volumes.append('<b>Volumes transfered:</b>')
-        if listing.TransferedSubvolumes.is_empty(): 
+        if BtrfsListing.TransferedSubvolumes.is_empty(): 
             volumes.append('---')
             print('''---
                     ''')
-        while not listing.TransferedSubvolumes.is_empty():
-            i = listing.TransferedSubvolumes.pop()
+        while not BtrfsListing.TransferedSubvolumes.is_empty():
+            i = BtrfsListing.TransferedSubvolumes.pop()
             volumes.append(i[1])
             print(i)
         volumes.append('')
         
         DEBUG("Deleted Subvolumes:",level=0,verbose=args.verbose)
         volumes.append('<b>Volumes deleted:</b>')
-        if listing.DeletedSubvolumes.is_empty(): 
+        if BtrfsListing.DeletedSubvolumes.is_empty(): 
             volumes.append('---')
             print(''' ---
                     ''')
-        while not listing.DeletedSubvolumes.is_empty():
-            i = listing.DeletedSubvolumes.pop()
+        while not BtrfsListing.DeletedSubvolumes.is_empty():
+            i = BtrfsListing.DeletedSubvolumes.pop()
             volumes.append(i[1])
             print(i)
         volumes.append('')
@@ -2116,6 +2139,7 @@ http://www.google.com
     
     logger.critical("---== (%s) finnished %s %s at %s ==---" % (os.getpid(),args.func.__name__, args.tag, args.timestamp))
 
+    args.mdb.finished(args.tag)
     
 #import ntfy
     

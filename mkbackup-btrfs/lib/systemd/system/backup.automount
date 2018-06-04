@@ -1,12 +1,13 @@
 [Unit]
 Description=Automounting of /backup - activated by backup.path
-#Before=local-fs.target
+#Before=local-fs.target remote-fs.target
 #DefaultDependencies = yes
-#After=backup.path
+After=backup.path
 
 [Automount]
 TimeoutIdleSec=15s
 Where=/backup
 
-[Install]
-WantedBy=mkbackup.target
+
+#[Install]
+#WantedBy=mkbackup.target
