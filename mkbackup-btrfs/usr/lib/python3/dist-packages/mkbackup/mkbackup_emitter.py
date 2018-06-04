@@ -1,42 +1,35 @@
 """Emmitter functionality."""
-#import dbus
-#import dbus.service
 import dbus
-#import dbus.glib
-#import dbus.exceptions
-import sys
+import dbus.service
+import dbus.glib
 
-class Emitter:
+
+class Emitter(dbus.service.Object):
+    """Emitter DBUS service object."""
+
     def __init__(self, conn=None, object_path=None, bus_name=None):
         """Initialize the emitter DBUS service object."""
-        #dbus.service.Object.__init__(self, conn=conn, object_path=object_path)
-        self._bus=dbus.SystemBus()
-        try:
-            self.proxy = self._bus.get_object(bus_name, object_path)
-            self.emitter_iface = dbus.Interface(self.proxy, 
-                    'org.freedesktop.DBus.Properties')
-            print(self.emitter_iface.GetAll('at.xundeenergie.mkbackup.Status'))
-        except dbus.exceptions.DBusException as e:
-            print("Failed to initialize D-Bus object: '%s'" % (str(e)))
-            sys.exit(2)
+        dbus.service.Object.__init__(self, conn=conn, object_path=object_path)
 
-    def Reset(self, *args, **kwargs):
-        self.emitter_iface.Set("at.xundeenergie.mkbackup.Status", "status", "reset")
-        print(self.emitter_iface.Get("at.xundeenergie.mkbackup.Status", "progress"))
+    @dbus.service.signal(dbus_interface='at.xundeenergie.mkbackup.Status')
+    def update(self,*args,**kwargs):
+        """Emmit a test signal."""
+        print('Emitted a update signal')
 
-    def Start(self, *args, **kwargs):
-        self.emitter_iface.Set("at.xundeenergie.mkbackup.Status", "status", "running")
-        print(self.emitter_iface.Get("at.xundeenergie.mkbackup.Status", "progress"))
+    @dbus.service.signal(dbus_interface='at.xundeenergie.mkbackup.Status')
+    def start(self,*args,**kwargs):
+        """Emmit a test signal."""
+        print('Emitted a start signal')
 
-    def Finished(self, *args, **kwargs):
-        self.emitter_iface.Set("at.xundeenergie.mkbackup.Status", "status", "finished")
-        print(self.emitter_iface.Get("at.xundeenergie.mkbackup.Status", "progress"))
+    @dbus.service.signal(dbus_interface='at.xundeenergie.mkbackup.Status')
+    def finished(self,*args,**kwargs):
+        """Emmit a test signal."""
+        print('Emitted a finished signal')
 
-    def Update(self, *args, **kwargs):
-        self.emitter_iface.Set("at.xundeenergie.mkbackup.Status", "progress", args[0])
-        print(self.emitter_iface.Get("at.xundeenergie.mkbackup.Status", "progress"))
-
-
+    @dbus.service.signal(dbus_interface='at.xundeenergie.mkbackup.Status')
+    def reset(self,*args,**kwargs):
+        """Emmit a test signal."""
+        print('Emitted a reset signal')
 
 """ Example to use
 progress = Emitter(dbus.SystemBus(),
