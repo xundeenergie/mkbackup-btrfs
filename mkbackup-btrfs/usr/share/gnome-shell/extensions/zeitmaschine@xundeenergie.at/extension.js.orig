@@ -1,4 +1,5 @@
 var GLib = imports.gi.GLib;
+const ByteArray = imports.byteArray;
 var Lang = imports.lang;
 var Main = imports.ui.main;
 var PanelMenu = imports.ui.panelMenu;
@@ -27,6 +28,7 @@ var refreshTime = 3.0;
 var MainLabel;
 var icon;
 var MainIcon;
+var ExtIcon;
 var extMediaName = 'external backup-drive';
 var Drives = new Object();
 
@@ -34,6 +36,8 @@ var Drives = new Object();
 //var EnabledIcon = 'my-caffeine-on-symbolic';
 var DisabledIcon = 'system-run-symbolic';
 var EnabledIcon = 'system-run-symbolic';
+//var ConfFile = '/etc/mkbackup-btrfs.conf';
+var ConfFile = '/tmp/mkbackup-btrfs.conf.tmp';
 
 
 var BackupManager = new Lang.Class({
@@ -50,8 +54,9 @@ var BackupManager = new Lang.Class({
 
         //Set a FileMonitor on the config-File. So the Config-File is only
         //read, when it changed.
-        this.GF = Gio.File.new_for_path('/etc/mksnapshot.conf');
-        this._monitorConf = this.GF.monitor_file(Gio.FileMonitorFlags.NONE,null,null,null)
+        this.GF = Gio.File.new_for_path(ConfFile);
+        //this._monitorConf = this.GF.monitor_file(Gio.FileMonitorFlags.NONE,null,null,null)
+        this._monitorConf = this.GF.monitor_file(Gio.FileMonitorFlags.NONE,null)
         this._monitorConf.connect("changed", Lang.bind(this, function(monitor, file, o, event) {
             // without this test, _loadConfig() is called more than once!!
             if (event == Gio.FileMonitorEvent.CHANGES_DONE_HINT && ! /~$/.test(file.get_basename())) {
@@ -67,12 +72,16 @@ var BackupManager = new Lang.Class({
 		var hbox = new St.BoxLayout({ style_class: 'panel-status-menu-box' });
 		MainIcon = new St.Icon({icon_name: 'drive-harddisk-usb-symbolic', 
                                 style_class: 'system-status-icon'});
+		ExtIcon = new St.Icon({icon_name: 'drive-harddisk-usb-symbolic', 
+                                style_class: 'system-status-icon'});
+        ExtIcon.hide();
 
 		MainLabel = new St.Label({ text: '---',
 		});
 
 		hbox.add_child(MainLabel);
 		hbox.add_child(MainIcon);
+		hbox.add_child(ExtIcon);
 		hbox.add_child(PopupMenu.arrowIcon(St.Side.BOTTOM));
 
 		this.actor.add_actor(hbox);
@@ -102,7 +111,7 @@ var BackupManager = new Lang.Class({
         }));
         this.menu.addMenuItem(this.extItem);
 
-		this.snapitem = new PopupMenu.PopupMenuItem(_("Take snapshot now"));
+		this.snapitem = new PopupMenu.PopupMenuItem(_("Take snapshot now (tag: manually)"));
 		this.snapitem.connect('activate', Lang.bind(this, function() {
 		    GLib.spawn_command_line_async(
 			this._getCommand('mkbackup@manually.service', 'restart', 'system'));
@@ -114,12 +123,21 @@ var BackupManager = new Lang.Class({
         this.bkpsubmenu.icon.icon_name = 'system-run-symbolic';
         this.menu.addMenuItem(this.bkpsubmenu);
 
+        //this.descrsubmenu = new PopupMenu.PopupSubMenuMenuItem(_("Info"), true);
+        //this.descrsubmenu.icon.icon_name = 'system-run-symbolic';
+        //this.bkpsubmenu.addMenuItem(this.descrsubmenu);
+
 		if(this._entries.length > 0)
 		this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 		
         this._refreshID = Mainloop.timeout_add_seconds(refreshTime, Lang.bind(this, this._refresh_panel));
         // New Volumes to use as backup-media
         this._monitor = Gio.VolumeMonitor.get();
+
+        this._addedDriveId = this._monitor.connect('drive-connected', Lang.bind(this, function(monitor, drive) {
+            log('DRIVE CONNECTED',drive.get_name());
+            this._DriveAdded(drive);
+        }));
 
         this._removedDriveId = this._monitor.connect('drive-disconnected', Lang.bind(this, function(monitor, drive) {
             log('DRIVE DISCONNECTED',drive.get_name(),this._removedDriveId)
@@ -128,18 +146,14 @@ var BackupManager = new Lang.Class({
             //this.drvsubmenu.destroy();
         }));
 
-        this._addedDriveId = this._monitor.connect('drive-connected', Lang.bind(this, function(monitor, drive) {
-            log('DRIVE CONNECTED',drive.get_name());
-            this._DriveAdded(drive);
-        }));
-
         this._addedVolumeId = this._monitor.connect('volume-added', Lang.bind(this, function(monitor, volume){
+            this._addVolume(volume);
             this._VolumeAdded(volume);
             log('VOLUMES',JSON.stringify(this._drives))
         }))
 
         this._removedVolumeId = this._monitor.connect('volume-removed', Lang.bind(this, function(monitor, volume){
-            this._VolumeRemoved(volume);
+            //this._VolumeRemoved(volume);
         }))
 
         /*this._monitor.get_volumes().forEach(Lang.bind(this, function(volume) {
@@ -164,14 +178,15 @@ var BackupManager = new Lang.Class({
         var Dident = drive.enumerate_identifiers();
         var u_dev = drive.get_identifier('unix-device');
         var d_name =  drive.get_name();
-        log('DRIVE unix-device',u_dev,d_name)
+        //log('DRIVE unix-device',u_dev,d_name)
         this._drives[d_name] = new Object()
         this._drives[d_name]['drive'] = drive;
         this._drives[d_name]['device'] = drive.get_identifier('unix-device'); 
         //this._drives[d_name]['uuid']   = drive.get_identifier('uuid'); 
         this._drives[d_name]['volumes'] = new Object()
-        if (drive.has_volumes()) {
-            log(drive.get_volumes());
+        log("ABCDE",this._drives[d_name]['device']);
+        /*if (drive.has_volumes()) {
+            log('DHV',drive.get_volumes());
             var VList = drive.get_volumes();
             VList.forEach(Lang.bind(this, function(volume){
                 var v_name = volume.get_name();
@@ -179,13 +194,17 @@ var BackupManager = new Lang.Class({
                 this._drives[d_name]['volumes'][v_name] = this._addVolume(volume);
             }));
             //VList.free()
+        } else {
+            log('DHNV',drive.get_volumes());
         };
         log('VOLUMES',JSON.stringify(this._drives))
-
+        log('X',this._drives['ST1000LM024 HN-M101MBB']['device'])
+        */
+        /*
         this.drvsubmenu = new PopupMenu.PopupSubMenuMenuItem(drive.get_name(), true);
         this.drvsubmenu.icon.icon_name = 'drive-harddisk-usb-symbolic';
         this.menu.addMenuItem(this.drvsubmenu);
-
+        */
         //log('Drive added',drive.get_name())
         //this.drvsubmenu = new PopupMenu.PopupSubMenuMenuItem(_(drive.get_name()), true);
         //this.drvsubmenu.icon.icon_name = 'drive-harddisk-usb-symbolic';
@@ -193,17 +212,22 @@ var BackupManager = new Lang.Class({
     },
 
     _addVolume: function(volume) {
+        var drives = volume.get_drive();
+        //log('D',drives.get_name())
+        //log('V',volume.get_name())
+        //this._drives[drives.get_name()][volume.get_name()] = volume;
         volume.enumerate_identifiers();
         var vol = new Object()
-        log(volume.get_identifier('uuid'))
-        log(volume.get_identifier('unix-device'))
-        log(volume.get_identifier('class'))
-        log(volume.get_identifier('label'))
-        vol['volume'] = volume;
-        vol['uuid'] = volume.get_identifier('uuid');
-        vol['u_device'] = volume.get_identifier('unix-device');
-        vol['vclass'] = volume.get_identifier('class');
-        vol['label'] = volume.get_identifier('label');
+        //log(volume.get_identifier('uuid'))
+        //log(volume.get_identifier('unix-device'))
+        //log(volume.get_identifier('class'))
+        //log(volume.get_identifier('label'))
+        //vol['volume'] = volume;
+        //vol['uuid'] = volume.get_identifier('uuid');
+        //vol['u_device'] = volume.get_identifier('unix-device');
+        //vol['vclass'] = volume.get_identifier('class');
+        //vol['label'] = volume.get_identifier('label');
+        //this._drives[drives.get_name()]['volumes'][volume.get_name()] = v_name;
         return vol
     },
 
@@ -236,17 +260,20 @@ var BackupManager = new Lang.Class({
         log(volume.get_identifier('class'))
         log(volume.get_identifier('label'))
         var dr = volume.get_drive()
+        this._drives[dr.get_name()] = dr
         log(dr.get_name())
         log(dr.enumerate_identifiers())
         log(dr.get_identifier('unix-device'))
 
+      /*
         var me
         try {
             me = this.drvsubmenu.menu._getMenuItems();
         } catch(e) {
             this._DriveAdded(drive)
         }
-        me = this.drvsubmenu.menu._getMenuItems();
+        */
+        //me = this.drvsubmenu.menu._getMenuItems();
 
         var menuItem = new VolMenuItem(volume, false);
 
@@ -261,7 +288,7 @@ var BackupManager = new Lang.Class({
 
 
         //this._removeItemByLabel(this.drvsubmenu.menu, volume.get_name());
-        this.drvsubmenu.menu.addMenuItem(menuItem);
+        //this.drvsubmenu.menu.addMenuItem(menuItem);
         var connID = menuItem.connect('toggled', Lang.bind(this, function() {
             log('ACTIVE?',menuItem.state,menuItem.label.text)
             if (menuItem.state) {
@@ -273,7 +300,7 @@ var BackupManager = new Lang.Class({
                 this._getCommand('mkbackup-'+reg+'@'+volume.get_identifier('unix-device')+'.service', 'start', 'system'));
         }));
         log(connID,volume.get_name())
-        this.menu.addMenuItem(this.drvsubmenu,1);
+        //this.menu.addMenuItem(this.drvsubmenu,1);
     },
 
     _removeItemByLabel: function(menu, label) { 
@@ -311,12 +338,13 @@ var BackupManager = new Lang.Class({
     _run_command: function(COMMAND) {
         var output = "";
         try {
-                output = GLib.spawn_command_line_sync(COMMAND, null, null, null, null);
+                //output = GLib.spawn_command_line_sync(COMMAND, null, null, null, null);
+                output = GLib.spawn_command_line_sync(COMMAND);
             } catch(e) {
                 throw e;
             }
 
-        return output[1].toString().replace(/\n$/, "") + "";
+        return ByteArray.toString(output[1]).replace(/\n$/, "") + "";
     },
 
 
@@ -334,7 +362,7 @@ var BackupManager = new Lang.Class({
         //extMediaName = 'external backup-drive';
         log('SDDRIVE',drive.get_name(),drive.get_volumes(),drive.has_media(),drive.is_removable(),drive.has_volumes(),drive.enumerate_identifiers());
         if (drive.is_removable() && drive.has_volumes()) {
-            //extMediaName = drive.get_name();
+            extMediaName = drive.get_name();
             log('SDDREMOV')
 
             drive.get_volumes().forEach(Lang.bind(this, function(volume) {
@@ -357,20 +385,29 @@ var BackupManager = new Lang.Class({
         return(mount.can_unmount() || mount.can_eject())
     },
 
-	_getCommand: function(service, action, type) {
-		var command = "systemctl"
+    _getCommand: function(service, action, type) {
+      var command = "systemctl"
 
-		command += " " + action
-		command += " " + service
-		command += " --" + type
-		if (type == "system" && (action != 'is-active' && action != 'is-enabled'))
-			command = "pkexec --user root " + command
+      command += " " + action
+      command += " " + service
+      command += " --" + type
+      if (type == "system" && (action != 'is-active' && action != 'is-enabled'))
+        command = "pkexec --user root " + command
 
-		return 'sh -c "' + command + '; exit;"'
-	},
+      return 'sh -c "' + command + '; exit;"'
+    },
+
+    _getDriveMounted: function(udevice) {
+        command = "/bin/grep"
+        command += " " + udevice
+        command += "/proc/mounts"
+        return 'sh -c "' + command + '; exit:"'
+    },
 
     _refresh_panel : function() {
 
+        //log('YY',this._drives['ST1000LM024 HN-M101MBB']['volumes'])
+        //log('YY',this._drives['ST1000LM024 HN-M101MBB'])
         var active = false;
         var volumes = []
         var mounted = false;
@@ -380,20 +417,33 @@ var BackupManager = new Lang.Class({
         // volumes to the list
         volumes.push('home-jakob-Videos-extern.mount')
         volumes.push('home-media.mount')
+        //for (var d in this._drives['ST1000LM024 HN-M101MBB']) {
+        /*for (var d in this._drives) {
+            log("D",d,this._drives[d].get_name());
+        };*/
 
-        this.aout = GLib.spawn_command_line_sync(
-            this._getCommand(this.services.join(' '), 'is-active', 'system'))[1].toString().split('\n');
-        //log(this.aout);
+        this.aout = ByteArray.toString(GLib.spawn_command_line_sync(
+            this._getCommand(this.services.join(' '), 'is-active', 'system'))[1]).split('\n');
+        //log(this.aout.indexOf('active'));
 
+        var apos = this.aout.indexOf('active')
         active = this.aout.indexOf('active') >= 0
 
-        var vout = GLib.spawn_command_line_sync(
-                this._getCommand(volumes.join(' '), 'is-active', 'system'))[1].toString().split('\n');
+        var vout = ByteArray.toString(GLib.spawn_command_line_sync(
+                this._getCommand(volumes.join(' '), 'is-active', 'system'))[1]).split('\n');
         mounted = vout.indexOf('active') >= 0
 
-        this.bkpsubmenu.icon.style = (active ? "color: #ff0000;" : "color: revert;");
+        //this.bkpsubmenu.icon.style_class = (active ? "system-status-icon" : "system-status-icon-red");
         MainIcon.style = (mounted ? "color: #ff0000;" : "color: revert;");
-        MainLabel.set_text(mounted ? _("mounted") : "");
+        ExtIcon.style = (mounted ? "color: #ff0000;" : "color: revert;");
+        (mounted ? ExtIcon.show() : ExtIcon.hide());
+        
+        //ExtIcon.actor = (mounted ? "visibile = true;" : "visible = false;");
+        var mlabel = (mounted ? _("mounted") : "");
+        var alabel = (active ? this.services[apos] : "");
+        MainLabel.set_text(mlabel + ' ' + alabel);
+        //MainLabel.set_text(mounted ? _("mounted") : "");
+        //MainLabel.set_text(active ? this.services[apos] : "");
 
 		if (this.menu.isOpen) {
             //Menu is open
@@ -407,7 +457,8 @@ var BackupManager = new Lang.Class({
             if (this.bkpsubmenu.menu.isOpen)  {
                 //Submenu Backu-intervals open
                 this._refresh();
-            }
+            };
+            this._refresh();
         }
 
         if (this._refreshID != 0)
@@ -427,10 +478,14 @@ var BackupManager = new Lang.Class({
 		var me = this.bkpsubmenu.menu._getMenuItems();
         //log(this.services.join(' '))
 
-        var eout = GLib.spawn_command_line_sync(
-            this._getCommand(this.services.join(' '), 'is-enabled', 'system'))[1].toString().split('\n');
+        //var eout = GLib.spawn_command_line_sync(
+        //    this._getCommand(this.services.join(' '), 'is-enabled', 'system'))[1].toString().split('\n');
+        var eout = ByteArray.toString(GLib.spawn_command_line_sync(
+            this._getCommand(this.services.join(' '), 'is-enabled', 'system'))[1]).split('\n');
         //log(eout);
 
+        this.aout = ByteArray.toString(GLib.spawn_command_line_sync(
+            this._getCommand(this.services.join(' '), 'is-active', 'system'))[1]).split('\n');
 
 		this._entries.forEach(Lang.bind(this, function(service,index,arr) {
             if (! arr[index].enabled == (eout[index] == 'enabled')) 
@@ -445,7 +500,7 @@ var BackupManager = new Lang.Class({
 		this._entries.forEach(Lang.bind(this, function(service,index,arr) {
 			var serviceItem
 			me.forEach(Lang.bind(this, function(item) {
-				if ( item.label.text == service['name'] ) {
+				if ( item.label.text == service['descr']+' ('+service['name'] + ')' ) {
 					arr[index].found = true;
 					serviceItem = item;
 					me.splice(me.indexOf(item),1);
@@ -454,16 +509,14 @@ var BackupManager = new Lang.Class({
 
             if ( arr[index].changed ) {
                 if (arr[index].found) {
-                    //log('update',service['name']);
                     if ( service.staticserv ) {
                         serviceItem.setToggleState(service.active);
                     } else  {
                         serviceItem.setToggleState(service.enabled);
                     }
                 } else {
-                    //log('new',service['name']);
                     if ( service.staticserv ) {
-                        serviceItem = new PopupTargetItem(service['name'], service.active);
+                        serviceItem = new PopupTargetItem(service['descr']+' ('+service['name'] + ')', service.active);
                         this.bkpsubmenu.menu.addMenuItem(serviceItem);
                         
                         serviceItem.connect('toggled', Lang.bind(this, function() {
@@ -471,7 +524,7 @@ var BackupManager = new Lang.Class({
                                 this._getCommand(service['service'], (this._check_service(service.service, 'active') ? 'stop' : 'start'), service["type"]));
                         }));
                     } else {
-                        serviceItem = new PopupServiceItem(service['name'], service.enabled);
+                        serviceItem = new PopupServiceItem(service['descr']+' ('+service['name'] + ')', service.enabled);
                         this.bkpsubmenu.menu.addMenuItem(serviceItem);
 
                         serviceItem.connect('toggled', Lang.bind(this, function() {
@@ -492,6 +545,9 @@ var BackupManager = new Lang.Class({
                 };
                 if (serviceItem.transferButton) {
                     serviceItem.transferButton.style = (service.tr ? "text-decoration: revert;" : "text-decoration: line-through;");
+                };
+                if (serviceItem.descriptionLabel) {
+                    serviceItem.descriptionLabel.label = service.descr;
                 };
 
 
@@ -524,7 +580,7 @@ var BackupManager = new Lang.Class({
         var obj = new Object();
         this._entries = [];
 
-        if(kf.load_from_file('/etc/mksnapshot.conf',GLib.KeyFileFlags.NONE)){
+        if(kf.load_from_file(ConfFile,GLib.KeyFileFlags.NONE)){
             //intervals = kf.get_groups()[0];
             this.bkpmnt = kf.get_value('DEFAULT','bkpmnt')
 
@@ -551,6 +607,16 @@ var BackupManager = new Lang.Class({
                     obj.tr = (kf.get_value(interval,"transfer").toLowerCase() === "true");
                 } catch(err) {
                     obj.tr = (kf.get_value("DEFAULT","transfer").toLowerCase() === "true");
+                }
+
+                try {
+                    obj.descr = (kf.get_value(interval,"description"));
+                } catch(err) {
+                    try {
+                    obj.descr = (kf.get_value("DEFAULT","description"));
+                    } catch(err) {
+                        obj.descr = "";
+                    }
                 }
             this._entries.push(obj)}));
         } 
