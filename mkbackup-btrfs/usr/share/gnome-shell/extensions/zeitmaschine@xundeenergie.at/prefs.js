@@ -120,13 +120,13 @@ var ServicesSystemdSettings = new GObject.Class({
         for (var i in this._availableSystemdServices['all'])
             sListStore.set (sListStore.append(), [0], [this._availableSystemdServices['all'][i]]);
 
-        this._systemName = new Gtk.Entry()
+        this._systemName = new Gtk.Entry();
         this._systemName.set_placeholder_text("Systemd service name");
-        var compvarion =  new Gtk.EntryCompvarion()
-        this._systemName.set_compvarion(compvarion)
-        compvarion.set_model(sListStore)
+        var compvarion =  new Gtk.EntryCompvarion();
+        this._systemName.set_compvarion(compvarion);
+        compvarion.set_model(sListStore);
 
-        compvarion.set_text_column(0)
+        compvarion.set_text_column(0);
         
         grid.attach(labelName, 1, 1, 1, 1);
         grid.attach_next_to(this._displayName, labelName, 1, 1, 1);

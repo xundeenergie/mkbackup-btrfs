@@ -1,6 +1,4 @@
 var GLib = imports.gi.GLib;
-const ByteArray = imports.byteArray;
-
 var Lang = imports.lang;
 var Main = imports.ui.main;
 var PanelMenu = imports.ui.panelMenu;
@@ -36,7 +34,7 @@ var Drives = new Object();
 //var EnabledIcon = 'my-caffeine-on-symbolic';
 var DisabledIcon = 'system-run-symbolic';
 var EnabledIcon = 'system-run-symbolic';
-let ConfFile = '/tmp/mkbackup-btrfs.conf.tmp';
+
 
 var BackupManager = new Lang.Class({
     Name: 'BackupManager',
@@ -52,13 +50,9 @@ var BackupManager = new Lang.Class({
 
         //Set a FileMonitor on the config-File. So the Config-File is only
         //read, when it changed.
-        log(ConfFile);
-        let GF = Gio.File.new_for_path(ConfFile);
-        log(ConfFile);
-        //this._monitorConf = this.GF.monitor_file(Gio.FileMonitorFlags.NONE,null,null,null)
-        let _monitorConf = GF.monitor_file(Gio.FileMonitorFlags.NONE,null)
-        log(ConfFile);
-        _monitorConf.connect("changed", Lang.bind(this, function(monitor, file, o, event) {
+        this.GF = Gio.File.new_for_path('/etc/mksnapshot.conf');
+        this._monitorConf = this.GF.monitor_file(Gio.FileMonitorFlags.NONE,null,null,null)
+        this._monitorConf.connect("changed", Lang.bind(this, function(monitor, file, o, event) {
             // without this test, _loadConfig() is called more than once!!
             if (event == Gio.FileMonitorEvent.CHANGES_DONE_HINT && ! /~$/.test(file.get_basename())) {
                 this._loadConfig();
@@ -322,7 +316,7 @@ var BackupManager = new Lang.Class({
                 throw e;
             }
 
-        return ByteArray.toString(output[1]).replace(/\n$/, "") + "";
+        return output[1].toString().replace(/\n$/, "") + "";
     },
 
 
@@ -387,14 +381,14 @@ var BackupManager = new Lang.Class({
         volumes.push('home-jakob-Videos-extern.mount')
         volumes.push('home-media.mount')
 
-        this.aout = ByteArray.toString(GLib.spawn_command_line_sync(
-            this._getCommand(this.services.join(' '), 'is-active', 'system'))[1]).split('\n');
+        this.aout = GLib.spawn_command_line_sync(
+            this._getCommand(this.services.join(' '), 'is-active', 'system'))[1].toString().split('\n');
         //log(this.aout);
 
         active = this.aout.indexOf('active') >= 0
 
-        var vout = ByteArray.toString(GLib.spawn_command_line_sync(
-                this._getCommand(volumes.join(' '), 'is-active', 'system'))[1]).split('\n');
+        var vout = GLib.spawn_command_line_sync(
+                this._getCommand(volumes.join(' '), 'is-active', 'system'))[1].toString().split('\n');
         mounted = vout.indexOf('active') >= 0
 
         this.bkpsubmenu.icon.style = (active ? "color: #ff0000;" : "color: revert;");
@@ -433,8 +427,8 @@ var BackupManager = new Lang.Class({
 		var me = this.bkpsubmenu.menu._getMenuItems();
         //log(this.services.join(' '))
 
-        var eout = ByteArray.toString(GLib.spawn_command_line_sync(
-            this._getCommand(this.services.join(' '), 'is-enabled', 'system'))[1]).split('\n');
+        var eout = GLib.spawn_command_line_sync(
+            this._getCommand(this.services.join(' '), 'is-enabled', 'system'))[1].toString().split('\n');
         //log(eout);
 
 
@@ -530,7 +524,7 @@ var BackupManager = new Lang.Class({
         var obj = new Object();
         this._entries = [];
 
-        if(kf.load_from_file(ConfFile,GLib.KeyFileFlags.NONE)){
+        if(kf.load_from_file('/etc/mksnapshot.conf',GLib.KeyFileFlags.NONE)){
             //intervals = kf.get_groups()[0];
             this.bkpmnt = kf.get_value('DEFAULT','bkpmnt')
 
