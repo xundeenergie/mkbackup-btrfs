@@ -317,7 +317,7 @@ var BackupManager = new Lang.Class({
     _run_command: function(COMMAND) {
         var output = "";
         try {
-                output = GLib.spawn_command_line_sync(COMMAND, null, null, null, null);
+                output = GLib.spawn_command_line_sync(COMMAND, null);
             } catch(e) {
                 throw e;
             }
