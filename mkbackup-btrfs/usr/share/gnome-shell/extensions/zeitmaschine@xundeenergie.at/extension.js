@@ -34,6 +34,7 @@ var Drives = new Object();
 //var EnabledIcon = 'my-caffeine-on-symbolic';
 var DisabledIcon = 'system-run-symbolic';
 var EnabledIcon = 'system-run-symbolic';
+var ConfFile = '/tmp/mkbackup-btrfs.conf.tmp';
 
 
 var BackupManager = new Lang.Class({
@@ -50,8 +51,9 @@ var BackupManager = new Lang.Class({
 
         //Set a FileMonitor on the config-File. So the Config-File is only
         //read, when it changed.
-        this.GF = Gio.File.new_for_path('/etc/mksnapshot.conf');
-        this._monitorConf = this.GF.monitor_file(Gio.FileMonitorFlags.NONE,null,null,null)
+        this.GF = Gio.File.new_for_path(ConfFile);
+        //this._monitorConf = this.GF.monitor_file(Gio.FileMonitorFlags.NONE,null,null,null)
+        this._monitorConf = this.GF.monitor_file(Gio.FileMonitorFlags.NONE,null)
         this._monitorConf.connect("changed", Lang.bind(this, function(monitor, file, o, event) {
             // without this test, _loadConfig() is called more than once!!
             if (event == Gio.FileMonitorEvent.CHANGES_DONE_HINT && ! /~$/.test(file.get_basename())) {
