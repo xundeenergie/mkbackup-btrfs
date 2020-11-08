@@ -1,5 +1,4 @@
 var GLib = imports.gi.GLib;
-const ByteArray = imports.byteArray;
 var Lang = imports.lang;
 var Main = imports.ui.main;
 var PanelMenu = imports.ui.panelMenu;
@@ -265,14 +264,12 @@ var BackupManager = new Lang.Class({
         log(dr.enumerate_identifiers())
         log(dr.get_identifier('unix-device'))
 
-      /*
         var me
         try {
             me = this.drvsubmenu.menu._getMenuItems();
         } catch(e) {
             this._DriveAdded(drive)
         }
-        */
         //me = this.drvsubmenu.menu._getMenuItems();
 
         var menuItem = new VolMenuItem(volume, false);
@@ -344,7 +341,7 @@ var BackupManager = new Lang.Class({
                 throw e;
             }
 
-        return ByteArray.toString(output[1]).replace(/\n$/, "") + "";
+        return output[1].toString().replace(/\n$/, "") + "";
     },
 
 
@@ -385,17 +382,17 @@ var BackupManager = new Lang.Class({
         return(mount.can_unmount() || mount.can_eject())
     },
 
-    _getCommand: function(service, action, type) {
-      var command = "systemctl"
+	_getCommand: function(service, action, type) {
+		var command = "systemctl"
 
-      command += " " + action
-      command += " " + service
-      command += " --" + type
-      if (type == "system" && (action != 'is-active' && action != 'is-enabled'))
-        command = "pkexec --user root " + command
+		command += " " + action
+		command += " " + service
+		command += " --" + type
+		if (type == "system" && (action != 'is-active' && action != 'is-enabled'))
+			command = "pkexec --user root " + command
 
-      return 'sh -c "' + command + '; exit;"'
-    },
+		return 'sh -c "' + command + '; exit;"'
+	},
 
     _getDriveMounted: function(udevice) {
         command = "/bin/grep"
@@ -422,17 +419,18 @@ var BackupManager = new Lang.Class({
             log("D",d,this._drives[d].get_name());
         };*/
 
-        this.aout = ByteArray.toString(GLib.spawn_command_line_sync(
-            this._getCommand(this.services.join(' '), 'is-active', 'system'))[1]).split('\n');
+        this.aout = GLib.spawn_command_line_sync(
+            this._getCommand(this.services.join(' '), 'is-active', 'system'))[1].toString().split('\n');
         //log(this.aout.indexOf('active'));
 
         var apos = this.aout.indexOf('active')
         active = this.aout.indexOf('active') >= 0
 
-        var vout = ByteArray.toString(GLib.spawn_command_line_sync(
-                this._getCommand(volumes.join(' '), 'is-active', 'system'))[1]).split('\n');
+        var vout = GLib.spawn_command_line_sync(
+                this._getCommand(volumes.join(' '), 'is-active', 'system'))[1].toString().split('\n');
         mounted = vout.indexOf('active') >= 0
 
+        this.bkpsubmenu.icon.style = (active ? "color: #ff0000;" : "color: revert;");
         //this.bkpsubmenu.icon.style_class = (active ? "system-status-icon" : "system-status-icon-red");
         MainIcon.style = (mounted ? "color: #ff0000;" : "color: revert;");
         ExtIcon.style = (mounted ? "color: #ff0000;" : "color: revert;");
@@ -478,14 +476,12 @@ var BackupManager = new Lang.Class({
 		var me = this.bkpsubmenu.menu._getMenuItems();
         //log(this.services.join(' '))
 
-        //var eout = GLib.spawn_command_line_sync(
-        //    this._getCommand(this.services.join(' '), 'is-enabled', 'system'))[1].toString().split('\n');
-        var eout = ByteArray.toString(GLib.spawn_command_line_sync(
-            this._getCommand(this.services.join(' '), 'is-enabled', 'system'))[1]).split('\n');
+        var eout = GLib.spawn_command_line_sync(
+            this._getCommand(this.services.join(' '), 'is-enabled', 'system'))[1].toString().split('\n');
         //log(eout);
 
-        this.aout = ByteArray.toString(GLib.spawn_command_line_sync(
-            this._getCommand(this.services.join(' '), 'is-active', 'system'))[1]).split('\n');
+        this.aout = GLib.spawn_command_line_sync(
+            this._getCommand(this.services.join(' '), 'is-active', 'system'))[1].toString().split('\n');
 
 		this._entries.forEach(Lang.bind(this, function(service,index,arr) {
             if (! arr[index].enabled == (eout[index] == 'enabled')) 

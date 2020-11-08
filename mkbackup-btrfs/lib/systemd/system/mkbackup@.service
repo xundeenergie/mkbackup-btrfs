@@ -34,7 +34,7 @@ CPUSchedulingPolicy=idle
 
 ExecStartPre=/bin/sh -c "(/bin/systemctl is-active -q mkbackup.target)"
 #ExecStartPre=/bin/touch /run/mkbackup-%i/systemd.lock
-ExecStart=/usr/local/bin/mkbackup -V -v -t %i create SNP
+ExecStart=/usr/local/bin/mkbackup -V -vvv -t %i create --no-clones SNP
 #ExecStopPost=-/bin/rm /run/mkbackup-%i/systemd.lock
 
 KillMode=mixed
